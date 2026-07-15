@@ -480,25 +480,399 @@ function renderDashboard() {
   ).join("");
 }
 
-// ---------------------------------------------------------------------------
+
 // Exportação para Excel
-// ---------------------------------------------------------------------------
-$("#btnExport").addEventListener("click", () => {
+const FONT_NAME = "Arial";
+const COR_HEADER = "FF1F4E78";
+const COR_BANDA = "FFEEF3F8";
+const COR_BORDA = "FFBFBFBF";
+const STATUS_COND_COLORS = { RUIM: "FFF8CBAD", RAZOAVEL: "FFFFE699", BOM: "FFC6E0B4" };
+const STATUS_PREV_COLORS = {
+  Pendente: { fill: "FFF8CBAD", font: "FFC00000" },
+  "Em andamento": { fill: "FFFFE699", font: "FF9C6500" },
+  "Concluída": { fill: "FFC6E0B4", font: "FF375623" },
+};
+const NOME_ORGAO = "ASSEMBLEIA LEGISLATIVA DO ESTADO DO CEARÁ";
+const NOME_SISTEMA = "Sistema de Planejamento da Manutenção Preventiva";
+const NOME_MARCA = "PCM ALCE";
+
+function colLetra(n) {
+  let s = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function bordaFina() {
+  const b = { style: "thin", color: { argb: COR_BORDA } };
+  return { top: b, left: b, right: b, bottom: b };
+}
+
+function normalizarStatusPreventiva(valor) {
+  const t = String(valor || "").trim().toUpperCase();
+  if (t.includes("CONCL")) return "Concluída";
+  if (t.includes("ANDAMENTO") || t.includes("EXECU")) return "Em andamento";
+  return "Pendente";
+}
+
+function adicionarCabecalho(ws, ultimaColuna) {
+  ultimaColuna = Math.max(ultimaColuna, 2);
+  const linhas = [
+    [NOME_ORGAO, 13, true],
+    [NOME_SISTEMA, 11, false],
+    [NOME_MARCA, 17, true],
+  ];
+  linhas.forEach(([texto, tam, negrito], i) => {
+    const linha = i + 1;
+    ws.mergeCells(linha, 1, linha, ultimaColuna);
+    for (let c = 1; c <= ultimaColuna; c++) {
+      const cell = ws.getCell(linha, c);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
+    }
+    const cell = ws.getCell(linha, 1);
+    cell.value = texto;
+    cell.font = { name: FONT_NAME, size: tam, bold: negrito, color: { argb: "FFFFFFFF" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(linha).height = linha === 3 ? 30 : 24;
+  });
+  return 5; // linha 4 fica livre como respiro
+}
+
+function calcularKpis(itens) {
+  const total = itens.length;
+  const concluidas = itens.filter((i) => normalizarStatusPreventiva(i.statusPreventiva) === "Concluída").length;
+  const andamento = itens.filter((i) => normalizarStatusPreventiva(i.statusPreventiva) === "Em andamento").length;
+  const pendentes = total - concluidas - andamento;
+  const execucaoPct = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
+  const pisos = new Set(itens.filter((i) => i.pisoPCM !== 99).map((i) => i.pisoPCM)).size;
+  const criticos = itens.filter((i) => String(i.statusCondicao || "").toUpperCase().includes("RUIM")).length;
+  const equipes = new Set(itens.filter((i) => i.equipeResponsavel).map((i) => i.equipeResponsavel)).size;
+  return { total, concluidas, andamento, pendentes, execucaoPct, pisos, criticos, equipes };
+}
+
+function formulasStatus(referencias) {
+  if (!referencias) return null;
+  const { colStatusPrev, colAmbiente, primeiraLinha, ultimaLinha } = referencias;
+  const faixaStatus = `Cronograma!$${colStatusPrev}$${primeiraLinha}:$${colStatusPrev}$${ultimaLinha}`;
+  const faixaTotal = `Cronograma!$${colAmbiente}$${primeiraLinha}:$${colAmbiente}$${ultimaLinha}`;
+  return {
+    total: `COUNTA(${faixaTotal})`,
+    concluidas: `COUNTIF(${faixaStatus},"Concluída")`,
+    andamento: `COUNTIF(${faixaStatus},"Em andamento")`,
+    pendentes: `COUNTIF(${faixaStatus},"Pendente")`,
+    execucao: `IFERROR(COUNTIF(${faixaStatus},"Concluída")/COUNTA(${faixaTotal}),0)`,
+  };
+}
+
+function escreverKpis(ws, linhaInicio, kpis, referencias) {
+  const formulas = formulasStatus(referencias);
+  const cartoes = [
+    ["Equipamentos", formulas ? formulas.total : kpis.total, "FF1F4E78"],
+    ["Concluídas", formulas ? formulas.concluidas : kpis.concluidas, "FF548235"],
+    ["Em andamento", formulas ? formulas.andamento : kpis.andamento, "FFBF8F00"],
+    ["Pendentes", formulas ? formulas.pendentes : kpis.pendentes, "FFC00000"],
+  ];
+  let col = 1;
+  const largura = 3, espaco = 1;
+  const linhaNum = linhaInicio, linhaMeio = linhaInicio + 1, linhaLabel = linhaInicio + 2;
+
+  cartoes.forEach(([label, valor, cor]) => {
+    const c1 = col, c2 = col + largura - 1;
+    for (const r of [linhaNum, linhaMeio, linhaLabel]) {
+      for (let c = c1; c <= c2; c++) {
+        const cell = ws.getCell(r, c);
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
+        cell.border = bordaFina();
+      }
+    }
+    ws.mergeCells(linhaNum, c1, linhaMeio, c2);
+    const cellNum = ws.getCell(linhaNum, c1);
+    cellNum.value = typeof valor === "string" ? { formula: valor } : valor;
+    cellNum.font = { name: FONT_NAME, size: 24, bold: true, color: { argb: "FFFFFFFF" } };
+    cellNum.alignment = { horizontal: "center", vertical: "middle" };
+
+    ws.mergeCells(linhaLabel, c1, linhaLabel, c2);
+    const cellLab = ws.getCell(linhaLabel, c1);
+    cellLab.value = label;
+    cellLab.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    cellLab.alignment = { horizontal: "center", vertical: "middle" };
+
+    col = c2 + 1 + espaco;
+  });
+
+  ws.getRow(linhaNum).height = 34;
+  ws.getRow(linhaMeio).height = 10;
+  ws.getRow(linhaLabel).height = 20;
+
+  const linhaExec = linhaLabel + 2;
+  const cellLabelExec = ws.getCell(linhaExec, 1);
+  cellLabelExec.value = "Execução:";
+  cellLabelExec.font = { name: FONT_NAME, size: 13, bold: true, color: { argb: "FF1F4E78" } };
+  const cellValExec = ws.getCell(linhaExec, 2);
+  cellValExec.value = formulas ? { formula: formulas.execucao } : kpis.execucaoPct / 100;
+  cellValExec.font = { name: FONT_NAME, size: 13, bold: true, color: { argb: "FF1F4E78" } };
+  cellValExec.numFmt = "0.0%";
+
+  return linhaExec + 2;
+}
+
+function escreverTabelaContagem(ws, colInicio, linhaInicio, titulo, entradas) {
+  const c1 = colInicio;
+  if (titulo) {
+    ws.getCell(linhaInicio, c1).value = titulo;
+    ws.getCell(linhaInicio, c1).font = { name: FONT_NAME, bold: true, size: 11 };
+  }
+  let r = linhaInicio + 1;
+  ws.getCell(r, c1).value = "Categoria";
+  ws.getCell(r, c1 + 1).value = "Quantidade";
+  for (const c of [c1, c1 + 1]) {
+    const cell = ws.getCell(r, c);
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
+    cell.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+  }
+  r++;
+  const primeiraLinhaDados = r;
+  entradas.forEach(([label, qtd], i) => {
+    const cellL = ws.getCell(r, c1);
+    cellL.value = String(label);
+    const cellQ = ws.getCell(r, c1 + 1);
+    cellQ.value = qtd;
+    cellL.border = bordaFina();
+    cellQ.border = bordaFina();
+    cellQ.alignment = { horizontal: "center" };
+    if (i % 2 === 0) {
+      cellL.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+      cellQ.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+    }
+    r++;
+  });
+  return [primeiraLinhaDados, r - 1];
+}
+
+function contarPor(itens, chave) {
+  const mapa = new Map();
+  itens.forEach((i) => {
+    const k = i[chave];
+    mapa.set(k, (mapa.get(k) || 0) + 1);
+  });
+  return mapa;
+}
+
+function rotuloPiso(v) {
+  if (v === 99) return "Não identificado";
+  if (v === 0) return "Térreo/Subsolo";
+  return `${v}º Piso`;
+}
+
+async function montarPlanilhaOrganizada(itens) {
+  const kpis = calcularKpis(itens);
+  const workbook = new ExcelJS.Workbook();
+
+  const colunas = [
+    ["patrimonio", "Patrimônio"], ["setor", "Setor"], ["ambiente", "Ambiente"],
+    ["statusCondicao", "Status Condição"], ["setorPCM", "Setor PCM"], ["pisoPCM", "Piso"],
+    ["semanaPlanejada", "Semana Planejada"], ["diaPlanejado", "Dia Planejado"],
+    ["equipeResponsavel", "Equipe Responsável"], ["ordemExecucao", "Ordem Execução"],
+    ["prioridadeSetor", "Prioridade"], ["statusPreventiva", "Status Preventiva"],
+    ["observacao", "Observação"],
+  ];
+  const statusPrevIdx = colunas.findIndex(([k]) => k === "statusPreventiva") + 1;
+  const ambienteIdx = colunas.findIndex(([k]) => k === "ambiente") + 1;
+  const linhaCabecalhoTabela = 5;
+  const primeiraLinhaDados = linhaCabecalhoTabela + 1;
+  const ultimaLinha = primeiraLinhaDados + itens.length - 1;
+  const referencias = {
+    primeiraLinha: primeiraLinhaDados,
+    ultimaLinha,
+    colAmbiente: colLetra(ambienteIdx),
+    colStatusPrev: colLetra(statusPrevIdx),
+  };
+  const formulasResumo = formulasStatus(referencias);
+
+  // --- Aba Resumo ---
+  const ws1 = workbook.addWorksheet("Resumo", { properties: { tabColor: { argb: "FF1F4E78" } } });
+  ws1.views = [{ showGridLines: false }];
+  let r = adicionarCabecalho(ws1, 2);
+  ws1.getCell(r, 1).value = `Gerado em ${new Date().toLocaleString("pt-BR")}`;
+  ws1.getCell(r, 1).font = { name: FONT_NAME, italic: true, size: 10, color: { argb: "FF808080" } };
+  r += 2;
+
+  const linhasResumo = [
+    ["Total de equipamentos", formulasResumo ? { formula: formulasResumo.total } : kpis.total, null],
+    ["Pisos atendidos", kpis.pisos, null],
+    ["Equipamentos críticos", kpis.criticos, null],
+    ["Concluídas", formulasResumo ? { formula: formulasResumo.concluidas } : kpis.concluidas, null],
+    ["Em andamento", formulasResumo ? { formula: formulasResumo.andamento } : kpis.andamento, null],
+    ["Pendentes", formulasResumo ? { formula: formulasResumo.pendentes } : kpis.pendentes, null],
+    ["Execução (%)", formulasResumo ? { formula: formulasResumo.execucao } : kpis.execucaoPct / 100, "0.0%"],
+    ["Equipes envolvidas", kpis.equipes, null],
+  ];
+  linhasResumo.forEach(([label, val, formato], i) => {
+    const lc = ws1.getCell(r, 1);
+    lc.value = label;
+    lc.font = { name: FONT_NAME, size: 11 };
+    lc.border = bordaFina();
+    const c = ws1.getCell(r, 2);
+    c.value = val;
+    c.font = { name: FONT_NAME, size: 12, bold: true, color: { argb: "FF1F4E78" } };
+    c.alignment = { horizontal: "center" };
+    c.border = bordaFina();
+    if (i % 2 === 0) {
+      lc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+    }
+    if (formato) c.numFmt = formato;
+    r++;
+  });
+
+  r += 1;
+  const contagemSetor = [...contarPor(itens, "setorPCM").entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  escreverTabelaContagem(ws1, 1, r, "Equipamentos por prioridade", contagemSetor);
+
+  ws1.getColumn(1).width = 48;
+  ws1.getColumn(2).width = 20;
+  ws1.getColumn(3).width = 4;
+
+  // --- Aba Cronograma ---
+  const ws2 = workbook.addWorksheet("Cronograma", { properties: { tabColor: { argb: "FF2E8B7F" } } });
+  ws2.views = [{ showGridLines: false, state: "frozen", ySplit: primeiraLinhaDados - 1 }];
+
+  adicionarCabecalho(ws2, colunas.length);
+  ws2.getRow(linhaCabecalhoTabela).height = 30;
+  colunas.forEach(([, rotulo], i) => {
+    const cell = ws2.getCell(linhaCabecalhoTabela, i + 1);
+    cell.value = rotulo;
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
+    cell.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    cell.border = bordaFina();
+  });
+
+  const statusCondIdx = colunas.findIndex(([k]) => k === "statusCondicao") + 1;
+
+  itens.forEach((item, offset) => {
+    const rIdx = primeiraLinhaDados + offset;
+    colunas.forEach(([chave], cIdx) => {
+      let val = item[chave];
+      if (chave === "statusPreventiva") val = normalizarStatusPreventiva(val);
+      if (chave === "pisoPCM") val = val === 99 ? "" : val;
+      const cell = ws2.getCell(rIdx, cIdx + 1);
+      cell.value = val === undefined || val === null ? "" : val;
+      cell.font = { name: FONT_NAME, size: 10 };
+      cell.border = bordaFina();
+      if (offset % 2 === 0) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+      }
+    });
+    if (statusCondIdx) {
+      const statusVal = String(item.statusCondicao || "").trim().toUpperCase();
+      const corFundo = STATUS_COND_COLORS[statusVal];
+      if (corFundo) {
+        ws2.getCell(rIdx, statusCondIdx).fill = { type: "pattern", pattern: "solid", fgColor: { argb: corFundo } };
+      }
+    }
+  });
+
+  const larguras = { 1: 14, 2: 24, 3: 30, 4: 14, 5: 22, 6: 8, 7: 14, 8: 12, 9: 14, 10: 10, 11: 12, 12: 14, 13: 24 };
+  Object.entries(larguras).forEach(([i, w]) => {
+    if (Number(i) <= colunas.length) ws2.getColumn(Number(i)).width = w;
+  });
+
+  const ultimaColunaLetra = colLetra(colunas.length);
+  ws2.autoFilter = `A${linhaCabecalhoTabela}:${ultimaColunaLetra}${ultimaLinha}`;
+
+  if (statusPrevIdx) {
+    const colLetraStatus = colLetra(statusPrevIdx);
+    const faixaStatus = `${colLetraStatus}${primeiraLinhaDados}:${colLetraStatus}${ultimaLinha}`;
+    const celulaAncora = `${colLetraStatus}${primeiraLinhaDados}`;
+    const regras = [
+      ["Pendente", STATUS_PREV_COLORS.Pendente],
+      ["Em andamento", STATUS_PREV_COLORS["Em andamento"]],
+      ["Concluída", STATUS_PREV_COLORS["Concluída"]],
+    ];
+    regras.forEach(([texto, cores], i) => {
+      ws2.addConditionalFormatting({
+        ref: faixaStatus,
+        rules: [
+          {
+            type: "expression",
+            formulae: [`EXACT(${celulaAncora},"${texto}")`],
+            style: {
+              fill: { type: "pattern", pattern: "solid", fgColor: { argb: cores.fill } },
+              font: { bold: true, color: { argb: cores.font } },
+            },
+            priority: i + 1,
+            stopIfTrue: true,
+          },
+        ],
+      });
+    });
+  }
+
+  // --- Aba Dashboard (sem gráficos - só KPIs e tabelas) ---
+  const ws3 = workbook.addWorksheet("Dashboard", { properties: { tabColor: { argb: "FFC9A34E" } } });
+  ws3.views = [{ showGridLines: false }];
+  let r3 = adicionarCabecalho(ws3, 15);
+  r3 = escreverKpis(ws3, r3, kpis, referencias);
+  r3 += 1;
+
+  const contagemPiso = [...contarPor(itens, "pisoPCM").entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([v, qtd]) => [rotuloPiso(v), qtd]);
+  const [, uSetor] = escreverTabelaContagem(ws3, 1, r3, "Equipamentos por prioridade", contagemSetor);
+  let proxima = uSetor + 3;
+  const [, uPiso] = escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por andar", contagemPiso);
+  proxima = uPiso + 3;
+
+  const equipesValidas = itens.filter((i) => i.equipeResponsavel);
+  if (equipesValidas.length) {
+    const contagemEquipe = [...contarPor(equipesValidas, "equipeResponsavel").entries()]
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    const [, uEquipe] = escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por equipe", contagemEquipe);
+    proxima = uEquipe + 3;
+  }
+
+  const semanasValidas = itens.filter((i) => i.semanaPlanejada);
+  if (semanasValidas.length) {
+    const contagemSemana = [...contarPor(semanasValidas, "semanaPlanejada").entries()]
+      .sort((a, b) => parseInt(a[0].match(/\d+/)[0], 10) - parseInt(b[0].match(/\d+/)[0], 10));
+    escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por semana", contagemSemana);
+  }
+
+  ws3.getColumn(1).width = 26;
+  ws3.getColumn(2).width = 14;
+
+  return workbook;
+}
+
+
+$("#btnExport").addEventListener("click", async () => {
   if (!ESTADO.equipamentos.length) {
     toast("Gere o cronograma primeiro.");
     return;
   }
-  const linhas = ESTADO.equipamentos.map((i) => ({
-    "Patrimônio": i.patrimonio, "Setor": i.setor, "Ambiente": i.ambiente,
-    "Status Condição": i.statusCondicao, "Setor PCM": i.setorPCM,
-    "Piso": i.pisoPCM === 99 ? "" : i.pisoPCM,
-    "Data Agendada": i.dataAgendada, "Equipe": i.equipeResponsavel,
-    "Status Preventiva": i.statusPreventiva, "Observação": i.observacao,
-  }));
-  const ws = XLSX.utils.json_to_sheet(linhas);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
-  const agora = new Date();
-  const nome = `PCM_ALCE_${agora.getFullYear()}_${String(agora.getMonth() + 1).padStart(2, "0")}.xlsx`;
-  XLSX.writeFile(wb, nome);
+  toast("Montando planilha...");
+  try {
+    const workbook = await montarPlanilha(ESTADO.equipamentos);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const agora = new Date();
+    a.href = url;
+    a.download = `PCM_ALCE_${agora.getFullYear()}_${String(agora.getMonth() + 1).padStart(2, "0")}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("Planilha baixada!");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao gerar planilha: " + err.message);
+  }
 });
