@@ -166,7 +166,7 @@ function classificar(rows) {
     const setorPCM = identificarSetor(setor, ambiente);
     const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     return {
-      id: patrimonio ? patrimonio.replace(/[\s/\\"']/g, "_") : `item_${idx}`,
+      id: patrimonio ? `${patrimonio.replace(/[\s/\\"']/g, "_")}_${idx}` : `item_${idx}`,
       patrimonio,
       setor, ambiente,
       statusCondicao: colStatus ? row[colStatus] : "",
@@ -254,24 +254,40 @@ async function gerarCronograma() {
 
   // Preserva status/observação já salvos no Firestore (caso o cronograma seja regenerado)
   toast("Salvando no Firebase...");
-  const existentesSnap = await getDocs(collection(db, "equipamentos"));
-  const existentes = {};
-  existentesSnap.forEach((d) => (existentes[d.id] = d.data()));
+  $("#btnGerar").disabled = true;
+  try {
+    const existentesSnap = await getDocs(collection(db, "equipamentos"));
+    const existentes = {};
+    existentesSnap.forEach((d) => (existentes[d.id] = d.data()));
 
-  const batch = writeBatch(db);
-  itens.forEach((item) => {
-    const anterior = existentes[item.id];
-    if (anterior) {
-      item.statusPreventiva = anterior.statusPreventiva || "Pendente";
-      item.observacao = anterior.observacao || "";
+    itens.forEach((item) => {
+      const anterior = existentes[item.id];
+      if (anterior) {
+        item.statusPreventiva = anterior.statusPreventiva || "Pendente";
+        item.observacao = anterior.observacao || "";
+      }
+    });
+
+    // O Firestore só aceita até 500 gravações por lote — dividimos em blocos menores
+    // pra planilhas grandes não falharem silenciosamente no meio do caminho.
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < itens.length; inicio += TAMANHO_LOTE) {
+      const pedaco = itens.slice(inicio, inicio + TAMANHO_LOTE);
+      const batch = writeBatch(db);
+      pedaco.forEach((item) => batch.set(doc(db, "equipamentos", item.id), item));
+      await batch.commit();
+      toast(`Salvando... ${Math.min(inicio + TAMANHO_LOTE, itens.length)}/${itens.length}`);
     }
-    batch.set(doc(db, "equipamentos", item.id), item);
-  });
-  await batch.commit();
 
-  iniciarSincronizacao();
-  toast("Cronograma gerado e salvo!");
-  irParaAba("calendar");
+    iniciarSincronizacao();
+    toast(`Cronograma gerado e salvo! (${itens.length} itens)`);
+    irParaAba("calendar");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao salvar no Firebase: " + err.message);
+  } finally {
+    $("#btnGerar").disabled = false;
+  }
 }
 
 function iniciarSincronizacao() {
@@ -286,6 +302,9 @@ function iniciarSincronizacao() {
     }
     renderCalendar();
     renderDashboard();
+  }, (err) => {
+    console.error(err);
+    toast("Erro ao ler dados do Firebase: " + err.message);
   });
 }
 
