@@ -159,10 +159,25 @@ function classificar(rows) {
     return;
   }
   ESTADO.meta = { colSetor, colAmbiente, colStatus, colPatrimonio };
+  let ultimoSetor = "";
+  let linhasCorrigidas = 0;
+  rows.forEach((row) => {
+    const valorAtual = String(row[colSetor] ?? "").trim();
+    if (valorAtual) {
+      ultimoSetor = valorAtual;
+    } else if (ultimoSetor) {
+      row[colSetor] = ultimoSetor;
+      linhasCorrigidas++;
+    }
+  });
+  if (linhasCorrigidas > 0) {
+    console.log(`${linhasCorrigidas} linha(s) tinham Setor em branco (célula mesclada) e foram corrigidas.`);
+  }
 
   const itens = rows.map((row, idx) => {
     const setor = row[colSetor];
     const ambiente = row[colAmbiente];
+    // ... resto continua igual
     const setorPCM = identificarSetor(setor, ambiente);
     const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     return {
@@ -252,14 +267,18 @@ async function gerarCronograma() {
   $("#resumoCapacidade").textContent =
     `Capacidade diária: ${capacidadeDia} aparelhos · Dias necessários: ${diasNecessarios} · Semanas necessárias: ${semanasNecessarias}`;
 
-  // Preserva status/observação já salvos no Firestore (caso o cronograma seja regenerado)
-  toast("Salvando no Firebase...");
+  toast("Lendo dados anteriores...");
   $("#btnGerar").disabled = true;
   try {
     const existentesSnap = await getDocs(collection(db, "equipamentos"));
     const existentes = {};
-    existentesSnap.forEach((d) => (existentes[d.id] = d.data()));
+    const idsAntigos = [];
+    existentesSnap.forEach((d) => {
+      existentes[d.id] = d.data();
+      idsAntigos.push(d.id);
+    });
 
+    // Preserva status/observação dos itens que continuam existindo no novo arquivo
     itens.forEach((item) => {
       const anterior = existentes[item.id];
       if (anterior) {
@@ -268,9 +287,19 @@ async function gerarCronograma() {
       }
     });
 
-    // O Firestore só aceita até 500 gravações por lote — dividimos em blocos menores
-    // pra planilhas grandes não falharem silenciosamente no meio do caminho.
     const TAMANHO_LOTE = 400;
+
+
+    if (idsAntigos.length) {
+      toast("Limpando dados antigos...");
+      for (let inicio = 0; inicio < idsAntigos.length; inicio += TAMANHO_LOTE) {
+        const pedacoIds = idsAntigos.slice(inicio, inicio + TAMANHO_LOTE);
+        const batchDel = writeBatch(db);
+        pedacoIds.forEach((id) => batchDel.delete(doc(db, "equipamentos", id)));
+        await batchDel.commit();
+      }
+    }
+
     for (let inicio = 0; inicio < itens.length; inicio += TAMANHO_LOTE) {
       const pedaco = itens.slice(inicio, inicio + TAMANHO_LOTE);
       const batch = writeBatch(db);
