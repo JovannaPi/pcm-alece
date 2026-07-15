@@ -856,7 +856,7 @@ $("#btnExport").addEventListener("click", async () => {
   }
   toast("Montando planilha...");
   try {
-    const workbook = await montarPlanilhaDetalhada(ESTADO.equipamentos);
+    const workbook = await montarPlanilhaOrganizada(ESTADO.equipamentos);
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
