@@ -1,15 +1,13 @@
-// Substitua pelos dados do SEU projeto Firebase.
-// Console do Firebase > Configurações do projeto > Seus apps > SDK config
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "COLE_AQUI",
-  authDomain: "SEU-PROJETO.firebaseapp.com",
-  projectId: "SEU-PROJETO",
-  storageBucket: "SEU-PROJETO.appspot.com",
-  messagingSenderId: "COLE_AQUI",
-  appId: "COLE_AQUI",
+  apiKey: "AIzaSyDlXUNfjDlmvOWxlgVRgJeyMQ2ntD7qxJg",
+  authDomain: "pcm-alece.firebaseapp.com",
+  projectId: "pcm-alece",
+  storageBucket: "pcm-alece.firebasestorage.app",
+  messagingSenderId: "414503646531",
+  appId: "1:414503646531:web:15e48ab67891a093362bf6",
 };
 
 const app = initializeApp(firebaseConfig);
