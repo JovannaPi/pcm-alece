@@ -248,9 +248,21 @@ async function gerarCronograma() {
 
   const itens = ESTADO.itensCarregados.map((i) => ({ ...i }));
   let contador = 0;
+const itens = ESTADO.itensCarregados.map((i) => ({ ...i }));
+  let contador = 0;
+  let grupoAmbienteAtual = null;
+  let indiceGrupo = -1;
   itens.forEach((item, idx) => {
+    // Agrupa por sala (Setor + Ambiente): todos os aparelhos da mesma sala
+    // ficam sempre com a mesma equipe, em vez de sortear equipe por aparelho.
+    const chaveAmbiente = `${item.setor}||${item.ambiente}`;
+    if (chaveAmbiente !== grupoAmbienteAtual) {
+      grupoAmbienteAtual = chaveAmbiente;
+      indiceGrupo++;
+    }
+    item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
+
     item.ordemExecucao = idx + 1;
-    item.equipeResponsavel = `Equipe ${(contador % nEquipes) + 1}`;
     item.dataAgendada = formatISO(dataCursor);
     item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
     const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
