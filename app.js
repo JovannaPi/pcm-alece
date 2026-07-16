@@ -330,17 +330,6 @@ async function gerarCronograma() {
   }
 }
 
-    iniciarSincronizacao();
-    toast(`Cronograma gerado e salvo! (${itens.length} itens)`);
-    irParaAba("calendar");
-  } catch (err) {
-    console.error(err);
-    toast("Erro ao salvar no Firebase: " + err.message);
-  } finally {
-    $("#btnGerar").disabled = false;
-  }
-}
-
 function iniciarSincronizacao() {
   if (ESTADO.unsubscribe) ESTADO.unsubscribe();
   const q = query(collection(db, "equipamentos"), orderBy("ordemExecucao"));
