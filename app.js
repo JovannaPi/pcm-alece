@@ -248,8 +248,6 @@ async function gerarCronograma() {
 
   const itens = ESTADO.itensCarregados.map((i) => ({ ...i }));
   let contador = 0;
-const itens = ESTADO.itensCarregados.map((i) => ({ ...i }));
-  let contador = 0;
   let grupoAmbienteAtual = null;
   let indiceGrupo = -1;
   itens.forEach((item, idx) => {
