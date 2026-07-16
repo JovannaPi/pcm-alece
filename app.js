@@ -55,14 +55,6 @@ function localizarColuna(nomesPossiveis, headers) {
   return null;
 }
 
-function mondaySameWeek(dateInput) {
-  const d = new Date(dateInput + "T00:00:00");
-  const day = d.getDay(); // 0=domingo .. 6=sábado
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
 function formatISO(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -111,7 +103,7 @@ function irParaAba(nome) {
 
 // ---------------------------------------------------------------------------
 // Upload + classificação
-// ---------------------------------------------------------------------------
+
 const dropzone = $("#dropzone");
 const fileInput = $("#fileInput");
 
@@ -240,25 +232,36 @@ async function gerarCronograma() {
     toast("Escolha a data de início do cronograma.");
     return;
   }
-  const segundaBase = mondaySameWeek(dataInicioStr);
+
+  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
   const capacidadeDia = nEquipes * aparelhosDia;
 
+  function ehDiaUtil(data) {
+    return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]);
+  }
+
+  let dataCursor = new Date(dataInicioStr + "T00:00:00");
+  while (!ehDiaUtil(dataCursor)) {
+    dataCursor.setDate(dataCursor.getDate() + 1);
+  }
+  const primeiraDataUtil = new Date(dataCursor);
+
   const itens = ESTADO.itensCarregados.map((i) => ({ ...i }));
-  let semana = 1, dia = 0, contador = 0;
+  let contador = 0;
   itens.forEach((item, idx) => {
-    item.semanaPlanejada = `Semana ${semana}`;
-    item.diaPlanejado = NOMES_DIAS[dia];
     item.ordemExecucao = idx + 1;
     item.equipeResponsavel = `Equipe ${(contador % nEquipes) + 1}`;
-
-    const dataReal = new Date(segundaBase);
-    dataReal.setDate(dataReal.getDate() + (semana - 1) * 7 + OFFSET_DIA[NOMES_DIAS[dia]]);
-    item.dataAgendada = formatISO(dataReal);
+    item.dataAgendada = formatISO(dataCursor);
+    item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+    const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+    item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
 
     contador++;
     if (contador >= capacidadeDia) {
-      contador = 0; dia++;
-      if (dia >= diasSemana) { dia = 0; semana++; }
+      contador = 0;
+      do {
+        dataCursor.setDate(dataCursor.getDate() + 1);
+      } while (!ehDiaUtil(dataCursor));
     }
   });
 
@@ -278,7 +281,6 @@ async function gerarCronograma() {
       idsAntigos.push(d.id);
     });
 
-    // Preserva status/observação dos itens que continuam existindo no novo arquivo
     itens.forEach((item) => {
       const anterior = existentes[item.id];
       if (anterior) {
@@ -288,7 +290,6 @@ async function gerarCronograma() {
     });
 
     const TAMANHO_LOTE = 400;
-
 
     if (idsAntigos.length) {
       toast("Limpando dados antigos...");
@@ -307,6 +308,17 @@ async function gerarCronograma() {
       await batch.commit();
       toast(`Salvando... ${Math.min(inicio + TAMANHO_LOTE, itens.length)}/${itens.length}`);
     }
+
+    iniciarSincronizacao();
+    toast(`Cronograma gerado e salvo! (${itens.length} itens)`);
+    irParaAba("calendar");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao salvar no Firebase: " + err.message);
+  } finally {
+    $("#btnGerar").disabled = false;
+  }
+}
 
     iniciarSincronizacao();
     toast(`Cronograma gerado e salvo! (${itens.length} itens)`);
