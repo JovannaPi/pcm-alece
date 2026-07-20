@@ -141,11 +141,18 @@
 
     <!-- VIEW 7: HISTÓRICO (em construção) -->
     <section class="view" id="view-historico">
-      <div class="card">
-        <h2>Histórico de manutenção</h2>
-        <p class="muted">Em construção — em breve você vai poder ver tudo que já foi feito em cada aparelho, mesmo depois de gerar um novo cronograma.</p>
-      </div>
-    </section>
+    <div class="card">
+        <div class="card-head">
+            <h2>Histórico de manutenção</h2>
+            <span class="pill" id="historicoCount">
+                0 registros
+            </span>
+        </div>
+        <div class="table-wrap">
+            <table id="historicoTable"></table>
+        </div>
+    </div>
+</section>
 
     <!-- VIEW 8: EQUIPAMENTOS -->
     <section class="view" id="view-equipamentos">
