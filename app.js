@@ -12,7 +12,6 @@ const PRIORIDADE = {
   "4 - TI/Racks": 4, "5 - Plenário": 5, "6 - Administração": 6, "7 - Todo o resto": 7,
 };
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
-const OFFSET_DIA = { Segunda: 0, Terça: 1, Quarta: 2, Quinta: 3, Sexta: 4, Sábado: 5, Domingo: 6 };
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
 
 function identificarSetor(setorTxt, ambienteTxt) {
@@ -56,8 +55,12 @@ function localizarColuna(nomesPossiveis, headers) {
   return null;
 }
 
+// CORREÇÃO: Nova função formatISO à prova de fuso horário
 function formatISO(date) {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,10 +235,13 @@ async function gerarCronograma() {
     irParaAba("upload");
     return;
   }
-  const nEquipes = Math.max(1, parseInt($("#nEquipes").value, 10) || 1);
-  const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia").value, 10) || 1);
-  const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana").value, 10) || 5));
-  const dataInicioStr = $("#dataInicio").value;
+  
+  // OTIMIZAÇÃO: Optional chaining (?.) nos valores para evitar bugs se HTML mudar
+  const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
+  const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
+  const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana")?.value, 10) || 5));
+  const dataInicioStr = $("#dataInicio")?.value;
+  
   if (!dataInicioStr) {
     toast("Escolha a data de início do cronograma.");
     return;
@@ -248,7 +254,10 @@ async function gerarCronograma() {
     return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
   }
 
-  let dataCursor = new Date(dataInicioStr + "T00:00:00");
+  // CORREÇÃO: Data iniciada ao meio-dia para evitar bugs de fuso
+  const [ano, mes, dia] = dataInicioStr.split("-");
+  let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0); 
+
   while (!ehDiaUtil(dataCursor)) {
     dataCursor.setDate(dataCursor.getDate() + 1);
   }
@@ -256,22 +265,20 @@ async function gerarCronograma() {
 
   $("#btnGerar").disabled = true;
   try {
-    // Itens vindos da planilha recém-carregada
     const itensPlanilha = ESTADO.itensCarregados.map((i) => ({ ...i }));
 
-    // Itens cadastrados manualmente (aba "Equipamentos") são preservados —
-    // eles não vêm de nenhuma planilha, então não podem ser "substituídos" por ela.
     toast("Lendo dados anteriores...");
-    const existentesSnap = await getDocs(collection(db, "equipamentos"));
+    
+    // OTIMIZAÇÃO: Usando ESTADO.equipamentos em vez de gastar leitura do Firebase com getDocs
     const existentes = {};
     const idsAntigos = [];
     const manuaisPreservados = [];
-    existentesSnap.forEach((d) => {
-      const dados = d.data();
-      existentes[d.id] = dados;
-      idsAntigos.push(d.id);
+    
+    ESTADO.equipamentos.forEach((dados) => {
+      existentes[dados.id] = dados;
+      idsAntigos.push(dados.id);
       if (dados.origem === "manual") {
-        manuaisPreservados.push({ ...dados, id: d.id });
+        manuaisPreservados.push({ ...dados });
       }
     });
 
@@ -281,6 +288,7 @@ async function gerarCronograma() {
     let grupoAmbienteAtual = null;
     let indiceGrupo = -1;
     let ordem = 0;
+    
     itens.forEach((item) => {
       const chaveAmbiente = `${item.setor}||${item.ambiente}`;
       if (chaveAmbiente !== grupoAmbienteAtual) {
@@ -355,7 +363,7 @@ function iniciarSincronizacao() {
   ESTADO.unsubscribe = onSnapshot(q, (snap) => {
     ESTADO.equipamentos = snap.docs.map((d) => d.data());
     if (!ESTADO.calYear && ESTADO.equipamentos.length) {
-      const primeira = new Date(ESTADO.equipamentos[0].dataAgendada + "T00:00:00");
+      const primeira = new Date(ESTADO.equipamentos[0].dataAgendada + "T12:00:00Z");
       ESTADO.calYear = primeira.getFullYear();
       ESTADO.calMonth = primeira.getMonth();
     }
@@ -464,6 +472,7 @@ function selecionarDia(iso) {
   const table = $("#dayDetailTable");
   table.innerHTML = `<thead><tr><th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Equipe</th><th>Status</th></tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
+  
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
@@ -476,21 +485,36 @@ function selecionarDia(iso) {
       if (s === item.statusPreventiva) opt.selected = true;
       select.appendChild(opt);
     });
+    
+    // CORREÇÃO: Tratamento contra cliques rápidos, gravação paralela e reversão visual
     select.addEventListener("change", async () => {
       const statusAnterior = item.statusPreventiva;
-      select.className = "status-select " + classeStatus(select.value);
+      const statusNovo = select.value;
+      
+      select.disabled = true;
+
       try {
-        await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: select.value});
-        await registrarOrdemServico(item, statusAnterior, select.value);
-        if (   statusAnterior !== "Concluída" &&  select.value === "Concluída"){
-    await registrarHistorico(item);
-}
-        toast(`Status de ${item.patrimonio || item.ambiente} atualizado.`);
+        await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: statusNovo });
+        
+        const promessasLogs = [registrarOrdemServico(item, statusAnterior, statusNovo)];
+        if (statusAnterior !== "Concluída" && statusNovo === "Concluída") {
+          promessasLogs.push(registrarHistorico(item));
+        }
+        
+        await Promise.all(promessasLogs);
+        
+        select.className = "status-select " + classeStatus(statusNovo);
+        toast(`Status atualizado com sucesso.`);
       } catch (err) {
         console.error(err);
+        select.value = statusAnterior;
+        select.className = "status-select " + classeStatus(statusAnterior);
         toast("Erro ao atualizar status: " + err.message);
+      } finally {
+        select.disabled = false;
       }
     });
+    
     tdStatus.appendChild(select);
     tr.appendChild(tdStatus);
     tbody.appendChild(tr);
@@ -572,26 +596,19 @@ function iniciarSincronizacaoOrdens() {
 iniciarSincronizacaoOrdens();
 
 function iniciarSincronizacaoHistorico(){
-    if(ESTADO.unsubscribeHistorico)
-        ESTADO.unsubscribeHistorico();
-    const q = query(
-        collection(db,"historico"),
-        orderBy("registradoEm","desc")    );
+  if(ESTADO.unsubscribeHistorico) ESTADO.unsubscribeHistorico();
+  const q = query(collection(db,"historico"), orderBy("registradoEm","desc"));
 
-    ESTADO.unsubscribeHistorico = onSnapshot(
-    q,
-    (snap) => {
-        ESTADO.historico = snap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        renderHistorico();
-    },
-    (err) => {
-        console.error(err);
-        toast("Erro ao carregar histórico: " + err.message);
-    }
-); 
+  ESTADO.unsubscribeHistorico = onSnapshot(q, (snap) => {
+    ESTADO.historico = snap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    renderHistorico();
+  }, (err) => {
+    console.error(err);
+    toast("Erro ao carregar histórico: " + err.message);
+  });
 }
 
 function renderOrdens() {
@@ -614,36 +631,34 @@ function renderOrdens() {
 }
 
 function renderHistorico(){
+  const table = $("#historicoTable");
+  if(!table) return;
 
-    const table = $("#historicoTable");
-
-    if(!table) return;
-
-    $("#historicoCount").textContent =
-        `${ESTADO.historico.length} registros`;
-    table.innerHTML = `
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Patrimônio</th>
-                <th>Setor</th>
-                <th>Equipe</th>
-                <th>Tipo</th>
-            </tr>
-        </thead>
-        <tbody>
-        ${ESTADO.historico.map(h=>`
-            <tr>
-                <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
-                <td>${h.patrimonio || "-"}</td>
-                <td>${h.setor}</td>
-                <td>${h.equipe}</td>
-                <td>${h.tipo}</td>
-            </tr>
-        `).join("")}
-        </tbody>
-    `;
+  $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
+  table.innerHTML = `
+      <thead>
+          <tr>
+              <th>Data</th>
+              <th>Patrimônio</th>
+              <th>Setor</th>
+              <th>Equipe</th>
+              <th>Tipo</th>
+          </tr>
+      </thead>
+      <tbody>
+      ${ESTADO.historico.map(h=>`
+          <tr>
+              <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
+              <td>${h.patrimonio || "-"}</td>
+              <td>${h.setor}</td>
+              <td>${h.equipe}</td>
+              <td>${h.tipo}</td>
+          </tr>
+      `).join("")}
+      </tbody>
+  `;
 }
+
 // ---------------------------------------------------------------------------
 // Cadastro de equipamentos (CRUD manual, sem depender da planilha)
 // ---------------------------------------------------------------------------
@@ -671,7 +686,6 @@ async function adicionarEquipamentoManual() {
     statusPreventiva: "Pendente",
     observacao: "",
     origem: "manual",
-    // Sem cronograma ainda — só ganha data/equipe na próxima vez que "Gerar cronograma" rodar.
     ordemExecucao: 999999,
   };
   try {
@@ -820,7 +834,7 @@ function renderFeriados() {
 }
 
 // ---------------------------------------------------------------------------
-// Exportação para Excel (abas separadas, cores e formatação — igual à versão Python)
+// Exportação para Excel
 // ---------------------------------------------------------------------------
 const FONT_NAME = "Arial";
 const COR_HEADER = "FF1F4E78";
@@ -1236,8 +1250,8 @@ async function apagarCronograma() {
   btnApagarCronograma.disabled = true;
   toast("Apagando cronograma...");
   try {
-    const snap = await getDocs(collection(db, "equipamentos"));
-    const ids = snap.docs.map((d) => d.id);
+    // OTIMIZAÇÃO: Lendo os IDs do estado local em vez de gastar requisição getDocs do Firebase
+    const ids = ESTADO.equipamentos.map(eq => eq.id);
 
     const TAMANHO_LOTE = 400;
     for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
