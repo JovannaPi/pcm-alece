@@ -611,16 +611,11 @@ function renderHistorico(){
 
   $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
   
-  // Limpa o conteúdo da tabela antes de preencher
-  table.innerHTML = `
-      <thead>
-          <tr>
-              <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
-              <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
-          </tr>
-      </thead>
-      <tbody></tbody>
-  `;
+  // Limpa o corpo da tabela antes de preencher
+  table.innerHTML = `<thead><tr>
+      <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
+      <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
+  </tr></thead><tbody></tbody>`;
   
   const tbody = table.querySelector("tbody");
 
@@ -635,15 +630,12 @@ function renderHistorico(){
         <td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>
     `;
     
-    // Criamos a célula de ação manualmente para anexar o evento
     const tdAcao = document.createElement("td");
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "🗑️";
-    
-    // O segredo está aqui: usamos addEventListener, que funciona dentro do módulo
+    // Botão ligado via código, não via HTML onclick
     btnDel.addEventListener("click", () => deletarRegistro('historico', h.id));
-    
     tdAcao.appendChild(btnDel);
     tr.appendChild(tdAcao);
     tbody.appendChild(tr);
