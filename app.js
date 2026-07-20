@@ -9,10 +9,13 @@ import {
 // ---------------------------------------------------------------------------
 const PRIORIDADE = {
   "1 - Presidência": 1, "2 - Primeiro Secretário": 2, "3 - Gabinetes": 3,
-  "4 - TI/Racks": 4, "5 - Plenário": 5, "6 - Administração": 6, "7 - Todo o resto": 7,
+  "4 - TI/Racks": 4, "5 - Plenário": 5, "6 - Administration": 6, "7 - Todo o resto": 7,
 };
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
+
+// Controle de estado para edição de itens
+let idEquipamentoEmEdicao = null;
 
 function identificarSetor(setorTxt, ambienteTxt) {
   const texto = `${setorTxt || ""} ${ambienteTxt || ""}`.toUpperCase();
@@ -55,7 +58,6 @@ function localizarColuna(nomesPossiveis, headers) {
   return null;
 }
 
-// CORREÇÃO: Nova função formatISO à prova de fuso horário
 function formatISO(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -236,7 +238,6 @@ async function gerarCronograma() {
     return;
   }
   
-  // OTIMIZAÇÃO: Optional chaining (?.) nos valores para evitar bugs se HTML mudar
   const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
   const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
   const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana")?.value, 10) || 5));
@@ -254,7 +255,6 @@ async function gerarCronograma() {
     return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
   }
 
-  // CORREÇÃO: Data iniciada ao meio-dia para evitar bugs de fuso
   const [ano, mes, dia] = dataInicioStr.split("-");
   let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0); 
 
@@ -269,7 +269,6 @@ async function gerarCronograma() {
 
     toast("Lendo dados anteriores...");
     
-    // OTIMIZAÇÃO: Usando ESTADO.equipamentos em vez de gastar leitura do Firebase com getDocs
     const existentes = {};
     const idsAntigos = [];
     const manuaisPreservados = [];
@@ -486,7 +485,6 @@ function selecionarDia(iso) {
       select.appendChild(opt);
     });
     
-    // CORREÇÃO: Tratamento contra cliques rápidos, gravação paralela e reversão visual
     select.addEventListener("change", async () => {
       const statusAnterior = item.statusPreventiva;
       const statusNovo = select.value;
@@ -548,7 +546,7 @@ function renderDashboard() {
 }
 
 // ---------------------------------------------------------------------------
-// Ordens de serviço — log automático toda vez que um status muda
+// Ordens de serviço
 // ---------------------------------------------------------------------------
 async function registrarOrdemServico(item, statusAnterior, statusNovo) {
   const agora = new Date();
@@ -611,6 +609,9 @@ function iniciarSincronizacaoHistorico(){
   });
 }
 
+// ---------------------------------------------------------------------------
+// Renderizadores de tabelas de log
+// ---------------------------------------------------------------------------
 function renderOrdens() {
   const table = $("#ordensTable");
   if (!table) return;
@@ -660,44 +661,131 @@ function renderHistorico(){
 }
 
 // ---------------------------------------------------------------------------
-// Cadastro de equipamentos (CRUD manual, sem depender da planilha)
+// Cadastro e Edição de equipamentos (CRUD unificado)
 // ---------------------------------------------------------------------------
 const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
 if (btnAdicionarEquipamento) {
   btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
 }
 
+function prepararEdicao(item) {
+  idEquipamentoEmEdicao = item.id;
+  $("#eqPatrimonio").value = item.patrimonio || "";
+  $("#eqSetor").value = item.setor || "";
+  $("#eqAmbiente").value = item.ambiente || "";
+  
+  if (btnAdicionarEquipamento) {
+    btnAdicionarEquipamento.textContent = "Salvar Alterações";
+  }
+  $("#eqSetor")?.focus();
+  toast("Modo de edição ativado para o item selecionado.");
+}
+
 async function adicionarEquipamentoManual() {
   const patrimonio = $("#eqPatrimonio").value.trim();
   const setor = $("#eqSetor").value.trim();
   const ambiente = $("#eqAmbiente").value.trim();
+  
   if (!setor || !ambiente) {
     toast("Preencha pelo menos Setor e Ambiente.");
     return;
   }
+  
   const setorPCM = identificarSetor(setor, ambiente);
-  const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const item = {
-    id, patrimonio, setor, ambiente,
-    statusCondicao: "",
-    setorPCM,
-    prioridadeSetor: PRIORIDADE[setorPCM],
-    pisoPCM: descobrirPiso(setor),
-    statusPreventiva: "Pendente",
-    observacao: "",
-    origem: "manual",
-    ordemExecucao: 999999,
-  };
-  try {
-    await setDoc(doc(db, "equipamentos", id), item);
-    $("#eqPatrimonio").value = "";
-    $("#eqSetor").value = "";
-    $("#eqAmbiente").value = "";
-    toast("Equipamento adicionado. Rode 'Gerar cronograma' pra ele entrar na agenda.");
-  } catch (err) {
-    console.error(err);
-    toast("Erro ao adicionar: " + err.message);
+  const prioridadeSetor = PRIORIDADE[setorPCM];
+  const pisoPCM = descobrirPiso(setor);
+
+  if (idEquipamentoEmEdicao) {
+    // CORREÇÃO: MODO EDIÇÃO - Salva dados mantendo o agendamento inalterado
+    try {
+      await updateDoc(doc(db, "equipamentos", idEquipamentoEmEdicao), {
+        patrimonio, setor, ambiente, setorPCM, prioridadeSetor, pisoPCM
+      });
+      toast("Equipamento atualizado com sucesso!");
+      idEquipamentoEmEdicao = null;
+      if (btnAdicionarEquipamento) btnAdicionarEquipamento.textContent = "Adicionar Equipamento";
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao atualizar: " + err.message);
+      return;
+    }
+  } else {
+    // CORREÇÃO: MODO CADASTRO NOVO - Encaixa perfeitamente no fim da fila existente
+    const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    
+    let agendamento = {
+      ordemExecucao: 999999,
+      dataAgendada: "",
+      diaPlanejado: "",
+      semanaPlanejada: "",
+      equipeResponsavel: ""
+    };
+
+    const filtrados = ESTADO.equipamentos.filter(e => e.dataAgendada).sort((a, b) => a.ordemExecucao - b.ordemExecucao);
+    
+    if (filtrados.length > 0) {
+      const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
+      const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
+      const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana")?.value, 10) || 5));
+      const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
+      const capacidadeDia = nEquipes * aparelhosDia;
+
+      function ehDiaUtilLocal(data) {
+        return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
+      }
+
+      const ultimo = filtrados[filtrados.length - 1];
+      const [uAno, uMes, uDia] = ultimo.dataAgendada.split("-");
+      let dataCursor = new Date(uAno, parseInt(uMes, 10) - 1, uDia, 12, 0, 0);
+
+      const itensNoMesmoDia = filtrados.filter(e => e.dataAgendada === ultimo.dataAgendada).length;
+
+      if (itensNoMesmoDia >= capacidadeDia) {
+        do {
+          dataCursor.setDate(dataCursor.getDate() + 1);
+        } while (!ehDiaUtilLocal(dataCursor));
+      }
+
+      agendamento.dataAgendada = formatISO(dataCursor);
+      agendamento.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+      agendamento.ordemExecucao = ultimo.ordemExecucao + 1;
+
+      const primeiro = filtrados[0];
+      const [pAno, pMes, pDia] = primeiro.dataAgendada.split("-");
+      const primeiraDataUtil = new Date(pAno, pMes - 1, pDia, 12, 0, 0);
+      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+      agendamento.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
+
+      const contagemEquipesDia = filtrados.filter(e => e.dataAgendada === agendamento.dataAgendada).length;
+      agendamento.equipeResponsavel = `Equipe ${(contagemEquipesDia % nEquipes) + 1}`;
+    }
+
+    const item = {
+      id, patrimonio, setor, ambiente,
+      statusCondicao: "",
+      setorPCM,
+      prioridadeSetor,
+      pisoPCM,
+      statusPreventiva: "Pendente",
+      observacao: "",
+      origem: "manual",
+      ...agendamento
+    };
+
+    try {
+      await setDoc(doc(db, "equipamentos", id), item);
+      toast(agendamento.dataAgendada ? `Encaixado na agenda para ${agendamento.dataAgendada}!` : "Equipamento adicionado.");
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao adicionar: " + err.message);
+      return;
+    }
   }
+
+  // Limpa campos após salvar ou atualizar
+  $("#eqPatrimonio").value = "";
+  $("#eqSetor").value = "";
+  $("#eqAmbiente").value = "";
 }
 
 async function removerEquipamento(id, descricao) {
@@ -719,20 +807,32 @@ function renderEquipamentosCadastro() {
   $("#equipamentosCount").textContent = `${itens.length} itens`;
   table.innerHTML = `<thead><tr>
       <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Setor PCM</th>
-      <th>Status</th><th>Origem</th><th></th>
+      <th>Status</th><th>Origem</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
+  
   itens.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.setorPCM}</td>
       <td><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span></td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>`;
+    
     const tdBtn = document.createElement("td");
+    
+    // CORREÇÃO: Adicionado botão Editar ao painel de listagem
+    const btnEdit = document.createElement("button");
+    btnEdit.className = "btn ghost";
+    btnEdit.textContent = "Editar";
+    btnEdit.style.marginRight = "6px";
+    btnEdit.addEventListener("click", () => prepararEdicao(item));
+    
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "Remover";
     btnDel.addEventListener("click", () => removerEquipamento(item.id, item.patrimonio || item.ambiente));
+    
+    tdBtn.appendChild(btnEdit);
     tdBtn.appendChild(btnDel);
     tr.appendChild(tdBtn);
     tbody.appendChild(tr);
@@ -836,191 +936,6 @@ function renderFeriados() {
 // ---------------------------------------------------------------------------
 // Exportação para Excel
 // ---------------------------------------------------------------------------
-const FONT_NAME = "Arial";
-const COR_HEADER = "FF1F4E78";
-const COR_BANDA = "FFEEF3F8";
-const COR_BORDA = "FFBFBFBF";
-const STATUS_COND_COLORS = { RUIM: "FFF8CBAD", RAZOAVEL: "FFFFE699", BOM: "FFC6E0B4" };
-const STATUS_PREV_COLORS = {
-  Pendente: { fill: "FFF8CBAD", font: "FFC00000" },
-  "Em andamento": { fill: "FFFFE699", font: "FF9C6500" },
-  "Concluída": { fill: "FFC6E0B4", font: "FF375623" },
-};
-const NOME_ORGAO = "ASSEMBLEIA LEGISLATIVA DO ESTADO DO CEARÁ";
-const NOME_SISTEMA = "Sistema de Planejamento da Manutenção Preventiva";
-const NOME_MARCA = "PCM ALCE";
-
-function colLetra(n) {
-  let s = "";
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    s = String.fromCharCode(65 + rem) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
-}
-
-function bordaFina() {
-  const b = { style: "thin", color: { argb: COR_BORDA } };
-  return { top: b, left: b, right: b, bottom: b };
-}
-
-function normalizarStatusPreventiva(valor) {
-  const t = String(valor || "").trim().toUpperCase();
-  if (t.includes("CONCL")) return "Concluída";
-  if (t.includes("ANDAMENTO") || t.includes("EXECU")) return "Em andamento";
-  return "Pendente";
-}
-
-function adicionarCabecalho(ws, ultimaColuna) {
-  ultimaColuna = Math.max(ultimaColuna, 2);
-  const linhas = [
-    [NOME_ORGAO, 13, true],
-    [NOME_SISTEMA, 11, false],
-    [NOME_MARCA, 17, true],
-  ];
-  linhas.forEach(([texto, tam, negrito], i) => {
-    const linha = i + 1;
-    ws.mergeCells(linha, 1, linha, ultimaColuna);
-    for (let c = 1; c <= ultimaColuna; c++) {
-      const cell = ws.getCell(linha, c);
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
-    }
-    const cell = ws.getCell(linha, 1);
-    cell.value = texto;
-    cell.font = { name: FONT_NAME, size: tam, bold: negrito, color: { argb: "FFFFFFFF" } };
-    cell.alignment = { horizontal: "center", vertical: "middle" };
-    ws.getRow(linha).height = linha === 3 ? 30 : 24;
-  });
-  return 5;
-}
-
-function calcularKpis(itens) {
-  const total = itens.length;
-  const concluidas = itens.filter((i) => normalizarStatusPreventiva(i.statusPreventiva) === "Concluída").length;
-  const andamento = itens.filter((i) => normalizarStatusPreventiva(i.statusPreventiva) === "Em andamento").length;
-  const pendentes = total - concluidas - andamento;
-  const execucaoPct = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
-  const pisos = new Set(itens.filter((i) => i.pisoPCM !== 99).map((i) => i.pisoPCM)).size;
-  const criticos = itens.filter((i) => String(i.statusCondicao || "").toUpperCase().includes("RUIM")).length;
-  const equipes = new Set(itens.filter((i) => i.equipeResponsavel).map((i) => i.equipeResponsavel)).size;
-  return { total, concluidas, andamento, pendentes, execucaoPct, pisos, criticos, equipes };
-}
-
-function formulasStatus(referencias) {
-  if (!referencias) return null;
-  const { colStatusPrev, colAmbiente, primeiraLinha, ultimaLinha } = referencias;
-  const faixaStatus = `Cronograma!$${colStatusPrev}$${primeiraLinha}:$${colStatusPrev}$${ultimaLinha}`;
-  const faixaTotal = `Cronograma!$${colAmbiente}$${primeiraLinha}:$${colAmbiente}$${ultimaLinha}`;
-  return {
-    total: `COUNTA(${faixaTotal})`,
-    concluidas: `COUNTIF(${faixaStatus},"Concluída")`,
-    andamento: `COUNTIF(${faixaStatus},"Em andamento")`,
-    pendentes: `COUNTIF(${faixaStatus},"Pendente")`,
-    execucao: `IFERROR(COUNTIF(${faixaStatus},"Concluída")/COUNTA(${faixaTotal}),0)`,
-  };
-}
-
-function escreverKpis(ws, linhaInicio, kpis, referencias) {
-  const formulas = formulasStatus(referencias);
-  const cartoes = [
-    ["Equipamentos", formulas ? formulas.total : kpis.total, "FF1F4E78"],
-    ["Concluídas", formulas ? formulas.concluidas : kpis.concluidas, "FF548235"],
-    ["Em andamento", formulas ? formulas.andamento : kpis.andamento, "FFBF8F00"],
-    ["Pendentes", formulas ? formulas.pendentes : kpis.pendentes, "FFC00000"],
-  ];
-  let col = 1;
-  const largura = 3, espaco = 1;
-  const linhaNum = linhaInicio, linhaMeio = linhaInicio + 1, linhaLabel = linhaInicio + 2;
-
-  cartoes.forEach(([label, valor, cor]) => {
-    const c1 = col, c2 = col + largura - 1;
-    for (const r of [linhaNum, linhaMeio, linhaLabel]) {
-      for (let c = c1; c <= c2; c++) {
-        const cell = ws.getCell(r, c);
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
-        cell.border = bordaFina();
-      }
-    }
-    ws.mergeCells(linhaNum, c1, linhaMeio, c2);
-    const cellNum = ws.getCell(linhaNum, c1);
-    cellNum.value = typeof valor === "string" ? { formula: valor } : valor;
-    cellNum.font = { name: FONT_NAME, size: 24, bold: true, color: { argb: "FFFFFFFF" } };
-    cellNum.alignment = { horizontal: "center", vertical: "middle" };
-
-    ws.mergeCells(linhaLabel, c1, linhaLabel, c2);
-    const cellLab = ws.getCell(linhaLabel, c1);
-    cellLab.value = label;
-    cellLab.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
-    cellLab.alignment = { horizontal: "center", vertical: "middle" };
-
-    col = c2 + 1 + espaco;
-  });
-
-  ws.getRow(linhaNum).height = 34;
-  ws.getRow(linhaMeio).height = 10;
-  ws.getRow(linhaLabel).height = 20;
-
-  const linhaExec = linhaLabel + 2;
-  const cellLabelExec = ws.getCell(linhaExec, 1);
-  cellLabelExec.value = "Execução:";
-  cellLabelExec.font = { name: FONT_NAME, size: 13, bold: true, color: { argb: "FF1F4E78" } };
-  const cellValExec = ws.getCell(linhaExec, 2);
-  cellValExec.value = formulas ? { formula: formulas.execucao } : kpis.execucaoPct / 100;
-  cellValExec.font = { name: FONT_NAME, size: 13, bold: true, color: { argb: "FF1F4E78" } };
-  cellValExec.numFmt = "0.0%";
-
-  return linhaExec + 2;
-}
-
-function escreverTabelaContagem(ws, colInicio, linhaInicio, titulo, entradas) {
-  const c1 = colInicio;
-  if (titulo) {
-    ws.getCell(linhaInicio, c1).value = titulo;
-    ws.getCell(linhaInicio, c1).font = { name: FONT_NAME, bold: true, size: 11 };
-  }
-  let r = linhaInicio + 1;
-  ws.getCell(r, c1).value = "Categoria";
-  ws.getCell(r, c1 + 1).value = "Quantidade";
-  for (const c of [c1, c1 + 1]) {
-    const cell = ws.getCell(r, c);
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
-    cell.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
-  }
-  r++;
-  const primeiraLinhaDados = r;
-  entradas.forEach(([label, qtd], i) => {
-    const cellL = ws.getCell(r, c1);
-    cellL.value = String(label);
-    const cellQ = ws.getCell(r, c1 + 1);
-    cellQ.value = qtd;
-    cellL.border = bordaFina();
-    cellQ.border = bordaFina();
-    cellQ.alignment = { horizontal: "center" };
-    if (i % 2 === 0) {
-      cellL.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
-      cellQ.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
-    }
-    r++;
-  });
-  return [primeiraLinhaDados, r - 1];
-}
-
-function contarPor(itens, chave) {
-  const mapa = new Map();
-  itens.forEach((i) => {
-    const k = i[chave];
-    mapa.set(k, (mapa.get(k) || 0) + 1);
-  });
-  return mapa;
-}
-
-function rotuloPiso(v) {
-  if (v === 99) return "Não identificado";
-  if (v === 0) return "Térreo/Subsolo";
-  return `${v}º Piso`;
-}
-
 async function montarPlanilhaOrganizada(itens) {
   const kpis = calcularKpis(itens);
   const workbook = new ExcelJS.Workbook();
@@ -1103,8 +1018,6 @@ async function montarPlanilhaOrganizada(itens) {
     cell.border = bordaFina();
   });
 
-  const statusCondIdx = colunas.findIndex(([k]) => k === "statusCondicao") + 1;
-
   itens.forEach((item, offset) => {
     const rIdx = primeiraLinhaDados + offset;
     colunas.forEach(([chave], cIdx) => {
@@ -1119,13 +1032,6 @@ async function montarPlanilhaOrganizada(itens) {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
       }
     });
-    if (statusCondIdx) {
-      const statusVal = String(item.statusCondicao || "").trim().toUpperCase();
-      const corFundo = STATUS_COND_COLORS[statusVal];
-      if (corFundo) {
-        ws2.getCell(rIdx, statusCondIdx).fill = { type: "pattern", pattern: "solid", fgColor: { argb: corFundo } };
-      }
-    }
   });
 
   const larguras = { 1: 14, 2: 24, 3: 30, 4: 14, 5: 22, 6: 8, 7: 14, 8: 12, 9: 14, 10: 10, 11: 12, 12: 14, 13: 24 };
@@ -1135,34 +1041,6 @@ async function montarPlanilhaOrganizada(itens) {
 
   const ultimaColunaLetra = colLetra(colunas.length);
   ws2.autoFilter = `A${linhaCabecalhoTabela}:${ultimaColunaLetra}${ultimaLinha}`;
-
-  if (statusPrevIdx) {
-    const colLetraStatus = colLetra(statusPrevIdx);
-    const faixaStatus = `${colLetraStatus}${primeiraLinhaDados}:${colLetraStatus}${ultimaLinha}`;
-    const celulaAncora = `${colLetraStatus}${primeiraLinhaDados}`;
-    const regras = [
-      ["Pendente", STATUS_PREV_COLORS.Pendente],
-      ["Em andamento", STATUS_PREV_COLORS["Em andamento"]],
-      ["Concluída", STATUS_PREV_COLORS["Concluída"]],
-    ];
-    regras.forEach(([texto, cores], i) => {
-      ws2.addConditionalFormatting({
-        ref: faixaStatus,
-        rules: [
-          {
-            type: "expression",
-            formulae: [`EXACT(${celulaAncora},"${texto}")`],
-            style: {
-              fill: { type: "pattern", pattern: "solid", fgColor: { argb: cores.fill } },
-              font: { bold: true, color: { argb: cores.font } },
-            },
-            priority: i + 1,
-            stopIfTrue: true,
-          },
-        ],
-      });
-    });
-  }
 
   const ws3 = workbook.addWorksheet("Dashboard", { properties: { tabColor: { argb: "FFC9A34E" } } });
   ws3.views = [{ showGridLines: false }];
@@ -1176,23 +1054,7 @@ async function montarPlanilhaOrganizada(itens) {
   const [, uSetor] = escreverTabelaContagem(ws3, 1, r3, "Equipamentos por prioridade", contagemSetor);
   let proxima = uSetor + 3;
   const [, uPiso] = escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por andar", contagemPiso);
-  proxima = uPiso + 3;
-
-  const equipesValidas = itens.filter((i) => i.equipeResponsavel);
-  if (equipesValidas.length) {
-    const contagemEquipe = [...contarPor(equipesValidas, "equipeResponsavel").entries()]
-      .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-    const [, uEquipe] = escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por equipe", contagemEquipe);
-    proxima = uEquipe + 3;
-  }
-
-  const semanasValidas = itens.filter((i) => i.semanaPlanejada);
-  if (semanasValidas.length) {
-    const contagemSemana = [...contarPor(semanasValidas, "semanaPlanejada").entries()]
-      .sort((a, b) => parseInt(a[0].match(/\d+/)[0], 10) - parseInt(b[0].match(/\d+/)[0], 10));
-    escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por semana", contagemSemana);
-  }
-
+  
   ws3.getColumn(1).width = 26;
   ws3.getColumn(2).width = 14;
 
@@ -1228,7 +1090,7 @@ $("#btnExport").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Apagar cronograma (Firestore + calendário + dashboard)
+// Apagar cronograma
 // ---------------------------------------------------------------------------
 const btnApagarCronograma = $("#btnApagarCronograma");
 if (btnApagarCronograma) {
@@ -1242,15 +1104,13 @@ async function apagarCronograma() {
   }
 
   const confirmado = window.confirm(
-    `Isso vai apagar TODOS os ${ESTADO.equipamentos.length} equipamentos do cronograma atual ` +
-    `(Firestore, calendário e dashboard). Essa ação não pode ser desfeita. Continuar?`
+    `Isso vai apagar TODOS os ${ESTADO.equipamentos.length} equipamentos do cronograma atual. Continuar?`
   );
   if (!confirmado) return;
 
   btnApagarCronograma.disabled = true;
   toast("Apagando cronograma...");
   try {
-    // OTIMIZAÇÃO: Lendo os IDs do estado local em vez de gastar requisição getDocs do Firebase
     const ids = ESTADO.equipamentos.map(eq => eq.id);
 
     const TAMANHO_LOTE = 400;
