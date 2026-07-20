@@ -69,9 +69,11 @@ const ESTADO = {
   equipamentos: [],
   feriados: [],
   ordens: [],
+  historico: [],
   unsubscribe: null,
   unsubscribeFeriados: null,
   unsubscribeOrdens: null,
+  unsubscribeHistorico: null,
   calYear: null,
   calMonth: null,
   diaSelecionado: null,
@@ -367,6 +369,7 @@ function iniciarSincronizacao() {
 }
 
 iniciarSincronizacao();
+iniciarSincronizacaoHistorico();
 
 $("#prevMonth").addEventListener("click", () => mudarMes(-1));
 $("#nextMonth").addEventListener("click", () => mudarMes(1));
@@ -477,8 +480,11 @@ function selecionarDia(iso) {
       const statusAnterior = item.statusPreventiva;
       select.className = "status-select " + classeStatus(select.value);
       try {
-        await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: select.value });
+        await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: select.value});
         await registrarOrdemServico(item, statusAnterior, select.value);
+        if (   statusAnterior !== "Concluída" &&  select.value === "Concluída"){
+    await registrarHistorico(item);
+}
         toast(`Status de ${item.patrimonio || item.ambiente} atualizado.`);
       } catch (err) {
         console.error(err);
@@ -535,6 +541,23 @@ async function registrarOrdemServico(item, statusAnterior, statusNovo) {
   });
 }
 
+async function registrarHistorico(item) {
+  const agora = new Date();
+  await addDoc(collection(db, "historico"), {
+    equipamentoId: item.id,
+    patrimonio: item.patrimonio || "",
+    setor: item.setor || "",
+    ambiente: item.ambiente || "",
+    equipe: item.equipeResponsavel || "",
+    tipo: "Preventiva",
+    dataProgramada: item.dataAgendada || "",
+    dataExecucao: formatISO(agora),
+    status: "Concluída",
+    observacao: item.observacao || "",
+    registradoEm: agora.toISOString()
+  });
+}
+
 function iniciarSincronizacaoOrdens() {
   if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
   const q = query(collection(db, "ordens"), orderBy("registradoEm", "desc"), limit(300));
@@ -547,6 +570,28 @@ function iniciarSincronizacaoOrdens() {
   });
 }
 iniciarSincronizacaoOrdens();
+
+function iniciarSincronizacaoHistorico(){
+    if(ESTADO.unsubscribeHistorico)
+        ESTADO.unsubscribeHistorico();
+    const q = query(
+        collection(db,"historico"),
+        orderBy("registradoEm","desc")    );
+
+    ESTADO.unsubscribeHistorico = onSnapshot(
+    q,
+    (snap) => {
+        ESTADO.historico = snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        renderHistorico();
+    },
+    (err) => {
+        console.error(err);
+        toast("Erro ao carregar histórico: " + err.message);
+    }
+);
 
 function renderOrdens() {
   const table = $("#ordensTable");
@@ -567,6 +612,37 @@ function renderOrdens() {
     }).join("")}</tbody>`;
 }
 
+function renderHistorico(){
+
+    const table = $("#historicoTable");
+
+    if(!table) return;
+
+    $("#historicoCount").textContent =
+        `${ESTADO.historico.length} registros`;
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Patrimônio</th>
+                <th>Setor</th>
+                <th>Equipe</th>
+                <th>Tipo</th>
+            </tr>
+        </thead>
+        <tbody>
+        ${ESTADO.historico.map(h=>`
+            <tr>
+                <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
+                <td>${h.patrimonio || "-"}</td>
+                <td>${h.setor}</td>
+                <td>${h.equipe}</td>
+                <td>${h.tipo}</td>
+            </tr>
+        `).join("")}
+        </tbody>
+    `;
+}
 // ---------------------------------------------------------------------------
 // Cadastro de equipamentos (CRUD manual, sem depender da planilha)
 // ---------------------------------------------------------------------------
