@@ -618,17 +618,33 @@ function renderOrdens() {
   $("#ordensCount").textContent = `${ESTADO.ordens.length} registros`;
   table.innerHTML = `<thead><tr>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
-      <th>Equipe</th><th>De</th><th>Para</th>
-    </tr></thead><tbody>${ESTADO.ordens.map((o) => {
-      const dt = new Date(o.registradoEm);
-      const dataFmt = dt.toLocaleString("pt-BR");
-      return `<tr>
-        <td>${dataFmt}</td><td>${o.patrimonio || "-"}</td><td>${o.setor || ""}</td>
-        <td>${o.ambiente || ""}</td><td>${o.equipe || ""}</td>
-        <td><span class="status-select ${classeStatus(o.statusAnterior)}" style="cursor:default">${o.statusAnterior || "-"}</span></td>
-        <td><span class="status-select ${classeStatus(o.statusNovo)}" style="cursor:default">${o.statusNovo}</span></td>
-      </tr>`;
-    }).join("")}</tbody>`;
+      <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+  ESTADO.ordens.forEach((o) => {
+    const dt = new Date(o.registradoEm);
+    const dataFmt = dt.toLocaleString("pt-BR");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${dataFmt}</td><td>${o.patrimonio || "-"}</td><td>${o.setor || ""}</td>
+      <td>${o.ambiente || ""}</td><td>${o.equipe || ""}</td>
+      <td><span class="status-select ${classeStatus(o.statusAnterior)}" style="cursor:default">${o.statusAnterior || "-"}</span></td>
+      <td><span class="status-select ${classeStatus(o.statusNovo)}" style="cursor:default">${o.statusNovo}</span></td>
+    `;
+    // Criando o botão de Imprimir para esta linha
+    const tdBtn = document.createElement("td");
+    const btnPrint = document.createElement("button");
+    btnPrint.className = "btn ghost";
+    btnPrint.textContent = "PMOC";
+    btnPrint.style.color = "var(--azul)"; // Destaca um pouco a cor do botão
+    
+    // Quando clicar, chama a função de gerar o PDF passando os dados dessa ordem
+    btnPrint.addEventListener("click", () => gerarPDFPMOC(o));
+    
+    tdBtn.appendChild(btnPrint);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
 }
 
 function renderHistorico(){
@@ -1139,4 +1155,97 @@ async function apagarCronograma() {
   } finally {
     btnApagarCronograma.disabled = false;
   }
+}
+// ---------------------------------------------------------------------------
+// Geração de PDF (PMOC)
+// ---------------------------------------------------------------------------
+function gerarPDFPMOC(ordem) {
+  // Busca os dados extras do equipamento usando o ID guardado na ordem
+  const eqFull = ESTADO.equipamentos.find(e => e.id === ordem.equipamentoId) || {};
+  
+  const idEquip = eqFull.patrimonio || ordem.patrimonio || "Sem Patrimônio";
+  const setor = eqFull.setorPCM || ordem.setor || "Não informado";
+  const ambiente = eqFull.ambiente || ordem.ambiente || "-";
+  const prioridade = eqFull.prioridadeSetor || "-";
+  const equipe = ordem.equipe || eqFull.equipeResponsavel || "-";
+  
+  // Pega a data de agendamento ou a data do registro da ordem
+  const dataExecucao = ordem.dataAgendada ? ordem.dataAgendada.split("-").reverse().join("/") : "____/____/20___";
+
+  const htmlDoc = `
+    <html>
+      <head>
+        <title>OS PMOC - Patrimônio ${idEquip}</title>
+        <style>
+          body { font-family: "Segoe UI", Roboto, sans-serif; color: #1C2530; margin: 0; background: #fff; }
+          .os-page { padding: 20mm; max-width: 800px; margin: 0 auto; }
+          .os-topline { display: flex; justify-content: space-between; border-bottom: 2px solid #1C2530; padding-bottom: 15px; margin-bottom: 20px; }
+          .org { font-family: Georgia, serif; font-size: 18px; font-weight: bold; }
+          .dept { font-size: 11px; color: #5B6B7A; }
+          .title-block { text-align: right; }
+          .doc-type { font-family: Georgia, serif; font-size: 14px; font-style: italic; color: #5B6B7A; }
+          .chamado-id { font-family: Consolas, monospace; font-size: 18px; font-weight: bold; color: #163A5B; }
+          .os-band { background: #EEF3F8; padding: 12px 16px; font-weight: bold; margin-bottom: 25px; }
+          .section-title { font-family: Georgia, serif; font-size: 15px; font-weight: bold; border-bottom: 1px solid #DCE3EA; padding-bottom: 5px; margin: 25px 0 15px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+          .item { border-bottom: 1px dotted #DCE3EA; padding-bottom: 5px; }
+          .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #5B6B7A; }
+          .val { font-size: 15px; font-weight: 500; }
+          .checklist { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          .checklist th, .checklist td { border: 1px solid #DCE3EA; padding: 10px; font-size: 13px; text-align: left; }
+          .checkbox-box { width: 16px; height: 16px; border: 1px solid #1C2530; display: inline-block; }
+        </style>
+      </head>
+      <body>
+        <div class="os-page">
+          
+          <div class="os-topline">
+            <div>
+              <div class="org">Núcleo de Manutenção Predial</div>
+              <div class="dept">Controle PMOC</div>
+            </div>
+            <div class="title-block">
+              <div class="doc-type">Ordem de Serviço (PMOC)</div>
+              <div class="chamado-id">Patrimônio: ${idEquip}</div>
+            </div>
+          </div>
+
+          <div class="os-band">Rotina PMOC Mensal — ${setor}</div>
+
+          <div class="section-title">1. Dados do Equipamento e Localização</div>
+          <div class="grid">
+            <div class="item"><span class="lbl">Patrimônio</span><span class="val">${idEquip}</span></div>
+            <div class="item"><span class="lbl">Ambiente</span><span class="val">${ambiente}</span></div>
+            <div class="item"><span class="lbl">Prioridade do Setor</span><span class="val">${prioridade}</span></div>
+            <div class="item"><span class="lbl">Equipe Responsável</span><span class="val">${equipe}</span></div>
+          </div>
+
+          <div class="section-title">2. Rotina de Manutenção PMOC</div>
+          <table class="checklist">
+            <tr><th style="width: 50px; text-align:center;">OK</th><th>Descrição da Tarefa</th></tr>
+            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Limpeza dos filtros de ar e grelhas.</td></tr>
+            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Higienização da bandeja e desobstrução de dreno.</td></tr>
+            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Verificação de ruídos e vibrações.</td></tr>
+            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Medição de temperatura de insuflamento e retorno.</td></tr>
+          </table>
+
+          <div class="section-title" style="margin-top: 40px;">3. Observações e Peças Pendentes</div>
+          <div style="border: 1px solid #DCE3EA; height: 120px; background: #F6F8FA;"></div>
+
+          <div style="margin-top: 40px; font-size: 14px; text-align: right; color: #5B6B7A;">
+            Data: ${dataExecucao} &nbsp;&nbsp;&nbsp; Técnico(a): _______________________
+          </div>
+
+        </div>
+      </body>
+    </html>
+  `;
+
+  const janela = window.open('', '', 'width=800,height=600');
+  janela.document.write(htmlDoc);
+  janela.document.close();
+  
+  janela.setTimeout(function() {
+    janela.print();
+  }, 250);
 }
