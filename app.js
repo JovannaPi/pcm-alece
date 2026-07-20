@@ -63,13 +63,13 @@ function formatISO(date) {
 // Estado da aplicação
 // ---------------------------------------------------------------------------
 const ESTADO = {
-  meta: null,               // { colSetor, colAmbiente, colStatus, colPatrimonio }
-  itensCarregados: [],      // itens recém-lidos do arquivo (antes de gerar cronograma)
-  equipamentos: [],         // itens já com cronograma, sincronizados com o Firestore
+  meta: null,
+  itensCarregados: [],
+  equipamentos: [],
   unsubscribe: null,
   calYear: null,
-  calMonth: null,           // 0-indexado
-  diaSelecionado: null,     // "YYYY-MM-DD"
+  calMonth: null,
+  diaSelecionado: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -83,9 +83,6 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.remove("show"), 2600);
 }
 
-// ---------------------------------------------------------------------------
-// Navegação por abas
-// ---------------------------------------------------------------------------
 $all(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     $all(".tab").forEach((b) => b.classList.remove("active"));
@@ -100,9 +97,6 @@ $all(".tab").forEach((btn) => {
 function irParaAba(nome) {
   $(`.tab[data-view="${nome}"]`)?.click();
 }
-
-// ---------------------------------------------------------------------------
-// Upload + classificação
 
 const dropzone = $("#dropzone");
 const fileInput = $("#fileInput");
@@ -169,7 +163,6 @@ function classificar(rows) {
   const itens = rows.map((row, idx) => {
     const setor = row[colSetor];
     const ambiente = row[colAmbiente];
-    // ... resto continua igual
     const setorPCM = identificarSetor(setor, ambiente);
     const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     return {
@@ -213,9 +206,6 @@ function renderPreview(itens) {
     <tbody>${itens.map((i) => `<tr>${cols.map((c) => `<td>${c[1](i) ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 
-// ---------------------------------------------------------------------------
-// Geração do cronograma + gravação no Firestore
-// ---------------------------------------------------------------------------
 $("#btnGerar").addEventListener("click", gerarCronograma);
 
 async function gerarCronograma() {
@@ -251,8 +241,6 @@ async function gerarCronograma() {
   let grupoAmbienteAtual = null;
   let indiceGrupo = -1;
   itens.forEach((item, idx) => {
-    // Agrupa por sala (Setor + Ambiente): todos os aparelhos da mesma sala
-    // ficam sempre com a mesma equipe, em vez de sortear equipe por aparelho.
     const chaveAmbiente = `${item.setor}||${item.ambiente}`;
     if (chaveAmbiente !== grupoAmbienteAtual) {
       grupoAmbienteAtual = chaveAmbiente;
@@ -348,12 +336,8 @@ function iniciarSincronizacao() {
   });
 }
 
-// Também escuta o Firestore desde o início (caso já existam dados de uma sessão anterior)
 iniciarSincronizacao();
 
-// ---------------------------------------------------------------------------
-// Calendário
-// ---------------------------------------------------------------------------
 $("#prevMonth").addEventListener("click", () => mudarMes(-1));
 $("#nextMonth").addEventListener("click", () => mudarMes(1));
 
@@ -377,7 +361,6 @@ function renderCalendar() {
   }
   $("#calendarTitle").textContent = `${NOMES_MES[ESTADO.calMonth]} de ${ESTADO.calYear}`;
 
-  // agrupa equipamentos por data
   const porData = {};
   for (const item of ESTADO.equipamentos) {
     (porData[item.dataAgendada] ||= []).push(item);
@@ -392,7 +375,7 @@ function renderCalendar() {
   });
 
   const primeiroDia = new Date(ESTADO.calYear, ESTADO.calMonth, 1);
-  const offsetInicial = (primeiroDia.getDay() + 6) % 7; // segunda = 0
+  const offsetInicial = (primeiroDia.getDay() + 6) % 7;
   const diasNoMes = new Date(ESTADO.calYear, ESTADO.calMonth + 1, 0).getDate();
 
   for (let i = 0; i < offsetInicial; i++) {
@@ -468,9 +451,6 @@ function classeStatus(status) {
   return "pendente";
 }
 
-// ---------------------------------------------------------------------------
-// Dashboard
-// ---------------------------------------------------------------------------
 function renderDashboard() {
   const itens = ESTADO.equipamentos;
   const total = itens.length;
@@ -491,8 +471,6 @@ function renderDashboard() {
   ).join("");
 }
 
-
-// Exportação para Excel
 const FONT_NAME = "Arial";
 const COR_HEADER = "FF1F4E78";
 const COR_BANDA = "FFEEF3F8";
@@ -549,7 +527,7 @@ function adicionarCabecalho(ws, ultimaColuna) {
     cell.alignment = { horizontal: "center", vertical: "middle" };
     ws.getRow(linha).height = linha === 3 ? 30 : 24;
   });
-  return 5; // linha 4 fica livre como respiro
+  return 5;
 }
 
 function calcularKpis(itens) {
@@ -703,7 +681,6 @@ async function montarPlanilhaOrganizada(itens) {
   };
   const formulasResumo = formulasStatus(referencias);
 
-  // --- Aba Resumo ---
   const ws1 = workbook.addWorksheet("Resumo", { properties: { tabColor: { argb: "FF1F4E78" } } });
   ws1.views = [{ showGridLines: false }];
   let r = adicionarCabecalho(ws1, 2);
@@ -747,7 +724,6 @@ async function montarPlanilhaOrganizada(itens) {
   ws1.getColumn(2).width = 20;
   ws1.getColumn(3).width = 4;
 
-  // --- Aba Cronograma ---
   const ws2 = workbook.addWorksheet("Cronograma", { properties: { tabColor: { argb: "FF2E8B7F" } } });
   ws2.views = [{ showGridLines: false, state: "frozen", ySplit: primeiraLinhaDados - 1 }];
 
@@ -823,7 +799,6 @@ async function montarPlanilhaOrganizada(itens) {
     });
   }
 
-  // --- Aba Dashboard (sem gráficos - só KPIs e tabelas) ---
   const ws3 = workbook.addWorksheet("Dashboard", { properties: { tabColor: { argb: "FFC9A34E" } } });
   ws3.views = [{ showGridLines: false }];
   let r3 = adicionarCabecalho(ws3, 15);
@@ -859,7 +834,6 @@ async function montarPlanilhaOrganizada(itens) {
   return workbook;
 }
 
-
 $("#btnExport").addEventListener("click", async () => {
   if (!ESTADO.equipamentos.length) {
     toast("Gere o cronograma primeiro.");
@@ -887,3 +861,57 @@ $("#btnExport").addEventListener("click", async () => {
     toast("Erro ao gerar planilha: " + err.message);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Apagar cronograma (Firestore + calendário + dashboard)
+// ---------------------------------------------------------------------------
+const btnApagarCronograma = $("#btnApagarCronograma");
+if (btnApagarCronograma) {
+  btnApagarCronograma.addEventListener("click", apagarCronograma);
+}
+
+async function apagarCronograma() {
+  if (!ESTADO.equipamentos.length) {
+    toast("Não há cronograma para apagar.");
+    return;
+  }
+
+  const confirmado = window.confirm(
+    `Isso vai apagar TODOS os ${ESTADO.equipamentos.length} equipamentos do cronograma atual ` +
+    `(Firestore, calendário e dashboard). Essa ação não pode ser desfeita. Continuar?`
+  );
+  if (!confirmado) return;
+
+  btnApagarCronograma.disabled = true;
+  toast("Apagando cronograma...");
+  try {
+    const snap = await getDocs(collection(db, "equipamentos"));
+    const ids = snap.docs.map((d) => d.id);
+
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+      const pedaco = ids.slice(inicio, inicio + TAMANHO_LOTE);
+      const batch = writeBatch(db);
+      pedaco.forEach((id) => batch.delete(doc(db, "equipamentos", id)));
+      await batch.commit();
+    }
+
+    ESTADO.equipamentos = [];
+    ESTADO.itensCarregados = [];
+    ESTADO.diaSelecionado = null;
+
+    $("#previewCard").hidden = true;
+    $("#resumoCapacidade").textContent = "";
+    $("#dayDetailCard").hidden = true;
+
+    renderCalendar();
+    renderDashboard();
+
+    toast(`Cronograma apagado (${ids.length} itens removidos).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao apagar cronograma: " + err.message);
+  } finally {
+    btnApagarCronograma.disabled = false;
+  }
+}
