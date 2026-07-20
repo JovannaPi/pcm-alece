@@ -591,7 +591,8 @@ function iniciarSincronizacaoHistorico(){
         console.error(err);
         toast("Erro ao carregar histórico: " + err.message);
     }
-);
+); 
+}
 
 function renderOrdens() {
   const table = $("#ordensTable");
