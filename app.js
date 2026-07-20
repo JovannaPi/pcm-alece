@@ -4,9 +4,6 @@ import {
   deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ---------------------------------------------------------------------------
-// Constantes / regras de classificação (mesma lógica do script Python original)
-// ---------------------------------------------------------------------------
 const PRIORIDADE = {
   "1 - Presidência": 1, "2 - Primeiro Secretário": 2, "3 - Gabinetes": 3,
   "4 - TI/Racks": 4, "5 - Plenário": 5, "6 - Administração": 6, "7 - Todo o resto": 7,
@@ -493,10 +490,9 @@ function selecionarDia(iso) {
 
       try {
         await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: statusNovo });
-        
-        const promessasLogs = [registrarOrdemServico(item, statusAnterior, statusNovo)];
-        if (statusAnterior !== "Concluída" && statusNovo === "Concluída") {
-          promessasLogs.push(registrarHistorico(item));
+        const promessasLogs = [registrarHistorico(item, statusAnterior, statusNovo)];
+        if (statusNovo === "Concluída") {
+          promessasLogs.push(registrarOrdemServico(item));
         }
         
         await Promise.all(promessasLogs);
@@ -548,22 +544,7 @@ function renderDashboard() {
 // ---------------------------------------------------------------------------
 // Ordens de serviço
 // ---------------------------------------------------------------------------
-async function registrarOrdemServico(item, statusAnterior, statusNovo) {
-  const agora = new Date();
-  await addDoc(collection(db, "ordens"), {
-    equipamentoId: item.id,
-    patrimonio: item.patrimonio || "",
-    setor: item.setor || "",
-    ambiente: item.ambiente || "",
-    equipe: item.equipeResponsavel || "",
-    dataAgendada: item.dataAgendada || "",
-    statusAnterior: statusAnterior || "",
-    statusNovo,
-    registradoEm: agora.toISOString(),
-  });
-}
-
-async function registrarHistorico(item) {
+async function registrarHistorico(item, statusAnterior, statusNovo) {
   const agora = new Date();
   await addDoc(collection(db, "historico"), {
     equipamentoId: item.id,
@@ -572,11 +553,23 @@ async function registrarHistorico(item) {
     ambiente: item.ambiente || "",
     equipe: item.equipeResponsavel || "",
     tipo: "Preventiva",
-    dataProgramada: item.dataAgendada || "",
-    dataExecucao: formatISO(agora),
-    status: "Concluída",
-    observacao: item.observacao || "",
+    statusAnterior: statusAnterior || "Pendente",
+    statusNovo: statusNovo,
     registradoEm: agora.toISOString()
+  });
+}
+
+async function registrarOrdemServico(item) {
+  const agora = new Date();
+  await addDoc(collection(db, "ordens"), {
+    equipamentoId: item.id,
+    patrimonio: item.patrimonio || "",
+    setor: item.setor || "",
+    ambiente: item.ambiente || "",
+    equipe: item.equipeResponsavel || "",
+    dataAgendada: item.dataAgendada || "",
+    status: "Concluída", 
+    registradoEm: agora.toISOString(),
   });
 }
 
@@ -612,33 +605,61 @@ function iniciarSincronizacaoHistorico(){
 // ---------------------------------------------------------------------------
 // Renderizadores de tabelas de log
 // ---------------------------------------------------------------------------
+function renderHistorico(){
+  const table = $("#historicoTable");
+  if(!table) return;
+
+  $("#historicoCount").textContent = `${ESTADO.historico.length} movimentações`;
+  table.innerHTML = `
+      <thead>
+          <tr>
+              <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
+              <th>Equipe</th><th>De</th><th>Para</th>
+          </tr>
+      </thead>
+      <tbody>
+      ${ESTADO.historico.map(h => `
+          <tr>
+              <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
+              <td>${h.patrimonio || "-"}</td>
+              <td>${h.setor}</td>
+              <td>${h.equipe}</td>
+              <td><span class="status-select ${classeStatus(h.statusAnterior)}" style="cursor:default">${h.statusAnterior || "-"}</span></td>
+              <td><span class="status-select ${classeStatus(h.statusNovo)}" style="cursor:default">${h.statusNovo}</span></td>
+          </tr>
+      `).join("")}
+      </tbody>
+  `;
+}
+
 function renderOrdens() {
   const table = $("#ordensTable");
   if (!table) return;
-  $("#ordensCount").textContent = `${ESTADO.ordens.length} registros`;
+  $("#ordensCount").textContent = `${ESTADO.ordens.length} OS Emitidas`;
+  
   table.innerHTML = `<thead><tr>
-      <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
-      <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
+      <th>Data de Conclusão</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
+      <th>Equipe</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
+    
   const tbody = table.querySelector("tbody");
+  
   ESTADO.ordens.forEach((o) => {
     const dt = new Date(o.registradoEm);
     const dataFmt = dt.toLocaleString("pt-BR");
     const tr = document.createElement("tr");
+    
     tr.innerHTML = `
       <td>${dataFmt}</td><td>${o.patrimonio || "-"}</td><td>${o.setor || ""}</td>
       <td>${o.ambiente || ""}</td><td>${o.equipe || ""}</td>
-      <td><span class="status-select ${classeStatus(o.statusAnterior)}" style="cursor:default">${o.statusAnterior || "-"}</span></td>
-      <td><span class="status-select ${classeStatus(o.statusNovo)}" style="cursor:default">${o.statusNovo}</span></td>
     `;
-    // Criando o botão de Imprimir para esta linha
+    
+    // Botão de imprimir a OS
     const tdBtn = document.createElement("td");
     const btnPrint = document.createElement("button");
     btnPrint.className = "btn ghost";
-    btnPrint.textContent = "PMOC";
-    btnPrint.style.color = "var(--azul)"; // Destaca um pouco a cor do botão
-    
-    // Quando clicar, chama a função de gerar o PDF passando os dados dessa ordem
+    btnPrint.textContent = "🖨️ PMOC";
+    btnPrint.style.color = "var(--azul)"; 
     btnPrint.addEventListener("click", () => gerarPDFPMOC(o));
     
     tdBtn.appendChild(btnPrint);
@@ -646,36 +667,6 @@ function renderOrdens() {
     tbody.appendChild(tr);
   });
 }
-
-function renderHistorico(){
-  const table = $("#historicoTable");
-  if(!table) return;
-
-  $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
-  table.innerHTML = `
-      <thead>
-          <tr>
-              <th>Data</th>
-              <th>Patrimônio</th>
-              <th>Setor</th>
-              <th>Equipe</th>
-              <th>Tipo</th>
-          </tr>
-      </thead>
-      <tbody>
-      ${ESTADO.historico.map(h=>`
-          <tr>
-              <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
-              <td>${h.patrimonio || "-"}</td>
-              <td>${h.setor}</td>
-              <td>${h.equipe}</td>
-              <td>${h.tipo}</td>
-          </tr>
-      `).join("")}
-      </tbody>
-  `;
-}
-
 // ---------------------------------------------------------------------------
 // Cadastro e Edição de equipamentos (CRUD unificado)
 // ---------------------------------------------------------------------------
