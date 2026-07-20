@@ -254,3 +254,10 @@ tbody tr:nth-child(even) { background: var(--azul-claro); }
   .sidenav-label, .sidenav-spacer { display: none; }
   .sidenav-item { width: auto; }
 }
+
+/* --- Feriados no calendário --- */
+.cal-day.is-holiday { background: #FCEFEF; border-color: #E8B4B4; }
+.cal-day-badge.holiday { background: #F3D6D6; color: #8A2E2E; }
+
+/* --- Botão pequeno "Remover" dentro de tabelas --- */
+table .btn.ghost { padding: 4px 10px; font-size: 12px; }
