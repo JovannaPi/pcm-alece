@@ -9,7 +9,7 @@ import {
 // ---------------------------------------------------------------------------
 const PRIORIDADE = {
   "1 - Presidência": 1, "2 - Primeiro Secretário": 2, "3 - Gabinetes": 3,
-  "4 - TI/Racks": 4, "5 - Plenário": 5, "6 - Administration": 6, "7 - Todo o resto": 7,
+  "4 - TI/Racks": 4, "5 - Plenário": 5, "6 - Administração": 6, "7 - Todo o resto": 7,
 };
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
@@ -186,7 +186,7 @@ function classificar(rows) {
       setor, ambiente,
       statusCondicao: colStatus ? row[colStatus] : "",
       setorPCM,
-      prioridadeSetor: PRIORIDADE[setorPCM],
+      prioridadeSetor: PRIORIDADE[setorPCM] || 7,
       pisoPCM: descobrirPiso(setor),
       statusPreventiva: "Pendente",
       observacao: "",
@@ -692,7 +692,7 @@ async function adicionarEquipamentoManual() {
   }
   
   const setorPCM = identificarSetor(setor, ambiente);
-  const prioridadeSetor = PRIORIDADE[setorPCM];
+  const prioridadeSetor = PRIORIDADE[setorPCM] || 7;
   const pisoPCM = descobrirPiso(setor);
 
   if (idEquipamentoEmEdicao) {
