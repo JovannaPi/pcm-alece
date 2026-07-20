@@ -610,6 +610,8 @@ function renderHistorico(){
   if(!table) return;
 
   $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
+  
+  // Limpa o conteúdo da tabela antes de preencher
   table.innerHTML = `
       <thead>
           <tr>
@@ -617,22 +619,35 @@ function renderHistorico(){
               <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
           </tr>
       </thead>
-      <tbody>
-      ${ESTADO.historico.map(h => `
-          <tr>
-              <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
-              <td>${h.patrimonio || "-"}</td>
-              <td>${h.setor}</td>
-              <td>${h.equipe}</td>
-              <td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>
-              <td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>
-              <td>
-                  <button class="btn ghost" onclick="deletarRegistro('historico', '${h.id}')">🗑️</button>
-              </td>
-          </tr>
-      `).join("")}
-      </tbody>
+      <tbody></tbody>
   `;
+  
+  const tbody = table.querySelector("tbody");
+
+  ESTADO.historico.forEach(h => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+        <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
+        <td>${h.patrimonio || "-"}</td>
+        <td>${h.setor}</td>
+        <td>${h.equipe}</td>
+        <td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>
+        <td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>
+    `;
+    
+    // Criamos a célula de ação manualmente para anexar o evento
+    const tdAcao = document.createElement("td");
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn ghost";
+    btnDel.textContent = "🗑️";
+    
+    // O segredo está aqui: usamos addEventListener, que funciona dentro do módulo
+    btnDel.addEventListener("click", () => deletarRegistro('historico', h.id));
+    
+    tdAcao.appendChild(btnDel);
+    tr.appendChild(tdAcao);
+    tbody.appendChild(tr);
+  });
 }
 
 function renderOrdens() {
