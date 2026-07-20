@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import {
   collection, doc, setDoc, getDocs, onSnapshot, updateDoc, query, orderBy, writeBatch,
+  deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,11 @@ const ESTADO = {
   meta: null,
   itensCarregados: [],
   equipamentos: [],
+  feriados: [],
+  ordens: [],
   unsubscribe: null,
+  unsubscribeFeriados: null,
+  unsubscribeOrdens: null,
   calYear: null,
   calMonth: null,
   diaSelecionado: null,
@@ -91,6 +96,9 @@ $all(".tab").forEach((btn) => {
     $(`#view-${btn.dataset.view}`).classList.add("active");
     if (btn.dataset.view === "calendar") renderCalendar();
     if (btn.dataset.view === "dashboard") renderDashboard();
+    if (btn.dataset.view === "equipamentos") renderEquipamentosCadastro();
+    if (btn.dataset.view === "feriados") renderFeriados();
+    if (btn.dataset.view === "ordens") renderOrdens();
   });
 });
 
@@ -208,6 +216,14 @@ function renderPreview(itens) {
 
 $("#btnGerar").addEventListener("click", gerarCronograma);
 
+// ---------------------------------------------------------------------------
+// Feriados e férias — datas que o cronograma deve pular
+// ---------------------------------------------------------------------------
+function estaEmFeriado(date) {
+  const iso = formatISO(date);
+  return ESTADO.feriados.some((f) => iso >= f.dataInicio && iso <= f.dataFim);
+}
+
 async function gerarCronograma() {
   if (!ESTADO.itensCarregados.length) {
     toast("Envie e classifique um levantamento primeiro.");
@@ -227,7 +243,7 @@ async function gerarCronograma() {
   const capacidadeDia = nEquipes * aparelhosDia;
 
   function ehDiaUtil(data) {
-    return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]);
+    return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
   }
 
   let dataCursor = new Date(dataInicioStr + "T00:00:00");
@@ -236,56 +252,69 @@ async function gerarCronograma() {
   }
   const primeiraDataUtil = new Date(dataCursor);
 
-  const itens = ESTADO.itensCarregados.map((i) => ({ ...i }));
-  let contador = 0;
-  let grupoAmbienteAtual = null;
-  let indiceGrupo = -1;
-  itens.forEach((item, idx) => {
-    const chaveAmbiente = `${item.setor}||${item.ambiente}`;
-    if (chaveAmbiente !== grupoAmbienteAtual) {
-      grupoAmbienteAtual = chaveAmbiente;
-      indiceGrupo++;
-    }
-    item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
-
-    item.ordemExecucao = idx + 1;
-    item.dataAgendada = formatISO(dataCursor);
-    item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
-    const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-    item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
-
-    contador++;
-    if (contador >= capacidadeDia) {
-      contador = 0;
-      do {
-        dataCursor.setDate(dataCursor.getDate() + 1);
-      } while (!ehDiaUtil(dataCursor));
-    }
-  });
-
-  const diasNecessarios = Math.ceil(itens.length / capacidadeDia);
-  const semanasNecessarias = Math.ceil(diasNecessarios / diasSemana);
-  $("#resumoCapacidade").textContent =
-    `Capacidade diária: ${capacidadeDia} aparelhos · Dias necessários: ${diasNecessarios} · Semanas necessárias: ${semanasNecessarias}`;
-
-  toast("Lendo dados anteriores...");
   $("#btnGerar").disabled = true;
   try {
+    // Itens vindos da planilha recém-carregada
+    const itensPlanilha = ESTADO.itensCarregados.map((i) => ({ ...i }));
+
+    // Itens cadastrados manualmente (aba "Equipamentos") são preservados —
+    // eles não vêm de nenhuma planilha, então não podem ser "substituídos" por ela.
+    toast("Lendo dados anteriores...");
     const existentesSnap = await getDocs(collection(db, "equipamentos"));
     const existentes = {};
     const idsAntigos = [];
+    const manuaisPreservados = [];
     existentesSnap.forEach((d) => {
-      existentes[d.id] = d.data();
+      const dados = d.data();
+      existentes[d.id] = dados;
       idsAntigos.push(d.id);
+      if (dados.origem === "manual") {
+        manuaisPreservados.push({ ...dados, id: d.id });
+      }
     });
 
+    const itens = [...itensPlanilha, ...manuaisPreservados];
+
+    let contador = 0;
+    let grupoAmbienteAtual = null;
+    let indiceGrupo = -1;
+    let ordem = 0;
     itens.forEach((item) => {
+      const chaveAmbiente = `${item.setor}||${item.ambiente}`;
+      if (chaveAmbiente !== grupoAmbienteAtual) {
+        grupoAmbienteAtual = chaveAmbiente;
+        indiceGrupo++;
+      }
+      item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
+
+      ordem++;
+      item.ordemExecucao = ordem;
+      item.dataAgendada = formatISO(dataCursor);
+      item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+      item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
+
       const anterior = existentes[item.id];
       if (anterior) {
         item.statusPreventiva = anterior.statusPreventiva || "Pendente";
         item.observacao = anterior.observacao || "";
       }
+
+      contador++;
+      if (contador >= capacidadeDia) {
+        contador = 0;
+        do {
+          dataCursor.setDate(dataCursor.getDate() + 1);
+        } while (!ehDiaUtil(dataCursor));
+      }
     });
+
+    const diasNecessarios = Math.ceil(itens.length / capacidadeDia);
+    const semanasNecessarias = Math.ceil(diasNecessarios / diasSemana);
+    $("#resumoCapacidade").textContent =
+      `Capacidade diária: ${capacidadeDia} aparelhos · Dias necessários: ${diasNecessarios} · ` +
+      `Semanas necessárias: ${semanasNecessarias}` +
+      (manuaisPreservados.length ? ` · ${manuaisPreservados.length} cadastrado(s) manualmente incluído(s)` : "");
 
     const TAMANHO_LOTE = 400;
 
@@ -330,6 +359,7 @@ function iniciarSincronizacao() {
     }
     renderCalendar();
     renderDashboard();
+    renderEquipamentosCadastro();
   }, (err) => {
     console.error(err);
     toast("Erro ao ler dados do Firebase: " + err.message);
@@ -387,13 +417,22 @@ function renderCalendar() {
   for (let dia = 1; dia <= diasNoMes; dia++) {
     const iso = `${ESTADO.calYear}-${String(ESTADO.calMonth + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
     const itensDoDia = porData[iso] || [];
+    const feriadoDoDia = ESTADO.feriados.find((f) => iso >= f.dataInicio && iso <= f.dataFim);
     const el = document.createElement("div");
-    el.className = "cal-day" + (itensDoDia.length ? " has-tasks" : "") + (ESTADO.diaSelecionado === iso ? " selected" : "");
+    el.className = "cal-day" + (itensDoDia.length ? " has-tasks" : "") +
+      (ESTADO.diaSelecionado === iso ? " selected" : "") + (feriadoDoDia ? " is-holiday" : "");
 
     const num = document.createElement("div");
     num.className = "cal-day-num";
     num.textContent = dia;
     el.appendChild(num);
+
+    if (feriadoDoDia) {
+      const tag = document.createElement("div");
+      tag.className = "cal-day-badge holiday";
+      tag.textContent = feriadoDoDia.label || (feriadoDoDia.tipo === "feriado" ? "Feriado" : "Férias");
+      el.appendChild(tag);
+    }
 
     if (itensDoDia.length) {
       const concluidas = itensDoDia.filter((i) => i.statusPreventiva === "Concluída").length;
@@ -435,9 +474,16 @@ function selecionarDia(iso) {
       select.appendChild(opt);
     });
     select.addEventListener("change", async () => {
+      const statusAnterior = item.statusPreventiva;
       select.className = "status-select " + classeStatus(select.value);
-      await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: select.value });
-      toast(`Status de ${item.patrimonio || item.ambiente} atualizado.`);
+      try {
+        await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: select.value });
+        await registrarOrdemServico(item, statusAnterior, select.value);
+        toast(`Status de ${item.patrimonio || item.ambiente} atualizado.`);
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao atualizar status: " + err.message);
+      }
     });
     tdStatus.appendChild(select);
     tr.appendChild(tdStatus);
@@ -471,6 +517,234 @@ function renderDashboard() {
   ).join("");
 }
 
+// ---------------------------------------------------------------------------
+// Ordens de serviço — log automático toda vez que um status muda
+// ---------------------------------------------------------------------------
+async function registrarOrdemServico(item, statusAnterior, statusNovo) {
+  const agora = new Date();
+  await addDoc(collection(db, "ordens"), {
+    equipamentoId: item.id,
+    patrimonio: item.patrimonio || "",
+    setor: item.setor || "",
+    ambiente: item.ambiente || "",
+    equipe: item.equipeResponsavel || "",
+    dataAgendada: item.dataAgendada || "",
+    statusAnterior: statusAnterior || "",
+    statusNovo,
+    registradoEm: agora.toISOString(),
+  });
+}
+
+function iniciarSincronizacaoOrdens() {
+  if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
+  const q = query(collection(db, "ordens"), orderBy("registradoEm", "desc"), limit(300));
+  ESTADO.unsubscribeOrdens = onSnapshot(q, (snap) => {
+    ESTADO.ordens = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderOrdens();
+  }, (err) => {
+    console.error(err);
+    toast("Erro ao ler ordens de serviço: " + err.message);
+  });
+}
+iniciarSincronizacaoOrdens();
+
+function renderOrdens() {
+  const table = $("#ordensTable");
+  if (!table) return;
+  $("#ordensCount").textContent = `${ESTADO.ordens.length} registros`;
+  table.innerHTML = `<thead><tr>
+      <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
+      <th>Equipe</th><th>De</th><th>Para</th>
+    </tr></thead><tbody>${ESTADO.ordens.map((o) => {
+      const dt = new Date(o.registradoEm);
+      const dataFmt = dt.toLocaleString("pt-BR");
+      return `<tr>
+        <td>${dataFmt}</td><td>${o.patrimonio || "-"}</td><td>${o.setor || ""}</td>
+        <td>${o.ambiente || ""}</td><td>${o.equipe || ""}</td>
+        <td><span class="status-select ${classeStatus(o.statusAnterior)}" style="cursor:default">${o.statusAnterior || "-"}</span></td>
+        <td><span class="status-select ${classeStatus(o.statusNovo)}" style="cursor:default">${o.statusNovo}</span></td>
+      </tr>`;
+    }).join("")}</tbody>`;
+}
+
+// ---------------------------------------------------------------------------
+// Cadastro de equipamentos (CRUD manual, sem depender da planilha)
+// ---------------------------------------------------------------------------
+const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
+if (btnAdicionarEquipamento) {
+  btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
+}
+
+async function adicionarEquipamentoManual() {
+  const patrimonio = $("#eqPatrimonio").value.trim();
+  const setor = $("#eqSetor").value.trim();
+  const ambiente = $("#eqAmbiente").value.trim();
+  if (!setor || !ambiente) {
+    toast("Preencha pelo menos Setor e Ambiente.");
+    return;
+  }
+  const setorPCM = identificarSetor(setor, ambiente);
+  const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const item = {
+    id, patrimonio, setor, ambiente,
+    statusCondicao: "",
+    setorPCM,
+    prioridadeSetor: PRIORIDADE[setorPCM],
+    pisoPCM: descobrirPiso(setor),
+    statusPreventiva: "Pendente",
+    observacao: "",
+    origem: "manual",
+    // Sem cronograma ainda — só ganha data/equipe na próxima vez que "Gerar cronograma" rodar.
+    ordemExecucao: 999999,
+  };
+  try {
+    await setDoc(doc(db, "equipamentos", id), item);
+    $("#eqPatrimonio").value = "";
+    $("#eqSetor").value = "";
+    $("#eqAmbiente").value = "";
+    toast("Equipamento adicionado. Rode 'Gerar cronograma' pra ele entrar na agenda.");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao adicionar: " + err.message);
+  }
+}
+
+async function removerEquipamento(id, descricao) {
+  const ok = window.confirm(`Remover "${descricao}"? Essa ação não pode ser desfeita.`);
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "equipamentos", id));
+    toast("Equipamento removido.");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao remover: " + err.message);
+  }
+}
+
+function renderEquipamentosCadastro() {
+  const table = $("#equipamentosTable");
+  if (!table) return;
+  const itens = ESTADO.equipamentos;
+  $("#equipamentosCount").textContent = `${itens.length} itens`;
+  table.innerHTML = `<thead><tr>
+      <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Setor PCM</th>
+      <th>Status</th><th>Origem</th><th></th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+  itens.forEach((item) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
+      <td>${item.setorPCM}</td>
+      <td><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span></td>
+      <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>`;
+    const tdBtn = document.createElement("td");
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn ghost";
+    btnDel.textContent = "Remover";
+    btnDel.addEventListener("click", () => removerEquipamento(item.id, item.patrimonio || item.ambiente));
+    tdBtn.appendChild(btnDel);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Feriados e férias
+// ---------------------------------------------------------------------------
+const feriadoTipoSelect = $("#feriadoTipo");
+if (feriadoTipoSelect) {
+  feriadoTipoSelect.addEventListener("change", () => {
+    $("#labelFeriadoFim").style.display = feriadoTipoSelect.value === "ferias" ? "flex" : "none";
+  });
+  feriadoTipoSelect.dispatchEvent(new Event("change"));
+}
+
+const btnAdicionarFeriado = $("#btnAdicionarFeriado");
+if (btnAdicionarFeriado) {
+  btnAdicionarFeriado.addEventListener("click", adicionarFeriado);
+}
+
+async function adicionarFeriado() {
+  const tipo = $("#feriadoTipo").value;
+  const label = $("#feriadoLabel").value.trim();
+  const dataInicio = $("#feriadoInicio").value;
+  const dataFimInput = $("#feriadoFim").value;
+  if (!dataInicio) {
+    toast("Escolha a data início.");
+    return;
+  }
+  const dataFim = tipo === "feriado" ? dataInicio : (dataFimInput || dataInicio);
+  if (dataFim < dataInicio) {
+    toast("A data fim não pode ser antes da data início.");
+    return;
+  }
+  try {
+    await addDoc(collection(db, "feriados"), {
+      tipo, label: label || (tipo === "feriado" ? "Feriado" : "Férias"),
+      dataInicio, dataFim,
+    });
+    $("#feriadoLabel").value = "";
+    $("#feriadoInicio").value = "";
+    $("#feriadoFim").value = "";
+    toast("Data cadastrada.");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao cadastrar: " + err.message);
+  }
+}
+
+async function removerFeriado(id, label) {
+  const ok = window.confirm(`Remover "${label}"?`);
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "feriados", id));
+    toast("Removido.");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao remover: " + err.message);
+  }
+}
+
+function iniciarSincronizacaoFeriados() {
+  if (ESTADO.unsubscribeFeriados) ESTADO.unsubscribeFeriados();
+  const q = query(collection(db, "feriados"), orderBy("dataInicio"));
+  ESTADO.unsubscribeFeriados = onSnapshot(q, (snap) => {
+    ESTADO.feriados = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderFeriados();
+    renderCalendar();
+  }, (err) => {
+    console.error(err);
+    toast("Erro ao ler feriados: " + err.message);
+  });
+}
+iniciarSincronizacaoFeriados();
+
+function renderFeriados() {
+  const table = $("#feriadosTable");
+  if (!table) return;
+  $("#feriadosCount").textContent = `${ESTADO.feriados.length} datas`;
+  table.innerHTML = `<thead><tr><th>Tipo</th><th>Descrição</th><th>Início</th><th>Fim</th><th></th></tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+  ESTADO.feriados.forEach((f) => {
+    const tr = document.createElement("tr");
+    const [ai, am, ad] = f.dataInicio.split("-");
+    const [bi, bm, bd] = f.dataFim.split("-");
+    tr.innerHTML = `<td>${f.tipo === "feriado" ? "Feriado" : "Férias"}</td><td>${f.label}</td>
+      <td>${ad}/${am}/${ai}</td><td>${bd}/${bm}/${bi}</td>`;
+    const tdBtn = document.createElement("td");
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn ghost";
+    btnDel.textContent = "Remover";
+    btnDel.addEventListener("click", () => removerFeriado(f.id, f.label));
+    tdBtn.appendChild(btnDel);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Exportação para Excel (abas separadas, cores e formatação — igual à versão Python)
+// ---------------------------------------------------------------------------
 const FONT_NAME = "Arial";
 const COR_HEADER = "FF1F4E78";
 const COR_BANDA = "FFEEF3F8";
