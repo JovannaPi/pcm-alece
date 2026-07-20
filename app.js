@@ -286,34 +286,34 @@ async function gerarCronograma() {
     let ordem = 0;
     
     itens.forEach((item) => {
-      const chaveAmbiente = `${item.setor}||${item.ambiente}`;
-      if (chaveAmbiente !== grupoAmbienteAtual) {
-        grupoAmbienteAtual = chaveAmbiente;
-        indiceGrupo++;
-      }
-      item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
+  const chaveAmbiente = `${item.setor}||${item.ambiente}`;
+  if (chaveAmbiente !== grupoAmbienteAtual) {
+    grupoAmbienteAtual = chaveAmbiente;
+    indiceGrupo++;
+  }
+  item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
 
-      ordem++;
-      item.ordemExecucao = ordem;
-      item.dataAgendada = formatISO(dataCursor);
-      item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
-      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-      item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
+  ordem++;
+  item.ordemExecucao = ordem;
+  item.dataAgendada = formatISO(dataCursor);
+  item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+  const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+  item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
 
-      const anterior = existentes[item.id];
-      if (anterior) {
-        item.statusPreventiva = anterior.statusPreventiva || "Pendente";
-        item.observacao = anterior.observacao || "";
-      }
+  const anterior = existentes[item.id];
+  if (anterior) {
+    item.statusPreventiva = anterior.statusPreventiva || "Pendente";
+    item.observacao = anterior.observacao || "";
+  }
 
-      contador++;
-      if (contador >= capacidadeDia) {
-        contador = 0;
-        do {
-          dataCursor.setDate(dataCursor.getDate() + 1);
-        } while (!ehDiaUtil(dataCursor));
-      }
-    });
+  contador++;
+  if (contador >= capacidadeDia) {
+    contador = 0;
+    do {
+      dataCursor.setDate(dataCursor.getDate() + 1);
+    } while (!ehDiaUtil(dataCursor));
+  }
+});
 
     const diasNecessarios = Math.ceil(itens.length / capacidadeDia);
     const semanasNecessarias = Math.ceil(diasNecessarios / diasSemana);
