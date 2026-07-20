@@ -609,12 +609,12 @@ function renderHistorico(){
   const table = $("#historicoTable");
   if(!table) return;
 
-  $("#historicoCount").textContent = `${ESTADO.historico.length} movimentações`;
+  $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
   table.innerHTML = `
       <thead>
           <tr>
               <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
-              <th>Equipe</th><th>De</th><th>Para</th>
+              <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
           </tr>
       </thead>
       <tbody>
@@ -624,8 +624,11 @@ function renderHistorico(){
               <td>${h.patrimonio || "-"}</td>
               <td>${h.setor}</td>
               <td>${h.equipe}</td>
-              <td><span class="status-select ${classeStatus(h.statusAnterior)}" style="cursor:default">${h.statusAnterior || "-"}</span></td>
-              <td><span class="status-select ${classeStatus(h.statusNovo)}" style="cursor:default">${h.statusNovo}</span></td>
+              <td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>
+              <td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>
+              <td>
+                  <button class="btn ghost" onclick="deletarRegistro('historico', '${h.id}')">🗑️</button>
+              </td>
           </tr>
       `).join("")}
       </tbody>
@@ -645,24 +648,31 @@ function renderOrdens() {
   const tbody = table.querySelector("tbody");
   
   ESTADO.ordens.forEach((o) => {
-    const dt = new Date(o.registradoEm);
-    const dataFmt = dt.toLocaleString("pt-BR");
     const tr = document.createElement("tr");
-    
     tr.innerHTML = `
-      <td>${dataFmt}</td><td>${o.patrimonio || "-"}</td><td>${o.setor || ""}</td>
-      <td>${o.ambiente || ""}</td><td>${o.equipe || ""}</td>
+      <td>${new Date(o.registradoEm).toLocaleString("pt-BR")}</td>
+      <td>${o.patrimonio || "-"}</td>
+      <td>${o.setor || ""}</td>
+      <td>${o.ambiente || ""}</td>
+      <td>${o.equipe || ""}</td>
     `;
     
-    // Botão de imprimir a OS
     const tdBtn = document.createElement("td");
+    
+    // Botão de Imprimir
     const btnPrint = document.createElement("button");
     btnPrint.className = "btn ghost";
     btnPrint.textContent = "🖨️ PMOC";
-    btnPrint.style.color = "var(--azul)"; 
     btnPrint.addEventListener("click", () => gerarPDFPMOC(o));
     
+    // Botão de Lixeira
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn ghost";
+    btnDel.textContent = "🗑️";
+    btnDel.addEventListener("click", () => deletarRegistro('ordens', o.id));
+    
     tdBtn.appendChild(btnPrint);
+    tdBtn.appendChild(btnDel);
     tr.appendChild(tdBtn);
     tbody.appendChild(tr);
   });
@@ -1239,4 +1249,16 @@ function gerarPDFPMOC(ordem) {
   janela.setTimeout(function() {
     janela.print();
   }, 250);
+}
+
+async function deletarRegistro(colecao, id) {
+  const ok = window.confirm("Excluir este registro permanentemente?");
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, colecao, id));
+    toast("Registro excluído!");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
 }
