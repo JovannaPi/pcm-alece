@@ -79,13 +79,17 @@ body {
   opacity: .78;
   font-weight: 500;
 }
-.brand-name {
-  font-family: var(--fonte-display);
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: .01em;
-  display: flex;
-  align-items: center;
+.brand-name::before {
+  content: "";
+  width: 34px;
+  height: 34px;
+  margin-right: 10px;
+
+  background: url("site-header-mobile.png") center center;
+  background-size: contain;
+  background-repeat: no-repeat;
+
+  flex-shrink: 0;
 }
 
 /* Selo circular discreto, como um carimbo/placa oficial — não é um logo importado,
