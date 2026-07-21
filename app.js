@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import {
-  collection, doc, setDoc, getDocs, onSnapshot, updateDoc, query, orderBy, writeBatch,
+  collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query, orderBy, writeBatch,
   deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -68,6 +68,8 @@ const ESTADO = {
   feriados: [],
   ordens: [],
   historico: [],
+  config: null,
+  filtros: { equipamentos: "", feriados: "", ordens: "", historico: "" },
   unsubscribe: null,
   unsubscribeFeriados: null,
   unsubscribeOrdens: null,
@@ -99,6 +101,7 @@ $all(".tab").forEach((btn) => {
     if (btn.dataset.view === "equipamentos") renderEquipamentosCadastro();
     if (btn.dataset.view === "feriados") renderFeriados();
     if (btn.dataset.view === "ordens") renderOrdens();
+    if (btn.dataset.view === "historico") renderHistorico();
   });
 });
 
@@ -255,6 +258,9 @@ async function gerarCronograma() {
 
   $("#btnGerar").disabled = true;
   try {
+    ESTADO.config = { nEquipes, aparelhosDia, diasSemana, dataInicio: formatISO(primeiraDataUtil) };
+    await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
+
     const itensPlanilha = ESTADO.itensCarregados.map((i) => ({ ...i }));
 
     toast("Lendo dados anteriores...");
@@ -346,6 +352,84 @@ async function gerarCronograma() {
   }
 }
 
+// Reorganiza as datas de TODOS os equipamentos já salvos, respeitando a ordem
+// de execução, a capacidade diária e os feriados/férias atuais. É chamada
+// automaticamente ao cadastrar um feriado novo ou um equipamento manual, para
+// que o cronograma sempre reflita o estado mais recente sem precisar reimportar
+// a planilha.
+async function reagendarTudo() {
+  if (!ESTADO.equipamentos.length) return;
+
+  if (!ESTADO.config) {
+    ESTADO.config = { nEquipes: 2, aparelhosDia: 2, diasSemana: 5, dataInicio: formatISO(new Date()) };
+  }
+
+  const { nEquipes, aparelhosDia, diasSemana, dataInicio } = ESTADO.config;
+  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
+  const capacidadeDia = Math.max(1, nEquipes) * Math.max(1, aparelhosDia);
+
+  function ehDiaUtilLocal(data) {
+    return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
+  }
+
+  const [ano, mes, dia] = dataInicio.split("-");
+  let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0);
+  while (!ehDiaUtilLocal(dataCursor)) dataCursor.setDate(dataCursor.getDate() + 1);
+  const primeiraDataUtil = new Date(dataCursor);
+
+  const itens = [...ESTADO.equipamentos].sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
+
+  let contador = 0;
+  const atualizacoes = [];
+
+  itens.forEach((item) => {
+    const novaData = formatISO(dataCursor);
+    const novoDia = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+    const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+    const novaSemana = `Semana ${Math.floor(diffDias / 7) + 1}`;
+
+    if (item.dataAgendada !== novaData || item.diaPlanejado !== novoDia || item.semanaPlanejada !== novaSemana) {
+      atualizacoes.push({ id: item.id, dataAgendada: novaData, diaPlanejado: novoDia, semanaPlanejada: novaSemana });
+    }
+
+    contador++;
+    if (contador >= capacidadeDia) {
+      contador = 0;
+      do { dataCursor.setDate(dataCursor.getDate() + 1); } while (!ehDiaUtilLocal(dataCursor));
+    }
+  });
+
+  if (atualizacoes.length) {
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < atualizacoes.length; inicio += TAMANHO_LOTE) {
+      const pedaco = atualizacoes.slice(inicio, inicio + TAMANHO_LOTE);
+      const batch = writeBatch(db);
+      pedaco.forEach((u) => batch.update(doc(db, "equipamentos", u.id), {
+        dataAgendada: u.dataAgendada, diaPlanejado: u.diaPlanejado, semanaPlanejada: u.semanaPlanejada,
+      }));
+      await batch.commit();
+    }
+    toast(`Cronograma reorganizado (${atualizacoes.length} item(ns) reagendado(s)).`);
+  }
+
+  await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
+}
+
+async function carregarConfig() {
+  try {
+    const snap = await getDoc(doc(db, "config", "cronograma"));
+    if (snap.exists()) {
+      ESTADO.config = snap.data();
+      if ($("#nEquipes")) $("#nEquipes").value = ESTADO.config.nEquipes;
+      if ($("#aparelhosDia")) $("#aparelhosDia").value = ESTADO.config.aparelhosDia;
+      if ($("#diasSemana")) $("#diasSemana").value = ESTADO.config.diasSemana;
+      if ($("#dataInicio")) $("#dataInicio").value = ESTADO.config.dataInicio;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 function iniciarSincronizacao() {
   if (ESTADO.unsubscribe) ESTADO.unsubscribe();
   const q = query(collection(db, "equipamentos"), orderBy("ordemExecucao"));
@@ -367,6 +451,20 @@ function iniciarSincronizacao() {
 
 iniciarSincronizacao();
 iniciarSincronizacaoHistorico();
+carregarConfig();
+
+function ligarBusca(inputId, chaveFiltro, renderFn) {
+  const input = $(`#${inputId}`);
+  if (!input) return;
+  input.addEventListener("input", () => {
+    ESTADO.filtros[chaveFiltro] = input.value.trim().toLowerCase();
+    renderFn();
+  });
+}
+ligarBusca("buscaEquipamentos", "equipamentos", renderEquipamentosCadastro);
+ligarBusca("buscaFeriados", "feriados", renderFeriados);
+ligarBusca("buscaOrdens", "ordens", renderOrdens);
+ligarBusca("buscaHistorico", "historico", renderHistorico);
 
 $("#prevMonth").addEventListener("click", () => mudarMes(-1));
 $("#nextMonth").addEventListener("click", () => mudarMes(1));
@@ -483,6 +581,7 @@ function selecionarDia(iso) {
 
       try {
         await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: statusNovo });
+        item.statusPreventiva = statusNovo;
         const promessasLogs = [registrarHistorico(item, statusAnterior, statusNovo)];
         if (statusNovo === "Concluída") {
           promessasLogs.push(registrarOrdemServico(item));
@@ -596,7 +695,14 @@ function renderHistorico(){
   const table = $("#historicoTable");
   if(!table) return;
 
-  $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
+  const termo = ESTADO.filtros.historico;
+  const historico = ESTADO.historico.filter((h) => {
+    if (!termo) return true;
+    const alvo = `${h.patrimonio || ""} ${h.setor || ""} ${h.equipe || ""}`.toLowerCase();
+    return alvo.includes(termo);
+  });
+
+  $("#historicoCount").textContent = `${historico.length} registros`;
 
   table.innerHTML = `<thead><tr>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
@@ -605,7 +711,7 @@ function renderHistorico(){
 
   const tbody = table.querySelector("tbody");
 
-  ESTADO.historico.forEach(h => {
+  historico.forEach(h => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
         <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
@@ -630,7 +736,15 @@ function renderHistorico(){
 function renderOrdens() {
   const table = $("#ordensTable");
   if (!table) return;
-  $("#ordensCount").textContent = `${ESTADO.ordens.length} OS Emitidas`;
+
+  const termo = ESTADO.filtros.ordens;
+  const ordens = ESTADO.ordens.filter((o) => {
+    if (!termo) return true;
+    const alvo = `${o.patrimonio || ""} ${o.setor || ""} ${o.ambiente || ""} ${o.equipe || ""}`.toLowerCase();
+    return alvo.includes(termo);
+  });
+
+  $("#ordensCount").textContent = `${ordens.length} OS Emitidas`;
 
   table.innerHTML = `<thead><tr>
       <th>Data de Conclusão</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
@@ -639,7 +753,7 @@ function renderOrdens() {
 
   const tbody = table.querySelector("tbody");
 
-  ESTADO.ordens.forEach((o) => {
+  ordens.forEach((o) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${new Date(o.registradoEm).toLocaleString("pt-BR")}</td>
@@ -716,52 +830,10 @@ async function adicionarEquipamentoManual() {
   } else {
     const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-    let agendamento = {
-      ordemExecucao: 999999,
-      dataAgendada: "",
-      diaPlanejado: "",
-      semanaPlanejada: "",
-      equipeResponsavel: ""
-    };
-
-    const filtrados = ESTADO.equipamentos.filter(e => e.dataAgendada).sort((a, b) => a.ordemExecucao - b.ordemExecucao);
-
-    if (filtrados.length > 0) {
-      const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
-      const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
-      const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana")?.value, 10) || 5));
-      const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
-      const capacidadeDia = nEquipes * aparelhosDia;
-
-      function ehDiaUtilLocal(data) {
-        return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
-      }
-
-      const ultimo = filtrados[filtrados.length - 1];
-      const [uAno, uMes, uDia] = ultimo.dataAgendada.split("-");
-      let dataCursor = new Date(uAno, parseInt(uMes, 10) - 1, uDia, 12, 0, 0);
-
-      const itensNoMesmoDia = filtrados.filter(e => e.dataAgendada === ultimo.dataAgendada).length;
-
-      if (itensNoMesmoDia >= capacidadeDia) {
-        do {
-          dataCursor.setDate(dataCursor.getDate() + 1);
-        } while (!ehDiaUtilLocal(dataCursor));
-      }
-
-      agendamento.dataAgendada = formatISO(dataCursor);
-      agendamento.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
-      agendamento.ordemExecucao = ultimo.ordemExecucao + 1;
-
-      const primeiro = filtrados[0];
-      const [pAno, pMes, pDia] = primeiro.dataAgendada.split("-");
-      const primeiraDataUtil = new Date(pAno, pMes - 1, pDia, 12, 0, 0);
-      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-      agendamento.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
-
-      const contagemEquipesDia = filtrados.filter(e => e.dataAgendada === agendamento.dataAgendada).length;
-      agendamento.equipeResponsavel = `Equipe ${(contagemEquipesDia % nEquipes) + 1}`;
-    }
+    const maiorOrdem = ESTADO.equipamentos.reduce((max, e) => Math.max(max, e.ordemExecucao || 0), 0);
+    const ordemExecucao = maiorOrdem + 1;
+    const nEquipesAtual = (ESTADO.config && ESTADO.config.nEquipes) || 2;
+    const equipeResponsavel = `Equipe ${((ordemExecucao - 1) % nEquipesAtual) + 1}`;
 
     const item = {
       id, patrimonio, setor, ambiente,
@@ -772,12 +844,18 @@ async function adicionarEquipamentoManual() {
       statusPreventiva: "Pendente",
       observacao: "",
       origem: "manual",
-      ...agendamento
+      ordemExecucao,
+      equipeResponsavel,
+      dataAgendada: "",
+      diaPlanejado: "",
+      semanaPlanejada: "",
     };
 
     try {
       await setDoc(doc(db, "equipamentos", id), item);
-      toast(agendamento.dataAgendada ? `Encaixado na agenda para ${agendamento.dataAgendada}!` : "Equipamento adicionado.");
+      ESTADO.equipamentos.push(item);
+      toast("Equipamento adicionado. Agendando automaticamente...");
+      await reagendarTudo();
     } catch (err) {
       console.error(err);
       toast("Erro ao adicionar: " + err.message);
@@ -805,7 +883,14 @@ async function removerEquipamento(id, descricao) {
 function renderEquipamentosCadastro() {
   const table = $("#equipamentosTable");
   if (!table) return;
-  const itens = ESTADO.equipamentos;
+
+  const termo = ESTADO.filtros.equipamentos;
+  const itens = ESTADO.equipamentos.filter((item) => {
+    if (!termo) return true;
+    const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""}`.toLowerCase();
+    return alvo.includes(termo);
+  });
+
   $("#equipamentosCount").textContent = `${itens.length} itens`;
   table.innerHTML = `<thead><tr>
       <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Setor PCM</th>
@@ -868,14 +953,14 @@ async function adicionarFeriado() {
     return;
   }
   try {
-    await addDoc(collection(db, "feriados"), {
-      tipo, label: label || (tipo === "feriado" ? "Feriado" : "Férias"),
-      dataInicio, dataFim,
-    });
+    const novoFeriado = { tipo, label: label || (tipo === "feriado" ? "Feriado" : "Férias"), dataInicio, dataFim };
+    const refDoc = await addDoc(collection(db, "feriados"), novoFeriado);
+    ESTADO.feriados.push({ id: refDoc.id, ...novoFeriado });
     $("#feriadoLabel").value = "";
     $("#feriadoInicio").value = "";
     $("#feriadoFim").value = "";
-    toast("Data cadastrada.");
+    toast("Data cadastrada. Reorganizando cronograma...");
+    await reagendarTudo();
   } catch (err) {
     console.error(err);
     toast("Erro ao cadastrar: " + err.message);
@@ -911,10 +996,18 @@ iniciarSincronizacaoFeriados();
 function renderFeriados() {
   const table = $("#feriadosTable");
   if (!table) return;
-  $("#feriadosCount").textContent = `${ESTADO.feriados.length} datas`;
+
+  const termo = ESTADO.filtros.feriados;
+  const feriados = ESTADO.feriados.filter((f) => {
+    if (!termo) return true;
+    const alvo = `${f.label || ""} ${f.tipo || ""}`.toLowerCase();
+    return alvo.includes(termo);
+  });
+
+  $("#feriadosCount").textContent = `${feriados.length} datas`;
   table.innerHTML = `<thead><tr><th>Tipo</th><th>Descrição</th><th>Início</th><th>Fim</th><th></th></tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
-  ESTADO.feriados.forEach((f) => {
+  feriados.forEach((f) => {
     const tr = document.createElement("tr");
     const [ai, am, ad] = f.dataInicio.split("-");
     const [bi, bm, bd] = f.dataFim.split("-");
@@ -1302,6 +1395,12 @@ async function apagarCronograma() {
     ESTADO.equipamentos = [];
     ESTADO.itensCarregados = [];
     ESTADO.diaSelecionado = null;
+    ESTADO.config = null;
+    try {
+      await deleteDoc(doc(db, "config", "cronograma"));
+    } catch (e) {
+      // pode não existir ainda, tudo bem
+    }
 
     $("#previewCard").hidden = true;
     $("#resumoCapacidade").textContent = "";
