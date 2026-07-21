@@ -79,17 +79,11 @@ body {
   opacity: .78;
   font-weight: 500;
 }
-.brand-name::before {
-  content: "";
-  width: 34px;
-  height: 34px;
-  margin-right: 10px;
-
-  background: url("site-header-mobile.png") center center;
-  background-size: contain;
-  background-repeat: no-repeat;
-
-  flex-shrink: 0;
+.brand-logo{
+  width:32px;
+  height:32px;
+  object-fit:contain;
+  margin-right:10px;
 }
 
 .tabs { display: flex; gap: 5px; flex-wrap: wrap; }
