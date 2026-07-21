@@ -11,7 +11,6 @@ const PRIORIDADE = {
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
 
-// Controle de estado para edição de itens
 let idEquipamentoEmEdicao = null;
 
 function identificarSetor(setorTxt, ambienteTxt) {
@@ -62,9 +61,6 @@ function formatISO(date) {
   return `${y}-${m}-${d}`;
 }
 
-// ---------------------------------------------------------------------------
-// Estado da aplicação
-// ---------------------------------------------------------------------------
 const ESTADO = {
   meta: null,
   itensCarregados: [],
@@ -220,9 +216,6 @@ function renderPreview(itens) {
 
 $("#btnGerar").addEventListener("click", gerarCronograma);
 
-// ---------------------------------------------------------------------------
-// Feriados e férias — datas que o cronograma deve pular
-// ---------------------------------------------------------------------------
 function estaEmFeriado(date) {
   const iso = formatISO(date);
   return ESTADO.feriados.some((f) => iso >= f.dataInicio && iso <= f.dataFim);
@@ -234,12 +227,12 @@ async function gerarCronograma() {
     irParaAba("upload");
     return;
   }
-  
+
   const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
   const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
   const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana")?.value, 10) || 5));
   const dataInicioStr = $("#dataInicio")?.value;
-  
+
   if (!dataInicioStr) {
     toast("Escolha a data de início do cronograma.");
     return;
@@ -253,7 +246,7 @@ async function gerarCronograma() {
   }
 
   const [ano, mes, dia] = dataInicioStr.split("-");
-  let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0); 
+  let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0);
 
   while (!ehDiaUtil(dataCursor)) {
     dataCursor.setDate(dataCursor.getDate() + 1);
@@ -265,11 +258,11 @@ async function gerarCronograma() {
     const itensPlanilha = ESTADO.itensCarregados.map((i) => ({ ...i }));
 
     toast("Lendo dados anteriores...");
-    
+
     const existentes = {};
     const idsAntigos = [];
     const manuaisPreservados = [];
-    
+
     ESTADO.equipamentos.forEach((dados) => {
       existentes[dados.id] = dados;
       idsAntigos.push(dados.id);
@@ -284,36 +277,36 @@ async function gerarCronograma() {
     let grupoAmbienteAtual = null;
     let indiceGrupo = -1;
     let ordem = 0;
-    
+
     itens.forEach((item) => {
-  const chaveAmbiente = `${item.setor}||${item.ambiente}`;
-  if (chaveAmbiente !== grupoAmbienteAtual) {
-    grupoAmbienteAtual = chaveAmbiente;
-    indiceGrupo++;
-  }
-  item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
+      const chaveAmbiente = `${item.setor}||${item.ambiente}`;
+      if (chaveAmbiente !== grupoAmbienteAtual) {
+        grupoAmbienteAtual = chaveAmbiente;
+        indiceGrupo++;
+      }
+      item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
 
-  ordem++;
-  item.ordemExecucao = ordem;
-  item.dataAgendada = formatISO(dataCursor);
-  item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
-  const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-  item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
+      ordem++;
+      item.ordemExecucao = ordem;
+      item.dataAgendada = formatISO(dataCursor);
+      item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+      item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
 
-  const anterior = existentes[item.id];
-  if (anterior) {
-    item.statusPreventiva = anterior.statusPreventiva || "Pendente";
-    item.observacao = anterior.observacao || "";
-  }
+      const anterior = existentes[item.id];
+      if (anterior) {
+        item.statusPreventiva = anterior.statusPreventiva || "Pendente";
+        item.observacao = anterior.observacao || "";
+      }
 
-  contador++;
-  if (contador >= capacidadeDia) {
-    contador = 0;
-    do {
-      dataCursor.setDate(dataCursor.getDate() + 1);
-    } while (!ehDiaUtil(dataCursor));
-  }
-});
+      contador++;
+      if (contador >= capacidadeDia) {
+        contador = 0;
+        do {
+          dataCursor.setDate(dataCursor.getDate() + 1);
+        } while (!ehDiaUtil(dataCursor));
+      }
+    });
 
     const diasNecessarios = Math.ceil(itens.length / capacidadeDia);
     const semanasNecessarias = Math.ceil(diasNecessarios / diasSemana);
@@ -468,7 +461,7 @@ function selecionarDia(iso) {
   const table = $("#dayDetailTable");
   table.innerHTML = `<thead><tr><th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Equipe</th><th>Status</th></tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
-  
+
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
@@ -481,11 +474,11 @@ function selecionarDia(iso) {
       if (s === item.statusPreventiva) opt.selected = true;
       select.appendChild(opt);
     });
-    
+
     select.addEventListener("change", async () => {
       const statusAnterior = item.statusPreventiva;
       const statusNovo = select.value;
-      
+
       select.disabled = true;
 
       try {
@@ -494,9 +487,9 @@ function selecionarDia(iso) {
         if (statusNovo === "Concluída") {
           promessasLogs.push(registrarOrdemServico(item));
         }
-        
+
         await Promise.all(promessasLogs);
-        
+
         select.className = "status-select " + classeStatus(statusNovo);
         toast(`Status atualizado com sucesso.`);
       } catch (err) {
@@ -508,7 +501,7 @@ function selecionarDia(iso) {
         select.disabled = false;
       }
     });
-    
+
     tdStatus.appendChild(select);
     tr.appendChild(tdStatus);
     tbody.appendChild(tr);
@@ -541,9 +534,6 @@ function renderDashboard() {
   ).join("");
 }
 
-// ---------------------------------------------------------------------------
-// Ordens de serviço
-// ---------------------------------------------------------------------------
 async function registrarHistorico(item, statusAnterior, statusNovo) {
   const agora = new Date();
   await addDoc(collection(db, "historico"), {
@@ -568,7 +558,7 @@ async function registrarOrdemServico(item) {
     ambiente: item.ambiente || "",
     equipe: item.equipeResponsavel || "",
     dataAgendada: item.dataAgendada || "",
-    status: "Concluída", 
+    status: "Concluída",
     registradoEm: agora.toISOString(),
   });
 }
@@ -602,21 +592,17 @@ function iniciarSincronizacaoHistorico(){
   });
 }
 
-// ---------------------------------------------------------------------------
-// Renderizadores de tabelas de log
-// ---------------------------------------------------------------------------
 function renderHistorico(){
   const table = $("#historicoTable");
   if(!table) return;
 
   $("#historicoCount").textContent = `${ESTADO.historico.length} registros`;
-  
-  // Limpa o corpo da tabela antes de preencher
+
   table.innerHTML = `<thead><tr>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
       <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
   </tr></thead><tbody></tbody>`;
-  
+
   const tbody = table.querySelector("tbody");
 
   ESTADO.historico.forEach(h => {
@@ -629,12 +615,11 @@ function renderHistorico(){
         <td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>
         <td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>
     `;
-    
+
     const tdAcao = document.createElement("td");
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "🗑️";
-    // Botão ligado via código, não via HTML onclick
     btnDel.addEventListener("click", () => deletarRegistro('historico', h.id));
     tdAcao.appendChild(btnDel);
     tr.appendChild(tdAcao);
@@ -646,14 +631,14 @@ function renderOrdens() {
   const table = $("#ordensTable");
   if (!table) return;
   $("#ordensCount").textContent = `${ESTADO.ordens.length} OS Emitidas`;
-  
+
   table.innerHTML = `<thead><tr>
       <th>Data de Conclusão</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
       <th>Equipe</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
-    
+
   const tbody = table.querySelector("tbody");
-  
+
   ESTADO.ordens.forEach((o) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -663,30 +648,26 @@ function renderOrdens() {
       <td>${o.ambiente || ""}</td>
       <td>${o.equipe || ""}</td>
     `;
-    
+
     const tdBtn = document.createElement("td");
-    
-    // Botão de Imprimir
+
     const btnPrint = document.createElement("button");
     btnPrint.className = "btn ghost";
     btnPrint.textContent = "🖨️ PMOC";
     btnPrint.addEventListener("click", () => gerarPDFPMOC(o));
-    
-    // Botão de Lixeira
+
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "🗑️";
     btnDel.addEventListener("click", () => deletarRegistro('ordens', o.id));
-    
+
     tdBtn.appendChild(btnPrint);
     tdBtn.appendChild(btnDel);
     tr.appendChild(tdBtn);
     tbody.appendChild(tr);
   });
 }
-// ---------------------------------------------------------------------------
-// Cadastro e Edição de equipamentos (CRUD unificado)
-// ---------------------------------------------------------------------------
+
 const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
 if (btnAdicionarEquipamento) {
   btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
@@ -697,7 +678,7 @@ function prepararEdicao(item) {
   $("#eqPatrimonio").value = item.patrimonio || "";
   $("#eqSetor").value = item.setor || "";
   $("#eqAmbiente").value = item.ambiente || "";
-  
+
   if (btnAdicionarEquipamento) {
     btnAdicionarEquipamento.textContent = "Salvar Alterações";
   }
@@ -709,18 +690,17 @@ async function adicionarEquipamentoManual() {
   const patrimonio = $("#eqPatrimonio").value.trim();
   const setor = $("#eqSetor").value.trim();
   const ambiente = $("#eqAmbiente").value.trim();
-  
+
   if (!setor || !ambiente) {
     toast("Preencha pelo menos Setor e Ambiente.");
     return;
   }
-  
+
   const setorPCM = identificarSetor(setor, ambiente);
   const prioridadeSetor = PRIORIDADE[setorPCM] || 7;
   const pisoPCM = descobrirPiso(setor);
 
   if (idEquipamentoEmEdicao) {
-    // CORREÇÃO: MODO EDIÇÃO - Salva dados mantendo o agendamento inalterado
     try {
       await updateDoc(doc(db, "equipamentos", idEquipamentoEmEdicao), {
         patrimonio, setor, ambiente, setorPCM, prioridadeSetor, pisoPCM
@@ -734,9 +714,8 @@ async function adicionarEquipamentoManual() {
       return;
     }
   } else {
-    // CORREÇÃO: MODO CADASTRO NOVO - Encaixa perfeitamente no fim da fila existente
     const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    
+
     let agendamento = {
       ordemExecucao: 999999,
       dataAgendada: "",
@@ -746,7 +725,7 @@ async function adicionarEquipamentoManual() {
     };
 
     const filtrados = ESTADO.equipamentos.filter(e => e.dataAgendada).sort((a, b) => a.ordemExecucao - b.ordemExecucao);
-    
+
     if (filtrados.length > 0) {
       const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
       const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
@@ -806,7 +785,6 @@ async function adicionarEquipamentoManual() {
     }
   }
 
-  // Limpa campos após salvar ou atualizar
   $("#eqPatrimonio").value = "";
   $("#eqSetor").value = "";
   $("#eqAmbiente").value = "";
@@ -834,28 +812,27 @@ function renderEquipamentosCadastro() {
       <th>Status</th><th>Origem</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
-  
+
   itens.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.setorPCM}</td>
       <td><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span></td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>`;
-    
+
     const tdBtn = document.createElement("td");
-    
-    // CORREÇÃO: Adicionado botão Editar ao painel de listagem
+
     const btnEdit = document.createElement("button");
     btnEdit.className = "btn ghost";
     btnEdit.textContent = "Editar";
     btnEdit.style.marginRight = "6px";
     btnEdit.addEventListener("click", () => prepararEdicao(item));
-    
+
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "Remover";
     btnDel.addEventListener("click", () => removerEquipamento(item.id, item.patrimonio || item.ambiente));
-    
+
     tdBtn.appendChild(btnEdit);
     tdBtn.appendChild(btnDel);
     tr.appendChild(tdBtn);
@@ -863,9 +840,6 @@ function renderEquipamentosCadastro() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Feriados e férias
-// ---------------------------------------------------------------------------
 const feriadoTipoSelect = $("#feriadoTipo");
 if (feriadoTipoSelect) {
   feriadoTipoSelect.addEventListener("change", () => {
@@ -957,9 +931,192 @@ function renderFeriados() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Exportação para Excel
-// ---------------------------------------------------------------------------
+const FONT_NAME = "Arial";
+const COR_HEADER = "FF1F4E78";
+const COR_BANDA = "FFEEF3F8";
+const COR_BORDA = "FFBFBFBF";
+const STATUS_COND_COLORS = { RUIM: "FFF8CBAD", RAZOAVEL: "FFFFE699", BOM: "FFC6E0B4" };
+const STATUS_PREV_COLORS = {
+  Pendente: { fill: "FFF8CBAD", font: "FFC00000" },
+  "Em andamento": { fill: "FFFFE699", font: "FF9C6500" },
+  "Concluída": { fill: "FFC6E0B4", font: "FF375623" },
+};
+const NOME_ORGAO = "ASSEMBLEIA LEGISLATIVA DO ESTADO DO CEARÁ";
+const NOME_SISTEMA = "Sistema de Planejamento da Manutenção Preventiva";
+const NOME_MARCA = "PCM ALCE";
+
+function colLetra(n) {
+  let s = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function bordaFina() {
+  const b = { style: "thin", color: { argb: COR_BORDA } };
+  return { top: b, left: b, right: b, bottom: b };
+}
+
+function normalizarStatusPreventiva(valor) {
+  const t = String(valor || "").trim().toUpperCase();
+  if (t.includes("CONCL")) return "Concluída";
+  if (t.includes("ANDAMENTO") || t.includes("EXECU")) return "Em andamento";
+  return "Pendente";
+}
+
+function adicionarCabecalho(ws, ultimaColuna) {
+  ultimaColuna = Math.max(ultimaColuna, 2);
+  const linhas = [
+    [NOME_ORGAO, 13, true],
+    [NOME_SISTEMA, 11, false],
+    [NOME_MARCA, 17, true],
+  ];
+  linhas.forEach(([texto, tam, negrito], i) => {
+    const linha = i + 1;
+    ws.mergeCells(linha, 1, linha, ultimaColuna);
+    for (let c = 1; c <= ultimaColuna; c++) {
+      const cell = ws.getCell(linha, c);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
+    }
+    const cell = ws.getCell(linha, 1);
+    cell.value = texto;
+    cell.font = { name: FONT_NAME, size: tam, bold: negrito, color: { argb: "FFFFFFFF" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(linha).height = linha === 3 ? 30 : 24;
+  });
+  return 5;
+}
+
+function calcularKpis(itens) {
+  const total = itens.length;
+  const concluidas = itens.filter((i) => normalizarStatusPreventiva(i.statusPreventiva) === "Concluída").length;
+  const andamento = itens.filter((i) => normalizarStatusPreventiva(i.statusPreventiva) === "Em andamento").length;
+  const pendentes = total - concluidas - andamento;
+  const execucaoPct = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
+  const pisos = new Set(itens.filter((i) => i.pisoPCM !== 99).map((i) => i.pisoPCM)).size;
+  const criticos = itens.filter((i) => String(i.statusCondicao || "").toUpperCase().includes("RUIM")).length;
+  const equipes = new Set(itens.filter((i) => i.equipeResponsavel).map((i) => i.equipeResponsavel)).size;
+  return { total, concluidas, andamento, pendentes, execucaoPct, pisos, criticos, equipes };
+}
+
+function formulasStatus(referencias) {
+  if (!referencias) return null;
+  const { colStatusPrev, colAmbiente, primeiraLinha, ultimaLinha } = referencias;
+  const faixaStatus = `Cronograma!$${colStatusPrev}$${primeiraLinha}:$${colStatusPrev}$${ultimaLinha}`;
+  const faixaTotal = `Cronograma!$${colAmbiente}$${primeiraLinha}:$${colAmbiente}$${ultimaLinha}`;
+  return {
+    total: `COUNTA(${faixaTotal})`,
+    concluidas: `COUNTIF(${faixaStatus},"Concluída")`,
+    andamento: `COUNTIF(${faixaStatus},"Em andamento")`,
+    pendentes: `COUNTIF(${faixaStatus},"Pendente")`,
+    execucao: `IFERROR(COUNTIF(${faixaStatus},"Concluída")/COUNTA(${faixaTotal}),0)`,
+  };
+}
+
+function escreverKpis(ws, linhaInicio, kpis, referencias) {
+  const formulas = formulasStatus(referencias);
+  const cartoes = [
+    ["Equipamentos", formulas ? formulas.total : kpis.total, "FF1F4E78"],
+    ["Concluídas", formulas ? formulas.concluidas : kpis.concluidas, "FF548235"],
+    ["Em andamento", formulas ? formulas.andamento : kpis.andamento, "FFBF8F00"],
+    ["Pendentes", formulas ? formulas.pendentes : kpis.pendentes, "FFC00000"],
+  ];
+  let col = 1;
+  const largura = 3, espaco = 1;
+  const linhaNum = linhaInicio, linhaMeio = linhaInicio + 1, linhaLabel = linhaInicio + 2;
+
+  cartoes.forEach(([label, valor, cor]) => {
+    const c1 = col, c2 = col + largura - 1;
+    for (const r of [linhaNum, linhaMeio, linhaLabel]) {
+      for (let c = c1; c <= c2; c++) {
+        const cell = ws.getCell(r, c);
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
+        cell.border = bordaFina();
+      }
+    }
+    ws.mergeCells(linhaNum, c1, linhaMeio, c2);
+    const cellNum = ws.getCell(linhaNum, c1);
+    cellNum.value = typeof valor === "string" ? { formula: valor } : valor;
+    cellNum.font = { name: FONT_NAME, size: 24, bold: true, color: { argb: "FFFFFFFF" } };
+    cellNum.alignment = { horizontal: "center", vertical: "middle" };
+
+    ws.mergeCells(linhaLabel, c1, linhaLabel, c2);
+    const cellLab = ws.getCell(linhaLabel, c1);
+    cellLab.value = label;
+    cellLab.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    cellLab.alignment = { horizontal: "center", vertical: "middle" };
+
+    col = c2 + 1 + espaco;
+  });
+
+  ws.getRow(linhaNum).height = 34;
+  ws.getRow(linhaMeio).height = 10;
+  ws.getRow(linhaLabel).height = 20;
+
+  const linhaExec = linhaLabel + 2;
+  const cellLabelExec = ws.getCell(linhaExec, 1);
+  cellLabelExec.value = "Execução:";
+  cellLabelExec.font = { name: FONT_NAME, size: 13, bold: true, color: { argb: "FF1F4E78" } };
+  const cellValExec = ws.getCell(linhaExec, 2);
+  cellValExec.value = formulas ? { formula: formulas.execucao } : kpis.execucaoPct / 100;
+  cellValExec.font = { name: FONT_NAME, size: 13, bold: true, color: { argb: "FF1F4E78" } };
+  cellValExec.numFmt = "0.0%";
+
+  return linhaExec + 2;
+}
+
+function escreverTabelaContagem(ws, colInicio, linhaInicio, titulo, entradas) {
+  const c1 = colInicio;
+  if (titulo) {
+    ws.getCell(linhaInicio, c1).value = titulo;
+    ws.getCell(linhaInicio, c1).font = { name: FONT_NAME, bold: true, size: 11 };
+  }
+  let r = linhaInicio + 1;
+  ws.getCell(r, c1).value = "Categoria";
+  ws.getCell(r, c1 + 1).value = "Quantidade";
+  for (const c of [c1, c1 + 1]) {
+    const cell = ws.getCell(r, c);
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_HEADER } };
+    cell.font = { name: FONT_NAME, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+  }
+  r++;
+  const primeiraLinhaDados = r;
+  entradas.forEach(([label, qtd], i) => {
+    const cellL = ws.getCell(r, c1);
+    cellL.value = String(label);
+    const cellQ = ws.getCell(r, c1 + 1);
+    cellQ.value = qtd;
+    cellL.border = bordaFina();
+    cellQ.border = bordaFina();
+    cellQ.alignment = { horizontal: "center" };
+    if (i % 2 === 0) {
+      cellL.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+      cellQ.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COR_BANDA } };
+    }
+    r++;
+  });
+  return [primeiraLinhaDados, r - 1];
+}
+
+function contarPor(itens, chave) {
+  const mapa = new Map();
+  itens.forEach((i) => {
+    const k = i[chave];
+    mapa.set(k, (mapa.get(k) || 0) + 1);
+  });
+  return mapa;
+}
+
+function rotuloPiso(v) {
+  if (v === 99) return "Não identificado";
+  if (v === 0) return "Térreo/Subsolo";
+  return `${v}º Piso`;
+}
+
+
 async function montarPlanilhaOrganizada(itens) {
   const kpis = calcularKpis(itens);
   const workbook = new ExcelJS.Workbook();
@@ -1078,7 +1235,7 @@ async function montarPlanilhaOrganizada(itens) {
   const [, uSetor] = escreverTabelaContagem(ws3, 1, r3, "Equipamentos por prioridade", contagemSetor);
   let proxima = uSetor + 3;
   const [, uPiso] = escreverTabelaContagem(ws3, 1, proxima, "Equipamentos por andar", contagemPiso);
-  
+
   ws3.getColumn(1).width = 26;
   ws3.getColumn(2).width = 14;
 
@@ -1113,9 +1270,6 @@ $("#btnExport").addEventListener("click", async () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Apagar cronograma
-// ---------------------------------------------------------------------------
 const btnApagarCronograma = $("#btnApagarCronograma");
 if (btnApagarCronograma) {
   btnApagarCronograma.addEventListener("click", apagarCronograma);
@@ -1164,20 +1318,16 @@ async function apagarCronograma() {
     btnApagarCronograma.disabled = false;
   }
 }
-// ---------------------------------------------------------------------------
-// Geração de PDF (PMOC)
-// ---------------------------------------------------------------------------
+
 function gerarPDFPMOC(ordem) {
-  // Busca os dados extras do equipamento usando o ID guardado na ordem
   const eqFull = ESTADO.equipamentos.find(e => e.id === ordem.equipamentoId) || {};
-  
+
   const idEquip = eqFull.patrimonio || ordem.patrimonio || "Sem Patrimônio";
   const setor = eqFull.setorPCM || ordem.setor || "Não informado";
   const ambiente = eqFull.ambiente || ordem.ambiente || "-";
   const prioridade = eqFull.prioridadeSetor || "-";
   const equipe = ordem.equipe || eqFull.equipeResponsavel || "-";
-  
-  // Pega a data de agendamento ou a data do registro da ordem
+
   const dataExecucao = ordem.dataAgendada ? ordem.dataAgendada.split("-").reverse().join("/") : "____/____/20___";
 
   const htmlDoc = `
@@ -1206,7 +1356,7 @@ function gerarPDFPMOC(ordem) {
       </head>
       <body>
         <div class="os-page">
-          
+
           <div class="os-topline">
             <div>
               <div class="org">Núcleo de Manutenção Predial</div>
@@ -1252,7 +1402,7 @@ function gerarPDFPMOC(ordem) {
   const janela = window.open('', '', 'width=800,height=600');
   janela.document.write(htmlDoc);
   janela.document.close();
-  
+
   janela.setTimeout(function() {
     janela.print();
   }, 250);
