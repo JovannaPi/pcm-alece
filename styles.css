@@ -216,6 +216,23 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
+/* Busca nas tabelas                                                    */
+/* ------------------------------------------------------------------ */
+.search-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: var(--fonte);
+  color: var(--texto);
+  background: var(--branco);
+  margin-bottom: 12px;
+}
+.search-input:focus { border-color: var(--azul); }
+.search-input::placeholder { color: var(--texto-suave); }
+
+/* ------------------------------------------------------------------ */
 /* Formulários                                                          */
 /* ------------------------------------------------------------------ */
 .grid-form {
