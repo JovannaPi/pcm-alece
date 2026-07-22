@@ -170,65 +170,90 @@ function marcarVerificacaoAtrasadosHoje() {
 // dia por navegador, para não ficar reprocessando a cada atualização em
 // tempo real.
 async function reagendarAtrasadosSeNecessario() {
-  if (jaVerificouAtrasadosHoje()) return;
+  // A trava foi comentada temporariamente para você poder fazer os testes
+  // if (jaVerificouAtrasadosHoje()) return; 
+
   const atrasados = ESTADO.equipamentos.filter(estaAtrasado);
-  marcarVerificacaoAtrasadosHoje();
   if (!atrasados.length) return;
+
+  // Garante que as configurações (capacidade) foram carregadas antes de calcular
+  if (!ESTADO.config) {
+    await carregarConfig(); 
+  }
+
   const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
   const nEquipes = (ESTADO.config && ESTADO.config.nEquipes) || 1;
   const aparelhosDia = (ESTADO.config && ESTADO.config.aparelhosDia) || 1;
   const capacidadeDia = nEquipes * aparelhosDia;
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
+
   function ehDiaUtilLocal(data) {
     return (
       DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) &&
       !estaEmFeriado(data)
     );
   }
-  // Conta quantos aparelhos já existem em cada dia
+
   const ocupacao = {};
   ESTADO.equipamentos.forEach((eq) => {
     if (!estaAtrasado(eq)) {
       ocupacao[eq.dataAgendada] = (ocupacao[eq.dataAgendada] || 0) + 1;
     }
   });
+
   const atualizacoes = [];
-  console.log("Atrasados:", atrasados);
+  
+  // Usada para recalcular a semana corretamente e não quebrar sua planilha
+  const dataInicioStr = (ESTADO.config && ESTADO.config.dataInicio) || formatISO(new Date());
+  const primeiraDataUtil = new Date(dataInicioStr + "T12:00:00Z");
   for (const item of atrasados) {
     let data = new Date();
-    data.setDate(data.getDate() + 1);
     while (true) {
       while (!ehDiaUtilLocal(data)) {
         data.setDate(data.getDate() + 1);
       }
+      
       const iso = formatISO(data);
       if ((ocupacao[iso] || 0) < capacidadeDia) {
         ocupacao[iso] = (ocupacao[iso] || 0) + 1;
+        
+        // Recalcula a qual semana este novo dia pertence
+        const diffDias = Math.floor((data - primeiraDataUtil) / 86400000);
+        const novaSemana = `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`;
+
         atualizacoes.push({
           id: item.id,
           dataAgendada: iso,
-          diaPlanejado: NOMES_DIAS[(data.getDay() + 6) % 7]
+          diaPlanejado: NOMES_DIAS[(data.getDay() + 6) % 7],
+          semanaPlanejada: novaSemana
         });
         break;
       }
+      // Se a capacidade deste dia estiver cheia, tenta o próximo
       data.setDate(data.getDate() + 1);
     }
   }
-  console.log("Atualizações que serão feitas:", atualizacoes);
   try {
     const TAMANHO_LOTE = 400;
     for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
       const batch = writeBatch(db);
       atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
-        console.log("Atualizando:", item);
         batch.update(doc(db, "equipamentos", item.id), {
           dataAgendada: item.dataAgendada,
-          diaPlanejado: item.diaPlanejado
+          diaPlanejado: item.diaPlanejado,
+          semanaPlanejada: item.semanaPlanejada
         });
-
       });
-      console.log("Enviando lote...");
       await batch.commit();
+    }
+    // Só marca como verificado SE a operação no banco der certo
+    marcarVerificacaoAtrasadosHoje(); 
+    
+    toast(`${atualizacoes.length} aparelho(s) reagendado(s) automaticamente.`);
+  } catch (err) {
+    console.error("Erro no reagendamento:", err);
+    toast("Erro ao reagendar atrasados: " + err.message);
+  }
 }
 
 // Espera o Firestore atualizar
