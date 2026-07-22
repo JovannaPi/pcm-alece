@@ -169,6 +169,10 @@ function marcarVerificacaoAtrasadosHoje() {
 // dia útil (pulando fins de semana e feriados). Roda no máximo uma vez por
 // dia por navegador, para não ficar reprocessando a cada atualização em
 // tempo real.
+// Detecta aparelhos atrasados e os remaneja automaticamente para o próximo
+// dia útil (pulando fins de semana e feriados). Roda no máximo uma vez por
+// dia por navegador, para não ficar reprocessando a cada atualização em
+// tempo real.
 async function reagendarAtrasadosSeNecessario() {
   // A trava foi comentada temporariamente para você poder fazer os testes
   // if (jaVerificouAtrasadosHoje()) return; 
@@ -206,6 +210,7 @@ async function reagendarAtrasadosSeNecessario() {
   // Usada para recalcular a semana corretamente e não quebrar sua planilha
   const dataInicioStr = (ESTADO.config && ESTADO.config.dataInicio) || formatISO(new Date());
   const primeiraDataUtil = new Date(dataInicioStr + "T12:00:00Z");
+  
   for (const item of atrasados) {
     let data = new Date();
     while (true) {
@@ -233,45 +238,33 @@ async function reagendarAtrasadosSeNecessario() {
       data.setDate(data.getDate() + 1);
     }
   }
+  
   try {
-    try {
-      const TAMANHO_LOTE = 400;
-      for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
-        const batch = writeBatch(db);
-        atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
-          batch.update(doc(db, "equipamentos", item.id), {
-            dataAgendada: item.dataAgendada,
-            diaPlanejado: item.diaPlanejado,
-            semanaPlanejada: item.semanaPlanejada
-          });
+    const TAMANHO_LOTE = 400;
+    for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
+      const batch = writeBatch(db);
+      atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
+        batch.update(doc(db, "equipamentos", item.id), {
+          dataAgendada: item.dataAgendada,
+          diaPlanejado: item.diaPlanejado,
+          semanaPlanejada: item.semanaPlanejada
         });
-        await batch.commit();
-      }
-      // Só marca como verificado SE a operação no banco der certo
-      marcarVerificacaoAtrasadosHoje(); 
-      
-      // Espera o Firestore atualizar
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Reorganiza todo o cronograma usando a função correta
-      await reagendarTudo(); 
-
-      toast(`${atualizacoes.length} aparelho(s) reagendado(s) automaticamente.`);
-    } catch (err) {
-      console.error("Erro no reagendamento:", err);
-      toast("Erro ao reagendar atrasados: " + err.message);
+      });
+      await batch.commit();
     }
-}
+    
+    // Só marca como verificado SE a operação no banco der certo
+    marcarVerificacaoAtrasadosHoje(); 
+    
+    // Espera o Firestore atualizar
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-// Espera o Firestore atualizar
-await new Promise(resolve => setTimeout(resolve, 1000));
+    // Reorganiza todo o cronograma usando a função correta
+    await reagendarTudo(); 
 
-// Reorganiza todo o cronograma
-await reagendarTudo();
-
-toast(`${atualizacoes.length} aparelho(s) reagendado(s).`);
+    toast(`${atualizacoes.length} aparelho(s) reagendado(s) automaticamente.`);
   } catch (err) {
-    console.error(err);
+    console.error("Erro no reagendamento:", err);
     toast("Erro ao reagendar atrasados: " + err.message);
   }
 }
