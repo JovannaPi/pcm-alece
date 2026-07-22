@@ -669,9 +669,13 @@ function selecionarDia(iso) {
       try {
         await updateDoc(doc(db, "equipamentos", item.id), { statusPreventiva: statusNovo });
         item.statusPreventiva = statusNovo;
+        
         const promessasLogs = [registrarHistorico(item, statusAnterior, statusNovo)];
+        
         if (statusNovo === "Concluída") {
           promessasLogs.push(registrarOrdemServico(item));
+        } else if (statusAnterior === "Concluída" && statusNovo !== "Concluída") {
+          promessasLogs.push(removerOrdemServico(item.id));
         }
 
         await Promise.all(promessasLogs);
@@ -748,7 +752,17 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
 
 async function registrarOrdemServico(item) {
   const agora = new Date();
-  await addDoc(collection(db, "ordens"), {
+  
+  // 1. Limpa ordens antigas (se você fez testes antes, isso apaga as duplicadas)
+  const ordensAntigas = ESTADO.ordens.filter(o => o.equipamentoId === item.id);
+  if (ordensAntigas.length > 0) {
+    const batch = writeBatch(db);
+    ordensAntigas.forEach(o => batch.delete(doc(db, "ordens", o.id)));
+    await batch.commit();
+  }
+
+  // 2. Cria a OS nova travada no ID do equipamento (garante que só exista uma)
+  await setDoc(doc(db, "ordens", item.id), {
     equipamentoId: item.id,
     patrimonio: item.patrimonio || "",
     setor: item.setor || "",
@@ -758,6 +772,16 @@ async function registrarOrdemServico(item) {
     status: "Concluída",
     registradoEm: agora.toISOString(),
   });
+}
+
+async function removerOrdemServico(equipamentoId) {
+  // Busca a OS amarrada a este equipamento e apaga
+  const ordensDoEquipamento = ESTADO.ordens.filter(o => o.equipamentoId === equipamentoId);
+  if (ordensDoEquipamento.length > 0) {
+    const batch = writeBatch(db);
+    ordensDoEquipamento.forEach(o => batch.delete(doc(db, "ordens", o.id)));
+    await batch.commit();
+  }
 }
 
 function iniciarSincronizacaoOrdens() {
