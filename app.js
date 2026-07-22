@@ -171,45 +171,65 @@ function marcarVerificacaoAtrasadosHoje() {
 // tempo real.
 async function reagendarAtrasadosSeNecessario() {
   if (jaVerificouAtrasadosHoje()) return;
-
   const atrasados = ESTADO.equipamentos.filter(estaAtrasado);
   marcarVerificacaoAtrasadosHoje();
   if (!atrasados.length) return;
-
   const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
+  const nEquipes = (ESTADO.config && ESTADO.config.nEquipes) || 1;
+  const aparelhosDia = (ESTADO.config && ESTADO.config.aparelhosDia) || 1;
+  const capacidadeDia = nEquipes * aparelhosDia;
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
   function ehDiaUtilLocal(data) {
-    return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
+    return (
+      DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) &&
+      !estaEmFeriado(data)
+    );
   }
-
-  let proximoDia = new Date();
-  proximoDia.setDate(proximoDia.getDate() + 1);
-  while (!ehDiaUtilLocal(proximoDia)) proximoDia.setDate(proximoDia.getDate() + 1);
-  const novaData = formatISO(proximoDia);
-  const novoDiaSemana = NOMES_DIAS[(proximoDia.getDay() + 6) % 7];
-
+  // Conta quantos aparelhos já existem em cada dia
+  const ocupacao = {};
+  ESTADO.equipamentos.forEach((eq) => {
+    if (!estaAtrasado(eq)) {
+      ocupacao[eq.dataAgendada] = (ocupacao[eq.dataAgendada] || 0) + 1;
+    }
+  });
+  const atualizacoes = [];
+  for (const item of atrasados) {
+    let data = new Date();
+    data.setDate(data.getDate() + 1);
+    while (true) {
+      while (!ehDiaUtilLocal(data)) {
+        data.setDate(data.getDate() + 1);
+      }
+      const iso = formatISO(data);
+      if ((ocupacao[iso] || 0) < capacidadeDia) {
+        ocupacao[iso] = (ocupacao[iso] || 0) + 1;
+        atualizacoes.push({
+          id: item.id,
+          dataAgendada: iso,
+          diaPlanejado: NOMES_DIAS[(data.getDay() + 6) % 7]
+        });
+        break;
+      }
+      data.setDate(data.getDate() + 1);
+    }
+  }
   try {
     const TAMANHO_LOTE = 400;
-    for (let inicio = 0; inicio < atrasados.length; inicio += TAMANHO_LOTE) {
-      const pedaco = atrasados.slice(inicio, inicio + TAMANHO_LOTE);
+    for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
       const batch = writeBatch(db);
-      pedaco.forEach((item) => {
+      atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
         batch.update(doc(db, "equipamentos", item.id), {
-          dataAgendada: novaData,
-          diaPlanejado: novoDiaSemana,
+          dataAgendada: item.dataAgendada,
+          diaPlanejado: item.diaPlanejado
         });
+
       });
       await batch.commit();
     }
-    const [anoN, mesN, diaN] = novaData.split("-");
-    toast(
-      atrasados.length === 1
-        ? `1 aparelho atrasado foi remanejado para ${diaN}/${mesN}/${anoN}.`
-        : `${atrasados.length} aparelhos atrasados foram remanejados para ${diaN}/${mesN}/${anoN}.`
-    );
+    toast(`${atualizacoes.length} aparelho(s) reagendado(s).`);
   } catch (err) {
     console.error(err);
-    toast("Erro ao remanejar atrasados: " + err.message);
+    toast("Erro ao reagendar atrasados: " + err.message);
   }
 }
 
