@@ -466,7 +466,7 @@ async function reagendarTudo() {
     // Avança o dia se não for dia útil ou se a equipe já estiver lotada
     while (!ehDiaUtilLocal(dataCursor) || (ocupacao[formatISO(dataCursor)] || 0) >= capacidadeDia) {
       dataCursor.setDate(dataCursor.getDate() + 1);
-    }
+  }
 
     const novaData = formatISO(dataCursor);
     const novoDia = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
@@ -477,27 +477,58 @@ async function reagendarTudo() {
 
     // Só separa para atualizar se a data realmente precisar mudar
     if (item.dataAgendada !== novaData || item.diaPlanejado !== novoDia || item.semanaPlanejada !== novaSemana) {
-      atualizacoes.push({ id: item.id, dataAgendada: novaData, diaPlanejado: novoDia, semanaPlanejada: novaSemana });
+      atualizacoes.push({ 
+        id: item.id, 
+        dataAgendada: novaData, 
+        diaPlanejado: novoDia, 
+        semanaPlanejada: novaSemana,
+        dataAntiga: item.dataAgendada, // NOVO: Guarda a data antiga
+        refCompleta: item // NOVO: Guarda dados para o log
+      });
     }
   });
 
-  // Salva tudo de uma vez no Firebase
+  // Salva tudo de uma vez no Firebase e gera o log
   if (atualizacoes.length) {
-    const TAMANHO_LOTE = 400;
+    const TAMANHO_LOTE = 200; // Reduzido pois agora salva 2 coisas por item
+    const agora = new Date().toISOString();
+    const formataBR = (iso) => iso ? iso.split("-").reverse().join("/") : "-";
+
     for (let inicio = 0; inicio < atualizacoes.length; inicio += TAMANHO_LOTE) {
       const pedaco = atualizacoes.slice(inicio, inicio + TAMANHO_LOTE);
       const batch = writeBatch(db);
-      pedaco.forEach((u) => batch.update(doc(db, "equipamentos", u.id), {
-        dataAgendada: u.dataAgendada, diaPlanejado: u.diaPlanejado, semanaPlanejada: u.semanaPlanejada,
-      }));
+      
+      pedaco.forEach((u) => {
+        // 1. Atualiza as datas no equipamento
+        batch.update(doc(db, "equipamentos", u.id), {
+          dataAgendada: u.dataAgendada, 
+          diaPlanejado: u.diaPlanejado, 
+          semanaPlanejada: u.semanaPlanejada,
+        });
+
+        // 2. Cria o registro no histórico apenas se era um atraso
+        if (u.dataAntiga && u.dataAntiga < hojeISO) {
+          const novoLogRef = doc(collection(db, "historico"));
+          batch.set(novoLogRef, {
+            equipamentoId: u.refCompleta.id,
+            patrimonio: u.refCompleta.patrimonio || "",
+            setor: u.refCompleta.setor || "",
+            ambiente: u.refCompleta.ambiente || "",
+            equipe: u.refCompleta.equipeResponsavel || "",
+            tipo: "Atraso Reagendado",
+            statusAnterior: formataBR(u.dataAntiga),
+            statusNovo: formataBR(u.dataAgendada),
+            registradoEm: agora
+          });
+        }
+      });
       await batch.commit();
     }
-    toast(`Cronograma recalculado de uma vez (${atualizacoes.length} reagendamentos).`);
+    toast(`Cronograma recalculado e histórico atualizado!`);
   }
 
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
 }
-
 async function carregarConfig() {
   try {
     const snap = await getDoc(doc(db, "config", "cronograma"));
