@@ -143,8 +143,8 @@ function atualizarBannerAtrasados() {
   const txt = $("#alertaAtrasadosTexto");
   if (txt) {
     txt.textContent = atrasados.length === 1
-      ? "1 aparelho preventivo está atrasado. O sistema está remanejando automaticamente para o próximo dia útil."
-      : `${atrasados.length} aparelhos preventivos estão atrasados. O sistema está remanejando automaticamente para o próximo dia útil.`;
+      ? "1 aparelho está atrasado."
+      : `${atrasados.length} aparelhos estão atrasados.`;
   }
   banner.hidden = false;
 }
