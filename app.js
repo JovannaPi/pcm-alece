@@ -229,9 +229,15 @@ async function reagendarAtrasadosSeNecessario() {
       });
       console.log("Enviando lote...");
       await batch.commit();
-      console.log("Lote enviado!");
-    }
-    toast(`${atualizacoes.length} aparelho(s) reagendado(s).`);
+}
+
+// Espera o Firestore atualizar
+await new Promise(resolve => setTimeout(resolve, 1000));
+
+// Reorganiza todo o cronograma
+await reorganizarCronograma();
+
+toast(`${atualizacoes.length} aparelho(s) reagendado(s).`);
   } catch (err) {
     console.error(err);
     toast("Erro ao reagendar atrasados: " + err.message);
