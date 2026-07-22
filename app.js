@@ -1620,3 +1620,33 @@ async function deletarRegistro(colecao, id) {
     toast("Erro ao excluir: " + err.message);
   }
 }
+
+// CONTROLE DO BOTÃO DE REAGENDAR ATRASADOS MANUALMENTE
+
+const btnReagendar = document.getElementById("btnReagendarAtrasados");
+
+if (btnReagendar) {
+  btnReagendar.addEventListener("click", async () => {
+    // Desabilita o botão para evitar múltiplos cliques
+    btnReagendar.disabled = true;
+    btnReagendar.textContent = "Reagendando...";
+    toast("Recalculando rotas e datas. Aguarde...");
+    
+    try {
+      await reagendarTudo();
+      toast("Aparelhos atrasados foram realocados com sucesso!");
+      
+      // Esconde a faixa amarela já que o problema foi resolvido
+      const banner = document.getElementById("alertaAtrasados");
+      if (banner) banner.hidden = true;
+      
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao reagendar: " + err.message);
+    } finally {
+      // Volta o botão ao normal
+      btnReagendar.disabled = false;
+      btnReagendar.textContent = "Reagendar Agora";
+    }
+  });
+}
