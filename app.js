@@ -10,6 +10,7 @@ const PRIORIDADE = {
 };
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
+const CHAVE_VERIFICACAO_ATRASADOS = "pmokVerificacaoAtrasados";
 
 let idEquipamentoEmEdicao = null;
 
@@ -61,6 +62,13 @@ function formatISO(date) {
   return `${y}-${m}-${d}`;
 }
 
+// Um aparelho é considerado atrasado quando a data agendada já passou e ele
+// ainda não foi marcado como Concluída.
+function estaAtrasado(item) {
+  if (!item.dataAgendada || item.statusPreventiva === "Concluída") return false;
+  return item.dataAgendada < formatISO(new Date());
+}
+
 const ESTADO = {
   meta: null,
   itensCarregados: [],
@@ -107,6 +115,102 @@ $all(".tab").forEach((btn) => {
 
 function irParaAba(nome) {
   $(`.tab[data-view="${nome}"]`)?.click();
+}
+
+// ------------------------------------------------------------------
+// Faixa de alerta de atrasados (visível em qualquer aba)
+// ------------------------------------------------------------------
+const btnFecharAlertaAtrasados = $("#fecharAlertaAtrasados");
+if (btnFecharAlertaAtrasados) {
+  btnFecharAlertaAtrasados.addEventListener("click", () => {
+    const banner = $("#alertaAtrasados");
+    if (banner) {
+      banner.dataset.fechado = formatISO(new Date());
+      banner.hidden = true;
+    }
+  });
+}
+
+function atualizarBannerAtrasados() {
+  const banner = $("#alertaAtrasados");
+  if (!banner) return;
+  const atrasados = ESTADO.equipamentos.filter(estaAtrasado);
+  if (!atrasados.length) {
+    banner.hidden = true;
+    return;
+  }
+  if (banner.dataset.fechado === formatISO(new Date())) return;
+  const txt = $("#alertaAtrasadosTexto");
+  if (txt) {
+    txt.textContent = atrasados.length === 1
+      ? "1 aparelho preventivo está atrasado. O sistema está remanejando automaticamente para o próximo dia útil."
+      : `${atrasados.length} aparelhos preventivos estão atrasados. O sistema está remanejando automaticamente para o próximo dia útil.`;
+  }
+  banner.hidden = false;
+}
+
+function jaVerificouAtrasadosHoje() {
+  try {
+    return localStorage.getItem(CHAVE_VERIFICACAO_ATRASADOS) === formatISO(new Date());
+  } catch (e) {
+    return false;
+  }
+}
+
+function marcarVerificacaoAtrasadosHoje() {
+  try {
+    localStorage.setItem(CHAVE_VERIFICACAO_ATRASADOS, formatISO(new Date()));
+  } catch (e) {
+    // localStorage indisponível (modo privado etc.) — tudo bem, só não terá o cache diário
+  }
+}
+
+// Detecta aparelhos atrasados e os remaneja automaticamente para o próximo
+// dia útil (pulando fins de semana e feriados). Roda no máximo uma vez por
+// dia por navegador, para não ficar reprocessando a cada atualização em
+// tempo real.
+async function reagendarAtrasadosSeNecessario() {
+  if (jaVerificouAtrasadosHoje()) return;
+
+  const atrasados = ESTADO.equipamentos.filter(estaAtrasado);
+  marcarVerificacaoAtrasadosHoje();
+  if (!atrasados.length) return;
+
+  const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
+  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
+  function ehDiaUtilLocal(data) {
+    return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
+  }
+
+  let proximoDia = new Date();
+  proximoDia.setDate(proximoDia.getDate() + 1);
+  while (!ehDiaUtilLocal(proximoDia)) proximoDia.setDate(proximoDia.getDate() + 1);
+  const novaData = formatISO(proximoDia);
+  const novoDiaSemana = NOMES_DIAS[(proximoDia.getDay() + 6) % 7];
+
+  try {
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < atrasados.length; inicio += TAMANHO_LOTE) {
+      const pedaco = atrasados.slice(inicio, inicio + TAMANHO_LOTE);
+      const batch = writeBatch(db);
+      pedaco.forEach((item) => {
+        batch.update(doc(db, "equipamentos", item.id), {
+          dataAgendada: novaData,
+          diaPlanejado: novoDiaSemana,
+        });
+      });
+      await batch.commit();
+    }
+    const [anoN, mesN, diaN] = novaData.split("-");
+    toast(
+      atrasados.length === 1
+        ? `1 aparelho atrasado foi remanejado para ${diaN}/${mesN}/${anoN}.`
+        : `${atrasados.length} aparelhos atrasados foram remanejados para ${diaN}/${mesN}/${anoN}.`
+    );
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao remanejar atrasados: " + err.message);
+  }
 }
 
 const dropzone = $("#dropzone");
@@ -443,6 +547,8 @@ function iniciarSincronizacao() {
     renderCalendar();
     renderDashboard();
     renderEquipamentosCadastro();
+    atualizarBannerAtrasados();
+    reagendarAtrasadosSeNecessario();
   }, (err) => {
     console.error(err);
     toast("Erro ao ler dados do Firebase: " + err.message);
@@ -489,6 +595,7 @@ function renderCalendar() {
   }
   $("#calendarTitle").textContent = `${NOMES_MES[ESTADO.calMonth]} de ${ESTADO.calYear}`;
 
+  const hojeISO = formatISO(new Date());
   const porData = {};
   for (const item of ESTADO.equipamentos) {
     (porData[item.dataAgendada] ||= []).push(item);
@@ -535,10 +642,12 @@ function renderCalendar() {
     if (itensDoDia.length) {
       const concluidas = itensDoDia.filter((i) => i.statusPreventiva === "Concluída").length;
       const andamento = itensDoDia.filter((i) => i.statusPreventiva === "Em andamento").length;
+      const temAtrasado = iso < hojeISO && concluidas < itensDoDia.length;
       const badge = document.createElement("div");
       let classe = "pendente";
       if (concluidas === itensDoDia.length) classe = "concluido";
       else if (andamento > 0 || concluidas > 0) classe = "andamento";
+      if (temAtrasado) classe = "atrasado";
       badge.className = "cal-day-badge " + classe;
       badge.textContent = `${itensDoDia.length} aparelho${itensDoDia.length > 1 ? "s" : ""}`;
       el.appendChild(badge);
@@ -602,6 +711,15 @@ function selecionarDia(iso) {
     });
 
     tdStatus.appendChild(select);
+
+    if (estaAtrasado(item)) {
+      const tagAtraso = document.createElement("span");
+      tagAtraso.className = "status-select atrasado";
+      tagAtraso.style.marginLeft = "6px";
+      tagAtraso.textContent = "Atrasado";
+      tdStatus.appendChild(tagAtraso);
+    }
+
     tr.appendChild(tdStatus);
     tbody.appendChild(tr);
   });
@@ -618,6 +736,7 @@ function renderDashboard() {
   const total = itens.length;
   const concluidas = itens.filter((i) => i.statusPreventiva === "Concluída").length;
   const andamento = itens.filter((i) => i.statusPreventiva === "Em andamento").length;
+  const atrasados = itens.filter(estaAtrasado).length;
   const pendentes = total - concluidas - andamento;
   const execucao = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
 
@@ -626,6 +745,7 @@ function renderDashboard() {
     ["concluido", concluidas, "Concluídas"],
     ["andamento", andamento, "Em andamento"],
     ["pendente", pendentes, "Pendentes"],
+    ["atrasado", atrasados, "Atrasados"],
     ["execucao", `${execucao}%`, "Execução"],
   ];
   $("#kpiRow").innerHTML = cartoes.map(([cls, num, label]) =>
@@ -902,7 +1022,10 @@ function renderEquipamentosCadastro() {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.setorPCM}</td>
-      <td><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span></td>
+      <td>
+        <span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
+        ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}
+      </td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>`;
 
     const tdBtn = document.createElement("td");
@@ -1408,6 +1531,7 @@ async function apagarCronograma() {
 
     renderCalendar();
     renderDashboard();
+    atualizarBannerAtrasados();
 
     toast(`Cronograma apagado (${ids.length} itens removidos).`);
   } catch (err) {
