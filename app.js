@@ -220,13 +220,16 @@ async function reagendarAtrasadosSeNecessario() {
     for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
       const batch = writeBatch(db);
       atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
+        console.log("Atualizando:", item);
         batch.update(doc(db, "equipamentos", item.id), {
           dataAgendada: item.dataAgendada,
           diaPlanejado: item.diaPlanejado
         });
 
       });
+      console.log("Enviando lote...");
       await batch.commit();
+      console.log("Lote enviado!");
     }
     toast(`${atualizacoes.length} aparelho(s) reagendado(s).`);
   } catch (err) {
