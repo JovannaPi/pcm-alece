@@ -193,6 +193,7 @@ async function reagendarAtrasadosSeNecessario() {
     }
   });
   const atualizacoes = [];
+  console.log("Atrasados:", atrasados);
   for (const item of atrasados) {
     let data = new Date();
     data.setDate(data.getDate() + 1);
@@ -213,6 +214,7 @@ async function reagendarAtrasadosSeNecessario() {
       data.setDate(data.getDate() + 1);
     }
   }
+  console.log("Atualizações que serão feitas:", atualizacoes);
   try {
     const TAMANHO_LOTE = 400;
     for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
