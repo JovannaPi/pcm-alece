@@ -234,33 +234,40 @@ async function reagendarAtrasadosSeNecessario() {
     }
   }
   try {
-    const TAMANHO_LOTE = 400;
-    for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
-      const batch = writeBatch(db);
-      atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
-        batch.update(doc(db, "equipamentos", item.id), {
-          dataAgendada: item.dataAgendada,
-          diaPlanejado: item.diaPlanejado,
-          semanaPlanejada: item.semanaPlanejada
+    try {
+      const TAMANHO_LOTE = 400;
+      for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
+        const batch = writeBatch(db);
+        atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
+          batch.update(doc(db, "equipamentos", item.id), {
+            dataAgendada: item.dataAgendada,
+            diaPlanejado: item.diaPlanejado,
+            semanaPlanejada: item.semanaPlanejada
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
+      }
+      // Só marca como verificado SE a operação no banco der certo
+      marcarVerificacaoAtrasadosHoje(); 
+      
+      // Espera o Firestore atualizar
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Reorganiza todo o cronograma usando a função correta
+      await reagendarTudo(); 
+
+      toast(`${atualizacoes.length} aparelho(s) reagendado(s) automaticamente.`);
+    } catch (err) {
+      console.error("Erro no reagendamento:", err);
+      toast("Erro ao reagendar atrasados: " + err.message);
     }
-    // Só marca como verificado SE a operação no banco der certo
-    marcarVerificacaoAtrasadosHoje(); 
-    
-    toast(`${atualizacoes.length} aparelho(s) reagendado(s) automaticamente.`);
-  } catch (err) {
-    console.error("Erro no reagendamento:", err);
-    toast("Erro ao reagendar atrasados: " + err.message);
-  }
 }
 
 // Espera o Firestore atualizar
 await new Promise(resolve => setTimeout(resolve, 1000));
 
 // Reorganiza todo o cronograma
-await reorganizarCronograma();
+await reagendarTudo();
 
 toast(`${atualizacoes.length} aparelho(s) reagendado(s).`);
   } catch (err) {
