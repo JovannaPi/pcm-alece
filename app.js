@@ -165,109 +165,6 @@ function marcarVerificacaoAtrasadosHoje() {
   }
 }
 
-// Detecta aparelhos atrasados e os remaneja automaticamente para o próximo
-// dia útil (pulando fins de semana e feriados). Roda no máximo uma vez por
-// dia por navegador, para não ficar reprocessando a cada atualização em
-// tempo real.
-// Detecta aparelhos atrasados e os remaneja automaticamente para o próximo
-// dia útil (pulando fins de semana e feriados). Roda no máximo uma vez por
-// dia por navegador, para não ficar reprocessando a cada atualização em
-// tempo real.
-async function reagendarAtrasadosSeNecessario() {
-  // A trava foi comentada temporariamente para você poder fazer os testes
-  // if (jaVerificouAtrasadosHoje()) return; 
-
-  const atrasados = ESTADO.equipamentos.filter(estaAtrasado);
-  if (!atrasados.length) return;
-
-  // Garante que as configurações (capacidade) foram carregadas antes de calcular
-  if (!ESTADO.config) {
-    await carregarConfig(); 
-  }
-
-  const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
-  const nEquipes = (ESTADO.config && ESTADO.config.nEquipes) || 1;
-  const aparelhosDia = (ESTADO.config && ESTADO.config.aparelhosDia) || 1;
-  const capacidadeDia = nEquipes * aparelhosDia;
-  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
-
-  function ehDiaUtilLocal(data) {
-    return (
-      DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) &&
-      !estaEmFeriado(data)
-    );
-  }
-
-  const ocupacao = {};
-  ESTADO.equipamentos.forEach((eq) => {
-    if (!estaAtrasado(eq)) {
-      ocupacao[eq.dataAgendada] = (ocupacao[eq.dataAgendada] || 0) + 1;
-    }
-  });
-
-  const atualizacoes = [];
-  
-  // Usada para recalcular a semana corretamente e não quebrar sua planilha
-  const dataInicioStr = (ESTADO.config && ESTADO.config.dataInicio) || formatISO(new Date());
-  const primeiraDataUtil = new Date(dataInicioStr + "T12:00:00Z");
-  
-  for (const item of atrasados) {
-    let data = new Date();
-    while (true) {
-      while (!ehDiaUtilLocal(data)) {
-        data.setDate(data.getDate() + 1);
-      }
-      
-      const iso = formatISO(data);
-      if ((ocupacao[iso] || 0) < capacidadeDia) {
-        ocupacao[iso] = (ocupacao[iso] || 0) + 1;
-        
-        // Recalcula a qual semana este novo dia pertence
-        const diffDias = Math.floor((data - primeiraDataUtil) / 86400000);
-        const novaSemana = `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`;
-
-        atualizacoes.push({
-          id: item.id,
-          dataAgendada: iso,
-          diaPlanejado: NOMES_DIAS[(data.getDay() + 6) % 7],
-          semanaPlanejada: novaSemana
-        });
-        break;
-      }
-      // Se a capacidade deste dia estiver cheia, tenta o próximo
-      data.setDate(data.getDate() + 1);
-    }
-  }
-  
-  try {
-    const TAMANHO_LOTE = 400;
-    for (let i = 0; i < atualizacoes.length; i += TAMANHO_LOTE) {
-      const batch = writeBatch(db);
-      atualizacoes.slice(i, i + TAMANHO_LOTE).forEach((item) => {
-        batch.update(doc(db, "equipamentos", item.id), {
-          dataAgendada: item.dataAgendada,
-          diaPlanejado: item.diaPlanejado,
-          semanaPlanejada: item.semanaPlanejada
-        });
-      });
-      await batch.commit();
-    }
-    
-    // Só marca como verificado SE a operação no banco der certo
-    marcarVerificacaoAtrasadosHoje(); 
-    
-    // Espera o Firestore atualizar
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Reorganiza todo o cronograma usando a função correta
-    await reagendarTudo(); 
-
-    toast(`${atualizacoes.length} aparelho(s) reagendado(s) automaticamente.`);
-  } catch (err) {
-    console.error("Erro no reagendamento:", err);
-    toast("Erro ao reagendar atrasados: " + err.message);
-  }
-}
 
 const dropzone = $("#dropzone");
 const fileInput = $("#fileInput");
@@ -527,38 +424,64 @@ async function reagendarTudo() {
   const { nEquipes, aparelhosDia, diasSemana, dataInicio } = ESTADO.config;
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
   const capacidadeDia = Math.max(1, nEquipes) * Math.max(1, aparelhosDia);
+  const hojeISO = formatISO(new Date());
 
   function ehDiaUtilLocal(data) {
     return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
   }
 
-  const [ano, mes, dia] = dataInicio.split("-");
+  // A data base para começar a alocar os pendentes deve ser a Data de Início original ou Hoje (o que for maior).
+  // Isso empurra tudo que está atrasado para frente naturalmente.
+  const dataBaseStr = dataInicio > hojeISO ? dataInicio : hojeISO;
+  const [ano, mes, dia] = dataBaseStr.split("-");
   let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0);
-  while (!ehDiaUtilLocal(dataCursor)) dataCursor.setDate(dataCursor.getDate() + 1);
-  const primeiraDataUtil = new Date(dataCursor);
 
-  const itens = [...ESTADO.equipamentos].sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
+  // Avança até o primeiro dia útil disponível
+  while (!ehDiaUtilLocal(dataCursor)) {
+    dataCursor.setDate(dataCursor.getDate() + 1);
+  }
 
-  let contador = 0;
+  // Base para cálculo contínuo de "Semanas" no cronograma
+  const [anoIn, mesIn, diaIn] = dataInicio.split("-");
+  const primeiraDataUtil = new Date(anoIn, parseInt(mesIn, 10) - 1, diaIn, 12, 0, 0);
+  while (!ehDiaUtilLocal(primeiraDataUtil)) primeiraDataUtil.setDate(primeiraDataUtil.getDate() + 1);
+
+  // Separa o que é fixo do que será roteado
+  const concluidos = ESTADO.equipamentos.filter(e => e.statusPreventiva !== "Pendente");
+  const pendentes = ESTADO.equipamentos.filter(e => e.statusPreventiva === "Pendente")
+                                       .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
+
+  // Mapeia os slots já ocupados pelas tarefas em andamento/concluídas do dia atual em diante
+  const ocupacao = {};
+  concluidos.forEach(c => {
+     if (c.dataAgendada >= hojeISO) {
+         ocupacao[c.dataAgendada] = (ocupacao[c.dataAgendada] || 0) + 1;
+     }
+  });
+
   const atualizacoes = [];
 
-  itens.forEach((item) => {
+  // Distribui os pendentes nos slots vazios
+  pendentes.forEach((item) => {
+    // Avança o dia se não for dia útil ou se a equipe já estiver lotada
+    while (!ehDiaUtilLocal(dataCursor) || (ocupacao[formatISO(dataCursor)] || 0) >= capacidadeDia) {
+      dataCursor.setDate(dataCursor.getDate() + 1);
+    }
+
     const novaData = formatISO(dataCursor);
     const novoDia = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
     const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-    const novaSemana = `Semana ${Math.floor(diffDias / 7) + 1}`;
+    const novaSemana = `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`;
 
+    ocupacao[novaData] = (ocupacao[novaData] || 0) + 1;
+
+    // Só separa para atualizar se a data realmente precisar mudar
     if (item.dataAgendada !== novaData || item.diaPlanejado !== novoDia || item.semanaPlanejada !== novaSemana) {
       atualizacoes.push({ id: item.id, dataAgendada: novaData, diaPlanejado: novoDia, semanaPlanejada: novaSemana });
     }
-
-    contador++;
-    if (contador >= capacidadeDia) {
-      contador = 0;
-      do { dataCursor.setDate(dataCursor.getDate() + 1); } while (!ehDiaUtilLocal(dataCursor));
-    }
   });
 
+  // Salva tudo de uma vez no Firebase
   if (atualizacoes.length) {
     const TAMANHO_LOTE = 400;
     for (let inicio = 0; inicio < atualizacoes.length; inicio += TAMANHO_LOTE) {
@@ -569,7 +492,7 @@ async function reagendarTudo() {
       }));
       await batch.commit();
     }
-    toast(`Cronograma reorganizado (${atualizacoes.length} item(ns) reagendado(s)).`);
+    toast(`Cronograma recalculado de uma vez (${atualizacoes.length} reagendamentos).`);
   }
 
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
@@ -604,7 +527,6 @@ function iniciarSincronizacao() {
     renderDashboard();
     renderEquipamentosCadastro();
     atualizarBannerAtrasados();
-    reagendarAtrasadosSeNecessario();
   }, (err) => {
     console.error(err);
     toast("Erro ao ler dados do Firebase: " + err.message);
