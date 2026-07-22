@@ -749,7 +749,6 @@ function renderDashboard() {
   const total = itens.length;
   const concluidas = itens.filter((i) => i.statusPreventiva === "Concluída").length;
   const andamento = itens.filter((i) => i.statusPreventiva === "Em andamento").length;
-  const atrasados = itens.filter(estaAtrasado).length;
   const pendentes = total - concluidas - andamento;
   const execucao = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
 
@@ -758,7 +757,6 @@ function renderDashboard() {
     ["concluido", concluidas, "Concluídas"],
     ["andamento", andamento, "Em andamento"],
     ["pendente", pendentes, "Pendentes"],
-    ["atrasado", atrasados, "Atrasados"],
     ["execucao", `${execucao}%`, "Execução"],
   ];
   $("#kpiRow").innerHTML = cartoes.map(([cls, num, label]) =>
