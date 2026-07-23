@@ -107,6 +107,7 @@
             <button class="btn ghost" id="nextMonth">›</button>
           </div>
         </div>
+        <div class="local-filtro" id="localFiltroCalendario"></div>
         <div class="calendar-grid" id="calendarGrid"></div>
       </div>
       <div class="card" id="dayDetailCard" hidden>
@@ -121,6 +122,7 @@
 
     <!-- VIEW 4: DASHBOARD -->
     <section class="view" id="view-dashboard">
+      <div class="local-filtro" id="localFiltroDashboard"></div>
       <div class="kpi-row" id="kpiRow"></div>
       <div class="card">
         <h2>Exportar</h2>
@@ -145,6 +147,7 @@
           <span class="pill" id="ordensCount">0 registros</span>
         </div>
         <p class="muted">Toda vez que o status de um aparelho é alterado no calendário, um registro é criado aqui automaticamente.</p>
+        <div class="local-filtro" id="localFiltroOrdens"></div>
         <input type="text" class="search-input" id="buscaOrdens" placeholder="Buscar por patrimônio, setor, ambiente ou equipe...">
         <div class="table-wrap">
           <table id="ordensTable"></table>
@@ -164,6 +167,7 @@
                 0 registros
             </span>
         </div>
+        <div class="local-filtro" id="localFiltroHistorico"></div>
         <input type="text" class="search-input" id="buscaHistorico" placeholder="Buscar por patrimônio, setor ou equipe...">
         <div class="table-wrap">
             <table id="historicoTable"></table>
@@ -183,6 +187,15 @@
           <label>Patrimônio<input type="text" id="eqPatrimonio" placeholder="Ex: 12345"></label>
           <label>Setor<input type="text" id="eqSetor" placeholder="Ex: Gabinete Dep. Fulano, 2º Piso"></label>
           <label>Ambiente<input type="text" id="eqAmbiente" placeholder="Ex: Sala de reuniões"></label>
+          <label>Prédio
+            <select id="eqLocal">
+              <option value="SEDE">SEDE</option>
+              <option value="ANEXO 1">Anexo 1</option>
+              <option value="ANEXO 2">Anexo 2</option>
+              <option value="ANEXO 3">Anexo 3</option>
+              <option value="ANEXO 4">Anexo 4</option>
+            </select>
+           </label>
         </div>
         <button class="btn primary" id="btnAdicionarEquipamento">+ Adicionar equipamento</button>
       </div>
@@ -191,6 +204,7 @@
           <h2>Equipamentos cadastrados</h2>
           <span class="pill" id="equipamentosCount">0 itens</span>
         </div>
+        <div class="local-filtro" id="localFiltroEquipamentos"></div>
         <input type="text" class="search-input" id="buscaEquipamentos" placeholder="Buscar por patrimônio, setor ou ambiente...">
         <div class="table-wrap">
           <table id="equipamentosTable"></table>
