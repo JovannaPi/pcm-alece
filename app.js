@@ -1593,6 +1593,50 @@ async function apagarCronograma() {
   }
 }
 
+async function apagarColecaoCompleta(nomeColecao, mensagem) {
+  const confirmado = window.confirm(mensagem);
+  if (!confirmado) return;
+  try {
+    const snap = await getDocs(collection(db, nomeColecao));
+    const ids = snap.docs.map((d) => d.id);
+    if (!ids.length) {
+      toast("Não há registros para apagar.");
+      return;
+    }
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+      const pedaco = ids.slice(inicio, inicio + TAMANHO_LOTE);
+      const batch = writeBatch(db);
+      pedaco.forEach((id) => batch.delete(doc(db, nomeColecao, id)));
+      await batch.commit();
+    }
+    toast(`${ids.length} registro(s) apagado(s).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao apagar: " + err.message);
+  }
+}
+
+const btnLimparHistorico = $("#btnLimparHistorico");
+if (btnLimparHistorico) {
+  btnLimparHistorico.addEventListener("click", () => {
+    apagarColecaoCompleta(
+      "historico",
+      "Isso vai apagar TODO o histórico de manutenção, permanentemente. Continuar?"
+    );
+  });
+}
+
+const btnLimparOrdens = $("#btnLimparOrdens");
+if (btnLimparOrdens) {
+  btnLimparOrdens.addEventListener("click", () => {
+    apagarColecaoCompleta(
+      "ordens",
+      "Isso vai apagar TODAS as ordens de serviço emitidas, permanentemente. Continuar?"
+    );
+  });
+}
+
 function gerarPDFPMOC(ordem) {
   const eqFull = ESTADO.equipamentos.find(e => e.id === ordem.equipamentoId) || {};
 
