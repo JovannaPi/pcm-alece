@@ -146,7 +146,7 @@
           <h2>Ordens de serviço</h2>
           <span class="pill" id="ordensCount">0 registros</span>
         </div>
-        <p class="muted">Toda vez que o status de um aparelho é alterado no calendário, um registro é criado aqui automaticamente.</p>
+        <p class="muted">Toda vez que o status de um aparelho é alterado para concluído, um registro é criado aqui automaticamente.</p>
         <div class="local-filtro" id="localFiltroOrdens"></div>
         <input type="text" class="search-input" id="buscaOrdens" placeholder="Buscar por patrimônio, setor, ambiente ou equipe...">
         <div class="table-wrap">
@@ -182,7 +182,7 @@
     <section class="view" id="view-equipamentos">
       <div class="card">
         <h2>Cadastro de equipamentos</h2>
-        <p class="muted">Adicione, edite ou remova aparelhos individualmente, sem precisar reimportar a planilha inteira. Itens cadastrados aqui são preservados mesmo quando você gerar um novo cronograma a partir de uma planilha, e entram automaticamente no cronograma agendado.</p>
+        <p class="muted">Adicione, edite ou remova aparelhos individualmente, sem precisar reimportar a planilha inteira.</p>
         <div class="grid-form">
           <label>Patrimônio<input type="text" id="eqPatrimonio" placeholder="Ex: 12345"></label>
           <label>Setor<input type="text" id="eqSetor" placeholder="Ex: Gabinete Dep. Fulano, 2º Piso"></label>
@@ -216,7 +216,7 @@
     <section class="view" id="view-feriados">
       <div class="card">
         <h2>Feriados e férias</h2>
-        <p class="muted">Datas cadastradas aqui são puladas automaticamente ao gerar o cronograma, e o cronograma já existente é reorganizado na hora para evitar essas datas.</p>
+        <p class="muted">
         <div class="grid-form">
           <label>Tipo
             <select id="feriadoTipo">
