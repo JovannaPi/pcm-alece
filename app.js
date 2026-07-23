@@ -1767,3 +1767,6 @@ if (btnReagendar) {
     }
   });
 }
+
+console.log("Botão histórico:", $("#btnLimparHistorico"));
+console.log("Botão ordens:", $("#btnLimparOrdens"));
