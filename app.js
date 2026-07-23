@@ -61,7 +61,11 @@ function formatISO(date) {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
-
+function formatarDataBR(iso) {
+  if (!iso) return "-";
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
 // Um aparelho é considerado atrasado quando a data agendada já passou e ele
 // ainda não foi marcado como Concluída.
 function estaAtrasado(item) {
@@ -447,15 +451,23 @@ async function reagendarTudo() {
   while (!ehDiaUtilLocal(primeiraDataUtil)) primeiraDataUtil.setDate(primeiraDataUtil.getDate() + 1);
 
   // Separa o que é fixo do que será roteado
-  const concluidos = ESTADO.equipamentos.filter(e => e.statusPreventiva !== "Pendente");
-  const pendentes = ESTADO.equipamentos.filter(e => e.statusPreventiva === "Pendente")
-                                       .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
+  // Fixos: "Concluída" sempre, e "Em andamento" só se ainda não estiver atrasado.
+  // Para reagendar: "Pendente" sempre, e "Em andamento" se já estiver atrasado.
+  const fixos = ESTADO.equipamentos.filter(e =>
+    e.statusPreventiva === "Concluída" ||
+    (e.statusPreventiva === "Em andamento" && !estaAtrasado(e))
+  );
+  const pendentes = ESTADO.equipamentos
+    .filter(e =>
+      e.statusPreventiva === "Pendente" ||
+      (e.statusPreventiva === "Em andamento" && estaAtrasado(e))
+    )
+    .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
 
-  // Mapeia os slots já ocupados pelas tarefas em andamento/concluídas do dia atual em diante
   const ocupacao = {};
-  concluidos.forEach(c => {
-     if (c.dataAgendada >= hojeISO) {
-         ocupacao[c.dataAgendada] = (ocupacao[c.dataAgendada] || 0) + 1;
+  fixos.forEach(f => {
+     if (f.dataAgendada >= hojeISO) {
+         ocupacao[f.dataAgendada] = (ocupacao[f.dataAgendada] || 0) + 1;
      }
   });
 
@@ -516,8 +528,8 @@ async function reagendarTudo() {
             ambiente: u.refCompleta.ambiente || "",
             equipe: u.refCompleta.equipeResponsavel || "",
             tipo: "Atraso Reagendado",
-            statusAnterior: formataBR(u.dataAntiga),
-            statusNovo: formataBR(u.dataAgendada),
+            dataAnterior: u.dataAntiga,
+            dataNova: u.dataAgendada,
             registradoEm: agora
           });
         }
@@ -857,20 +869,28 @@ function renderHistorico(){
 
   table.innerHTML = `<thead><tr>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
-      <th>Equipe</th><th>De</th><th>Para</th><th>Ações</th>
+      <th>Equipe</th><th>Tipo</th><th>De</th><th>Para</th><th>Ações</th>
   </tr></thead><tbody></tbody>`;
 
   const tbody = table.querySelector("tbody");
 
   historico.forEach(h => {
     const tr = document.createElement("tr");
+    const ehReagendamento = h.tipo === "Atraso Reagendado";
+    const colDe = ehReagendamento
+      ? `<td>${formatarDataBR(h.dataAnterior)}</td>`
+      : `<td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>`;
+    const colPara = ehReagendamento
+      ? `<td>${formatarDataBR(h.dataNova)}</td>`
+      : `<td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>`;
     tr.innerHTML = `
         <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
         <td>${h.patrimonio || "-"}</td>
         <td>${h.setor}</td>
         <td>${h.equipe}</td>
-        <td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>
-        <td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>
+        <td>${h.tipo || "Preventiva"}</td>
+        ${colDe}
+        ${colPara}
     `;
 
     const tdAcao = document.createElement("td");
