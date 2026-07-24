@@ -87,11 +87,12 @@
       <div class="card">
         <h2>Capacidade da equipe</h2>
         <div class="grid-form">
-          <label>Nº de equipes<input type="number" id="nEquipes" value="2" min="1"></label>
-          <label>Aparelhos por equipe/dia<input type="number" id="aparelhosDia" value="2" min="1"></label>
-          <label>Dias úteis por semana<input type="number" id="diasSemana" value="5" min="1" max="7"></label>
-          <label>Data de início<input type="date" id="dataInicio"></label>
+         <label>Dias úteis por semana<input type="number" id="diasSemana" value="5" min="1" max="7"></label>
+         <label>Data de início<input type="date" id="dataInicio"></label>
         </div>
+        <h2 style="font-size:14px; margin-top:18px;">Capacidade por prédio/anexo</h2>
+        <p class="muted">Cada prédio tem sua própria equipe e avança no calendário no próprio ritmo.</p>
+        <div id="capacidadesPorPredio"></div>
         <button class="btn primary" id="btnGerar">Gerar cronograma</button>
         <p class="muted" id="resumoCapacidade"></p>
       </div>
