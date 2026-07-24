@@ -89,6 +89,7 @@ const ESTADO = {
   calYear: null,
   calMonth: null,
   diaSelecionado: null,
+  localFiltro: "Todos",
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -114,11 +115,54 @@ $all(".tab").forEach((btn) => {
     if (btn.dataset.view === "feriados") renderFeriados();
     if (btn.dataset.view === "ordens") renderOrdens();
     if (btn.dataset.view === "historico") renderHistorico();
+    renderTodosSeletoresLocal();
   });
 });
 
 function irParaAba(nome) {
   $(`.tab[data-view="${nome}"]`)?.click();
+}
+
+// ------------------------------------------------------------------
+// Filtro por prédio (SEDE / Anexo 1 / Anexo 2 / ...) — usado nas telas
+// que listam equipamentos, ordens e histórico.
+// ------------------------------------------------------------------
+function locaisDisponiveis() {
+  const set = new Set(ESTADO.equipamentos.map((e) => e.local || "SEDE"));
+  return ["Todos", ...[...set].sort()];
+}
+
+function aplicarFiltroLocal(itens) {
+  if (ESTADO.localFiltro === "Todos") return itens;
+  return itens.filter((i) => (i.local || "SEDE") === ESTADO.localFiltro);
+}
+
+function renderSeletorLocal(containerId) {
+  const el = $(`#${containerId}`);
+  if (!el) return;
+  const locais = locaisDisponiveis();
+  el.innerHTML = locais.map((l) =>
+    `<button class="local-pill ${l === ESTADO.localFiltro ? "active" : ""}" data-local="${l}">${l}</button>`
+  ).join("");
+  el.querySelectorAll(".local-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ESTADO.localFiltro = btn.dataset.local;
+      renderTodosSeletoresLocal();
+      renderCalendar();
+      renderDashboard();
+      renderEquipamentosCadastro();
+      renderOrdens();
+      renderHistorico();
+    });
+  });
+}
+
+function renderTodosSeletoresLocal() {
+  renderSeletorLocal("localFiltroCalendario");
+  renderSeletorLocal("localFiltroDashboard");
+  renderSeletorLocal("localFiltroOrdens");
+  renderSeletorLocal("localFiltroHistorico");
+  renderSeletorLocal("localFiltroEquipamentos");
 }
 
 // ------------------------------------------------------------------
@@ -192,11 +236,17 @@ function processarArquivo(file) {
     try {
       const data = new Uint8Array(e.target.result);
       const wb = XLSX.read(data, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      if (!rows.length) throw new Error("Planilha vazia.");
-      classificar(rows);
-      $("#dropzoneLabel").textContent = `"${file.name}" carregado — ${rows.length} itens`;
+      let todasAsLinhas = [];
+      wb.SheetNames.forEach((nomeAba) => {
+        const sheet = wb.Sheets[nomeAba];
+        const linhas = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        linhas.forEach((linha) => { linha.__local = nomeAba.trim(); });
+        todasAsLinhas = todasAsLinhas.concat(linhas);
+      });
+      if (!todasAsLinhas.length) throw new Error("Planilha vazia.");
+      classificar(todasAsLinhas);
+      $("#dropzoneLabel").textContent =
+        `"${file.name}" carregado — ${todasAsLinhas.length} itens em ${wb.SheetNames.length} aba(s)`;
     } catch (err) {
       toast("Erro ao ler o arquivo: " + err.message);
       $("#dropzoneLabel").textContent = "Clique ou arraste o arquivo aqui";
@@ -218,8 +268,13 @@ function classificar(rows) {
   }
   ESTADO.meta = { colSetor, colAmbiente, colStatus, colPatrimonio };
   let ultimoSetor = "";
+  let localAnterior = null;
   let linhasCorrigidas = 0;
   rows.forEach((row) => {
+    if (row.__local !== localAnterior) {
+      ultimoSetor = "";
+      localAnterior = row.__local;
+    }
     const valorAtual = String(row[colSetor] ?? "").trim();
     if (valorAtual) {
       ultimoSetor = valorAtual;
@@ -241,6 +296,7 @@ function classificar(rows) {
       id: patrimonio ? `${patrimonio.replace(/[\s/\\"']/g, "_")}_${idx}` : `item_${idx}`,
       patrimonio,
       setor, ambiente,
+      local: row.__local || "SEDE",
       statusCondicao: colStatus ? row[colStatus] : "",
       setorPCM,
       prioridadeSetor: PRIORIDADE[setorPCM] || 7,
@@ -526,6 +582,7 @@ async function reagendarTudo() {
             patrimonio: u.refCompleta.patrimonio || "",
             setor: u.refCompleta.setor || "",
             ambiente: u.refCompleta.ambiente || "",
+            local: u.refCompleta.local || "SEDE",
             equipe: u.refCompleta.equipeResponsavel || "",
             tipo: "Atraso Reagendado",
             dataAnterior: u.dataAntiga,
@@ -570,6 +627,7 @@ function iniciarSincronizacao() {
     renderDashboard();
     renderEquipamentosCadastro();
     atualizarBannerAtrasados();
+    renderTodosSeletoresLocal();
   }, (err) => {
     console.error(err);
     toast("Erro ao ler dados do Firebase: " + err.message);
@@ -618,7 +676,7 @@ function renderCalendar() {
 
   const hojeISO = formatISO(new Date());
   const porData = {};
-  for (const item of ESTADO.equipamentos) {
+  for (const item of aplicarFiltroLocal(ESTADO.equipamentos)) {
     (porData[item.dataAgendada] ||= []).push(item);
   }
 
@@ -757,7 +815,7 @@ function classeStatus(status) {
 }
 
 function renderDashboard() {
-  const itens = ESTADO.equipamentos;
+  const itens = aplicarFiltroLocal(ESTADO.equipamentos);
   const total = itens.length;
   const concluidas = itens.filter((i) => i.statusPreventiva === "Concluída").length;
   const andamento = itens.filter((i) => i.statusPreventiva === "Em andamento").length;
@@ -783,6 +841,7 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
     patrimonio: item.patrimonio || "",
     setor: item.setor || "",
     ambiente: item.ambiente || "",
+    local: item.local || "SEDE",
     equipe: item.equipeResponsavel || "",
     tipo: "Preventiva",
     statusAnterior: statusAnterior || "Pendente",
@@ -808,6 +867,7 @@ async function registrarOrdemServico(item) {
     patrimonio: item.patrimonio || "",
     setor: item.setor || "",
     ambiente: item.ambiente || "",
+    local: item.local || "SEDE",
     equipe: item.equipeResponsavel || "",
     dataAgendada: item.dataAgendada || "",
     status: "Concluída",
@@ -859,7 +919,7 @@ function renderHistorico(){
   if(!table) return;
 
   const termo = ESTADO.filtros.historico;
-  const historico = ESTADO.historico.filter((h) => {
+  const historico = aplicarFiltroLocal(ESTADO.historico).filter((h) => {
     if (!termo) return true;
     const alvo = `${h.patrimonio || ""} ${h.setor || ""} ${h.equipe || ""}`.toLowerCase();
     return alvo.includes(termo);
@@ -909,7 +969,7 @@ function renderOrdens() {
   if (!table) return;
 
   const termo = ESTADO.filtros.ordens;
-  const ordens = ESTADO.ordens.filter((o) => {
+  const ordens = aplicarFiltroLocal(ESTADO.ordens).filter((o) => {
     if (!termo) return true;
     const alvo = `${o.patrimonio || ""} ${o.setor || ""} ${o.ambiente || ""} ${o.equipe || ""}`.toLowerCase();
     return alvo.includes(termo);
@@ -963,6 +1023,7 @@ function prepararEdicao(item) {
   $("#eqPatrimonio").value = item.patrimonio || "";
   $("#eqSetor").value = item.setor || "";
   $("#eqAmbiente").value = item.ambiente || "";
+  if ($("#eqLocal")) $("#eqLocal").value = item.local || "SEDE";
 
   if (btnAdicionarEquipamento) {
     btnAdicionarEquipamento.textContent = "Salvar Alterações";
@@ -986,9 +1047,10 @@ async function adicionarEquipamentoManual() {
   const pisoPCM = descobrirPiso(setor);
 
   if (idEquipamentoEmEdicao) {
+    const local = $("#eqLocal")?.value || "SEDE";
     try {
       await updateDoc(doc(db, "equipamentos", idEquipamentoEmEdicao), {
-        patrimonio, setor, ambiente, setorPCM, prioridadeSetor, pisoPCM
+        patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM
       });
       toast("Equipamento atualizado com sucesso!");
       idEquipamentoEmEdicao = null;
@@ -1006,8 +1068,11 @@ async function adicionarEquipamentoManual() {
     const nEquipesAtual = (ESTADO.config && ESTADO.config.nEquipes) || 2;
     const equipeResponsavel = `Equipe ${((ordemExecucao - 1) % nEquipesAtual) + 1}`;
 
+    const local = $("#eqLocal")?.value || "SEDE";
+
     const item = {
       id, patrimonio, setor, ambiente,
+      local,
       statusCondicao: "",
       setorPCM,
       prioridadeSetor,
@@ -1056,7 +1121,7 @@ function renderEquipamentosCadastro() {
   if (!table) return;
 
   const termo = ESTADO.filtros.equipamentos;
-  const itens = ESTADO.equipamentos.filter((item) => {
+  const itens = aplicarFiltroLocal(ESTADO.equipamentos).filter((item) => {
     if (!termo) return true;
     const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""}`.toLowerCase();
     return alvo.includes(termo);
@@ -1064,7 +1129,7 @@ function renderEquipamentosCadastro() {
 
   $("#equipamentosCount").textContent = `${itens.length} itens`;
   table.innerHTML = `<thead><tr>
-      <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Setor PCM</th>
+      <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Prédio</th><th>Setor PCM</th>
       <th>Status</th><th>Origem</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
@@ -1072,6 +1137,7 @@ function renderEquipamentosCadastro() {
   itens.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
+      <td>${item.local || "SEDE"}</td>
       <td>${item.setorPCM}</td>
       <td>
         <span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
