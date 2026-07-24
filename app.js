@@ -147,6 +147,17 @@ function renderSeletorLocal(containerId) {
   el.querySelectorAll(".local-pill").forEach((btn) => {
     btn.addEventListener("click", () => {
       ESTADO.localFiltro = btn.dataset.local;
+
+      // Pula o calendário para o primeiro mês com itens desse prédio, senão
+      // o mês visível pode ficar "vazio" só porque o filtro mudou.
+      const itensFiltrados = aplicarFiltroLocal(ESTADO.equipamentos).filter((i) => i.dataAgendada);
+      if (itensFiltrados.length) {
+        const ordenado = [...itensFiltrados].sort((a, b) => a.dataAgendada.localeCompare(b.dataAgendada));
+        const primeira = new Date(ordenado[0].dataAgendada + "T12:00:00Z");
+        ESTADO.calYear = primeira.getFullYear();
+        ESTADO.calMonth = primeira.getMonth();
+      }
+
       renderTodosSeletoresLocal();
       renderCalendar();
       renderDashboard();
@@ -739,7 +750,7 @@ function renderCalendar() {
 function selecionarDia(iso) {
   ESTADO.diaSelecionado = iso;
   renderCalendar();
-  const itensDoDia = ESTADO.equipamentos.filter((i) => i.dataAgendada === iso);
+  const itensDoDia = aplicarFiltroLocal(ESTADO.equipamentos).filter((i) => i.dataAgendada === iso);
   const [ano, mes, dia] = iso.split("-");
   $("#dayDetailCard").hidden = false;
   $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${itensDoDia.length} aparelho(s)`;
