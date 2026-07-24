@@ -115,7 +115,7 @@ $all(".tab").forEach((btn) => {
     if (btn.dataset.view === "feriados") renderFeriados();
     if (btn.dataset.view === "ordens") renderOrdens();
     if (btn.dataset.view === "historico") renderHistorico();
-    renderTodosSeletoresLocal();
+    if (btn.dataset.view === "config") renderCapacidadesPorPredio();
   });
 });
 
@@ -325,6 +325,7 @@ function classificar(rows) {
   );
 
   ESTADO.itensCarregados = itens;
+  renderCapacidadesPorPredio();
   renderPreview(itens);
 }
 
@@ -359,95 +360,97 @@ async function gerarCronograma() {
     return;
   }
 
-  const nEquipes = Math.max(1, parseInt($("#nEquipes")?.value, 10) || 1);
-  const aparelhosDia = Math.max(1, parseInt($("#aparelhosDia")?.value, 10) || 1);
   const diasSemana = Math.min(7, Math.max(1, parseInt($("#diasSemana")?.value, 10) || 5));
   const dataInicioStr = $("#dataInicio")?.value;
-
   if (!dataInicioStr) {
     toast("Escolha a data de início do cronograma.");
     return;
   }
+  const capacidades = lerCapacidadesDaTela();
 
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
-  const capacidadeDia = nEquipes * aparelhosDia;
-
   function ehDiaUtil(data) {
     return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
   }
 
-  const [ano, mes, dia] = dataInicioStr.split("-");
-  let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0);
-
-  while (!ehDiaUtil(dataCursor)) {
-    dataCursor.setDate(dataCursor.getDate() + 1);
-  }
-  const primeiraDataUtil = new Date(dataCursor);
+  const [anoI, mesI, diaI] = dataInicioStr.split("-");
+  let dataInicioBase = new Date(anoI, parseInt(mesI, 10) - 1, diaI, 12, 0, 0);
+  while (!ehDiaUtil(dataInicioBase)) dataInicioBase.setDate(dataInicioBase.getDate() + 1);
+  const primeiraDataUtilGlobal = new Date(dataInicioBase);
 
   $("#btnGerar").disabled = true;
   try {
-    ESTADO.config = { nEquipes, aparelhosDia, diasSemana, dataInicio: formatISO(primeiraDataUtil) };
+    ESTADO.config = { diasSemana, dataInicio: formatISO(primeiraDataUtilGlobal), capacidades };
     await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
 
     const itensPlanilha = ESTADO.itensCarregados.map((i) => ({ ...i }));
-
     toast("Lendo dados anteriores...");
 
     const existentes = {};
     const idsAntigos = [];
     const manuaisPreservados = [];
-
     ESTADO.equipamentos.forEach((dados) => {
       existentes[dados.id] = dados;
       idsAntigos.push(dados.id);
-      if (dados.origem === "manual") {
-        manuaisPreservados.push({ ...dados });
-      }
+      if (dados.origem === "manual") manuaisPreservados.push({ ...dados });
     });
 
     const itens = [...itensPlanilha, ...manuaisPreservados];
 
-    let contador = 0;
-    let grupoAmbienteAtual = null;
-    let indiceGrupo = -1;
-    let ordem = 0;
-
+    // Agrupa por prédio — cada grupo anda no próprio ritmo, com sua própria capacidade
+    const grupos = new Map();
     itens.forEach((item) => {
-      const chaveAmbiente = `${item.setor}||${item.ambiente}`;
-      if (chaveAmbiente !== grupoAmbienteAtual) {
-        grupoAmbienteAtual = chaveAmbiente;
-        indiceGrupo++;
-      }
-      item.equipeResponsavel = `Equipe ${(indiceGrupo % nEquipes) + 1}`;
-
-      ordem++;
-      item.ordemExecucao = ordem;
-      item.dataAgendada = formatISO(dataCursor);
-      item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
-      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-      item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
-
-      const anterior = existentes[item.id];
-      if (anterior) {
-        item.statusPreventiva = anterior.statusPreventiva || "Pendente";
-        item.observacao = anterior.observacao || "";
-      }
-
-      contador++;
-      if (contador >= capacidadeDia) {
-        contador = 0;
-        do {
-          dataCursor.setDate(dataCursor.getDate() + 1);
-        } while (!ehDiaUtil(dataCursor));
-      }
+      const local = item.local || "SEDE";
+      if (!grupos.has(local)) grupos.set(local, []);
+      grupos.get(local).push(item);
     });
 
-    const diasNecessarios = Math.ceil(itens.length / capacidadeDia);
-    const semanasNecessarias = Math.ceil(diasNecessarios / diasSemana);
-    $("#resumoCapacidade").textContent =
-      `Capacidade diária: ${capacidadeDia} aparelhos · Dias necessários: ${diasNecessarios} · ` +
-      `Semanas necessárias: ${semanasNecessarias}` +
-      (manuaisPreservados.length ? ` · ${manuaisPreservados.length} cadastrado(s) manualmente incluído(s)` : "");
+    const resumoPorPredio = [];
+
+    grupos.forEach((itensDoPredio, local) => {
+      const cap = capacidades[local] || { nEquipes: 1, aparelhosDia: 2 };
+      const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
+
+      let dataCursor = new Date(primeiraDataUtilGlobal);
+      let contador = 0;
+      let grupoAmbienteAtual = null;
+      let indiceGrupo = -1;
+      let ordem = 0;
+
+      itensDoPredio.forEach((item) => {
+        const chaveAmbiente = `${item.setor}||${item.ambiente}`;
+        if (chaveAmbiente !== grupoAmbienteAtual) {
+          grupoAmbienteAtual = chaveAmbiente;
+          indiceGrupo++;
+        }
+        item.equipeResponsavel = `Equipe ${(indiceGrupo % cap.nEquipes) + 1}`;
+
+        ordem++;
+        item.ordemExecucao = ordem;
+        item.dataAgendada = formatISO(dataCursor);
+        item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+        const diffDias = Math.floor((dataCursor - primeiraDataUtilGlobal) / 86400000);
+        item.semanaPlanejada = `Semana ${Math.floor(diffDias / 7) + 1}`;
+
+        const anterior = existentes[item.id];
+        if (anterior) {
+          item.statusPreventiva = anterior.statusPreventiva || "Pendente";
+          item.observacao = anterior.observacao || "";
+        }
+
+        contador++;
+        if (contador >= capacidadeDia) {
+          contador = 0;
+          do { dataCursor.setDate(dataCursor.getDate() + 1); } while (!ehDiaUtil(dataCursor));
+        }
+      });
+
+      const diasNecessarios = Math.ceil(itensDoPredio.length / capacidadeDia);
+      resumoPorPredio.push(`<strong>${local}</strong>: ${itensDoPredio.length} itens · ${diasNecessarios} dia(s) úteis · capacidade ${capacidadeDia}/dia`);
+    });
+
+    $("#resumoCapacidade").innerHTML = resumoPorPredio.join("<br>") +
+      (manuaisPreservados.length ? `<br>${manuaisPreservados.length} cadastrado(s) manualmente incluído(s)` : "");
 
     const TAMANHO_LOTE = 400;
 
@@ -489,103 +492,91 @@ async function reagendarTudo() {
   if (!ESTADO.equipamentos.length) return;
 
   if (!ESTADO.config) {
-    ESTADO.config = { nEquipes: 2, aparelhosDia: 2, diasSemana: 5, dataInicio: formatISO(new Date()) };
+    ESTADO.config = { diasSemana: 5, dataInicio: formatISO(new Date()), capacidades: {} };
   }
+  if (!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
 
-  const { nEquipes, aparelhosDia, diasSemana, dataInicio } = ESTADO.config;
-  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
-  const capacidadeDia = Math.max(1, nEquipes) * Math.max(1, aparelhosDia);
+  const { diasSemana, dataInicio, capacidades } = ESTADO.config;
+  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana || 5);
   const hojeISO = formatISO(new Date());
 
   function ehDiaUtilLocal(data) {
     return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
   }
 
-  // A data base para começar a alocar os pendentes deve ser a Data de Início original ou Hoje (o que for maior).
-  // Isso empurra tudo que está atrasado para frente naturalmente.
   const dataBaseStr = dataInicio > hojeISO ? dataInicio : hojeISO;
-  const [ano, mes, dia] = dataBaseStr.split("-");
-  let dataCursor = new Date(ano, parseInt(mes, 10) - 1, dia, 12, 0, 0);
+  const [anoB, mesB, diaB] = dataBaseStr.split("-");
+  const dataCursorInicial = new Date(anoB, parseInt(mesB, 10) - 1, diaB, 12, 0, 0);
+  while (!ehDiaUtilLocal(dataCursorInicial)) dataCursorInicial.setDate(dataCursorInicial.getDate() + 1);
 
-  // Avança até o primeiro dia útil disponível
-  while (!ehDiaUtilLocal(dataCursor)) {
-    dataCursor.setDate(dataCursor.getDate() + 1);
-  }
-
-  // Base para cálculo contínuo de "Semanas" no cronograma
   const [anoIn, mesIn, diaIn] = dataInicio.split("-");
   const primeiraDataUtil = new Date(anoIn, parseInt(mesIn, 10) - 1, diaIn, 12, 0, 0);
   while (!ehDiaUtilLocal(primeiraDataUtil)) primeiraDataUtil.setDate(primeiraDataUtil.getDate() + 1);
 
-  // Separa o que é fixo do que será roteado
-  // Fixos: "Concluída" sempre, e "Em andamento" só se ainda não estiver atrasado.
-  // Para reagendar: "Pendente" sempre, e "Em andamento" se já estiver atrasado.
-  const fixos = ESTADO.equipamentos.filter(e =>
-    e.statusPreventiva === "Concluída" ||
-    (e.statusPreventiva === "Em andamento" && !estaAtrasado(e))
-  );
-  const pendentes = ESTADO.equipamentos
-    .filter(e =>
-      e.statusPreventiva === "Pendente" ||
-      (e.statusPreventiva === "Em andamento" && estaAtrasado(e))
-    )
-    .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
-
-  const ocupacao = {};
-  fixos.forEach(f => {
-     if (f.dataAgendada >= hojeISO) {
-         ocupacao[f.dataAgendada] = (ocupacao[f.dataAgendada] || 0) + 1;
-     }
+  const porPredio = new Map();
+  ESTADO.equipamentos.forEach((e) => {
+    const local = e.local || "SEDE";
+    if (!porPredio.has(local)) porPredio.set(local, []);
+    porPredio.get(local).push(e);
   });
 
   const atualizacoes = [];
 
-  // Distribui os pendentes nos slots vazios
-  pendentes.forEach((item) => {
-    // Avança o dia se não for dia útil ou se a equipe já estiver lotada
-    while (!ehDiaUtilLocal(dataCursor) || (ocupacao[formatISO(dataCursor)] || 0) >= capacidadeDia) {
-      dataCursor.setDate(dataCursor.getDate() + 1);
-  }
+  porPredio.forEach((itensDoPredio, local) => {
+    const cap = capacidades[local] || { nEquipes: 1, aparelhosDia: 2 };
+    const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
 
-    const novaData = formatISO(dataCursor);
-    const novoDia = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
-    const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
-    const novaSemana = `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`;
+    const fixos = itensDoPredio.filter((e) =>
+      e.statusPreventiva === "Concluída" ||
+      (e.statusPreventiva === "Em andamento" && !estaAtrasado(e))
+    );
+    const pendentes = itensDoPredio
+      .filter((e) =>
+        e.statusPreventiva === "Pendente" ||
+        (e.statusPreventiva === "Em andamento" && estaAtrasado(e))
+      )
+      .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
 
-    ocupacao[novaData] = (ocupacao[novaData] || 0) + 1;
+    const ocupacao = {};
+    fixos.forEach((f) => {
+      if (f.dataAgendada >= hojeISO) {
+        ocupacao[f.dataAgendada] = (ocupacao[f.dataAgendada] || 0) + 1;
+      }
+    });
 
-    // Só separa para atualizar se a data realmente precisar mudar
-    if (item.dataAgendada !== novaData || item.diaPlanejado !== novoDia || item.semanaPlanejada !== novaSemana) {
-      atualizacoes.push({ 
-        id: item.id, 
-        dataAgendada: novaData, 
-        diaPlanejado: novoDia, 
-        semanaPlanejada: novaSemana,
-        dataAntiga: item.dataAgendada, // NOVO: Guarda a data antiga
-        refCompleta: item // NOVO: Guarda dados para o log
-      });
-    }
+    let dataCursor = new Date(dataCursorInicial);
+
+    pendentes.forEach((item) => {
+      while (!ehDiaUtilLocal(dataCursor) || (ocupacao[formatISO(dataCursor)] || 0) >= capacidadeDia) {
+        dataCursor.setDate(dataCursor.getDate() + 1);
+      }
+      const novaData = formatISO(dataCursor);
+      const novoDia = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+      const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
+      const novaSemana = `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`;
+
+      ocupacao[novaData] = (ocupacao[novaData] || 0) + 1;
+
+      if (item.dataAgendada !== novaData || item.diaPlanejado !== novoDia || item.semanaPlanejada !== novaSemana) {
+        atualizacoes.push({
+          id: item.id, dataAgendada: novaData, diaPlanejado: novoDia, semanaPlanejada: novaSemana,
+          dataAntiga: item.dataAgendada, refCompleta: item,
+        });
+      }
+    });
   });
 
-  // Salva tudo de uma vez no Firebase e gera o log
   if (atualizacoes.length) {
-    const TAMANHO_LOTE = 200; // Reduzido pois agora salva 2 coisas por item
+    const TAMANHO_LOTE = 200;
     const agora = new Date().toISOString();
-    const formataBR = (iso) => iso ? iso.split("-").reverse().join("/") : "-";
 
     for (let inicio = 0; inicio < atualizacoes.length; inicio += TAMANHO_LOTE) {
       const pedaco = atualizacoes.slice(inicio, inicio + TAMANHO_LOTE);
       const batch = writeBatch(db);
-      
       pedaco.forEach((u) => {
-        // 1. Atualiza as datas no equipamento
         batch.update(doc(db, "equipamentos", u.id), {
-          dataAgendada: u.dataAgendada, 
-          diaPlanejado: u.diaPlanejado, 
-          semanaPlanejada: u.semanaPlanejada,
+          dataAgendada: u.dataAgendada, diaPlanejado: u.diaPlanejado, semanaPlanejada: u.semanaPlanejada,
         });
-
-        // 2. Cria o registro no histórico apenas se era um atraso
         if (u.dataAntiga && u.dataAntiga < hojeISO) {
           const novoLogRef = doc(collection(db, "historico"));
           batch.set(novoLogRef, {
@@ -598,13 +589,13 @@ async function reagendarTudo() {
             tipo: "Atraso Reagendado",
             dataAnterior: u.dataAntiga,
             dataNova: u.dataAgendada,
-            registradoEm: agora
+            registradoEm: agora,
           });
         }
       });
       await batch.commit();
     }
-    toast(`Cronograma recalculado e histórico atualizado!`);
+    toast(`Cronograma recalculado (${atualizacoes.length} item(ns) reagendado(s)).`);
   }
 
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
@@ -618,6 +609,7 @@ async function carregarConfig() {
       if ($("#aparelhosDia")) $("#aparelhosDia").value = ESTADO.config.aparelhosDia;
       if ($("#diasSemana")) $("#diasSemana").value = ESTADO.config.diasSemana;
       if ($("#dataInicio")) $("#dataInicio").value = ESTADO.config.dataInicio;
+        renderCapacidadesPorPredio();
     }
   } catch (err) {
     console.error(err);
@@ -648,6 +640,47 @@ function iniciarSincronizacao() {
 iniciarSincronizacao();
 iniciarSincronizacaoHistorico();
 carregarConfig();
+
+function slugLocal(local) {
+  return String(local).replace(/[^a-zA-Z0-9]/g, "_");
+}
+
+function locaisParaConfigurar() {
+  const origem = ESTADO.equipamentos.length ? ESTADO.equipamentos : ESTADO.itensCarregados;
+  const set = new Set(origem.map((e) => e.local || "SEDE"));
+  return set.size ? [...set].sort() : ["SEDE"];
+}
+
+function renderCapacidadesPorPredio() {
+  const container = $("#capacidadesPorPredio");
+  if (!container) return;
+  const locais = locaisParaConfigurar();
+  const capacidadesAtuais = (ESTADO.config && ESTADO.config.capacidades) || {};
+
+  container.innerHTML = locais.map((local) => {
+    const slug = slugLocal(local);
+    const cap = capacidadesAtuais[local] || { nEquipes: 2, aparelhosDia: 2 };
+    return `
+      <div class="capacidade-linha">
+        <span class="capacidade-nome">${local}</span>
+        <label>Equipes<input type="number" min="1" id="nEquipes_${slug}" data-local="${local}" class="input-capacidade-equipes" value="${cap.nEquipes}"></label>
+        <label>Aparelhos/equipe/dia<input type="number" min="1" id="aparelhosDia_${slug}" data-local="${local}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia}"></label>
+      </div>`;
+  }).join("");
+}
+
+function lerCapacidadesDaTela() {
+  const capacidades = {};
+  $all(".input-capacidade-equipes").forEach((input) => {
+    const local = input.dataset.local;
+    const aparInput = $(`#aparelhosDia_${slugLocal(local)}`);
+    capacidades[local] = {
+      nEquipes: Math.max(1, parseInt(input.value, 10) || 1),
+      aparelhosDia: Math.max(1, parseInt(aparInput?.value, 10) || 1),
+    };
+  });
+  return capacidades;
+}
 
 function ligarBusca(inputId, chaveFiltro, renderFn) {
   const input = $(`#${inputId}`);
@@ -1074,12 +1107,12 @@ async function adicionarEquipamentoManual() {
   } else {
     const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-    const maiorOrdem = ESTADO.equipamentos.reduce((max, e) => Math.max(max, e.ordemExecucao || 0), 0);
-    const ordemExecucao = maiorOrdem + 1;
-    const nEquipesAtual = (ESTADO.config && ESTADO.config.nEquipes) || 2;
-    const equipeResponsavel = `Equipe ${((ordemExecucao - 1) % nEquipesAtual) + 1}`;
-
     const local = $("#eqLocal")?.value || "SEDE";
+    const itensDoMesmoLocal = ESTADO.equipamentos.filter((e) => (e.local || "SEDE") === local);
+    const maiorOrdem = itensDoMesmoLocal.reduce((max, e) => Math.max(max, e.ordemExecucao || 0), 0);
+    const ordemExecucao = maiorOrdem + 1;
+    const capLocal = (ESTADO.config && ESTADO.config.capacidades && ESTADO.config.capacidades[local]) || { nEquipes: 2 };
+    const equipeResponsavel = `Equipe ${((ordemExecucao - 1) % capLocal.nEquipes) + 1}`;
 
     const item = {
       id, patrimonio, setor, ambiente,
