@@ -2313,7 +2313,7 @@ function iniciarSincronizacaoCiclos() {
       
     // RASTREADOR: Vai imprimir no console tudo que achou no banco!
     console.log(" CICLOS ENCONTRADOS NO BANCO:", ESTADO.ciclos);
-    function numeroDoCiclo(id) {
+function numeroDoCiclo(id) {
   const ordenado = [...ESTADO.ciclos].sort((a, b) =>
     String(a.criadoEm || a.dataInicio || "").localeCompare(String(b.criadoEm || b.dataInicio || "")));
   const idx = ordenado.findIndex((c) => c.id === id);
