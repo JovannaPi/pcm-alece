@@ -2198,58 +2198,72 @@ function iniciarSincronizacaoCiclos() {
 }
 
 function renderCiclos() {
-  try {
-    const table = $("#ciclosTable");
-    if (!table) return;
-    
-    const encerrados = ESTADO.ciclos.filter(c => c.dataFechamento);
-    const ativos = ESTADO.ciclos.filter(c => !c.dataFechamento);
+  const table = $("#ciclosTable");
+  if (!table) return;
+  
+  const encerrados = ESTADO.ciclos.filter(c => c.dataFechamento);
+  const ativos = ESTADO.ciclos.filter(c => !c.dataFechamento);
 
-    $("#ciclosCount").textContent = `${encerrados.length} ciclo(s) encerrado(s) | ${ativos.length} ativo(s)`;
+  $("#ciclosCount").textContent = `${encerrados.length} ciclo(s) encerrado(s) | ${ativos.length} ativo(s)`;
 
-    table.innerHTML = `<thead><tr>
-        <th>Ciclo</th><th>Status</th><th>Início</th><th>Encerramento</th><th>Aparelhos</th>
-        <th>No prazo</th><th>Em atraso</th><th>Por prédio</th>
-      </tr></thead><tbody></tbody>`;
-    const tbody = table.querySelector("tbody");
+  // Adicionamos a coluna "Ações" no cabeçalho
+  table.innerHTML = `<thead><tr>
+      <th>Ciclo</th><th>Status</th><th>Início</th><th>Encerramento</th><th>Aparelhos</th>
+      <th>No prazo</th><th>Em atraso</th><th>Por prédio</th><th>Ações</th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
 
-    if (!ESTADO.ciclos.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--texto-suave)">Nenhum ciclo encontrado.</td></tr>`;
-      return;
-    }
-
-    ESTADO.ciclos.forEach((c) => {
-      // Proteção extra caso "porPredio" venha vazio ou diferente do esperado
-      const porPredio = c.porPredio 
-        ? Object.entries(c.porPredio).map(([local, qtd]) => `${local}: ${qtd}`).join(" · ")
-        : "-";
-        
-      const isAtivo = !c.dataFechamento;
-      const statusLabel = isAtivo 
-        ? `<span class="status-select andamento" style="cursor:default">Em andamento</span>` 
-        : `<span class="status-select concluido" style="cursor:default">Encerrado</span>`;
-      
-      const numeroCiclo = c.numero || (ESTADO.config && ESTADO.config.cicloAtual) || 1;
-      
-      // Proteção extra para datas
-      const dataDeInicio = c.dataInicio || (c.criadoEm ? c.criadoEm.split('T')[0] : '');
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><strong>Ciclo ${numeroCiclo}</strong></td>
-        <td>${statusLabel}</td>
-        <td>${formatarDataBR(dataDeInicio)}</td>
-        <td>${c.dataFechamento ? formatarDataBR(c.dataFechamento) : "-"}</td>
-        <td>${c.total || ESTADO.equipamentos.length}</td>
-        <td>${c.noPrazo !== undefined ? c.noPrazo : "-"}</td>
-        <td>${c.emAtraso !== undefined ? c.emAtraso : "-"}</td>
-        <td style="font-size:12px;color:var(--texto-suave)">${porPredio}</td>`;
-      tbody.appendChild(tr);
-    });
-  } catch (error) {
-    // RASTREADOR DE ERRO: Se a tabela quebrar na hora de desenhar, ele avisa aqui!
-    console.error(" ERRO ", error);
+  if (!ESTADO.ciclos.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--texto-suave)">Nenhum ciclo encontrado.</td></tr>`;
+    return;
   }
+
+  ESTADO.ciclos.forEach((c) => {
+    const porPredio = c.porPredio 
+      ? Object.entries(c.porPredio).map(([local, qtd]) => `${local}: ${qtd}`).join(" · ")
+      : "-";
+      
+    const isAtivo = !c.dataFechamento;
+    const statusLabel = isAtivo 
+      ? `<span class="status-select andamento" style="cursor:default">Em andamento</span>` 
+      : `<span class="status-select concluido" style="cursor:default">Encerrado</span>`;
+    
+    const numeroCiclo = c.numero || (ESTADO.config && ESTADO.config.cicloAtual) || 1;
+    const dataDeInicio = c.dataInicio || (c.criadoEm ? c.criadoEm.split('T')[0] : '');
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>Ciclo ${numeroCiclo}</strong></td>
+      <td>${statusLabel}</td>
+      <td>${formatarDataBR(dataDeInicio)}</td>
+      <td>${c.dataFechamento ? formatarDataBR(c.dataFechamento) : "-"}</td>
+      <td>${c.total || ESTADO.equipamentos.length}</td>
+      <td>${c.noPrazo !== undefined ? c.noPrazo : "-"}</td>
+      <td>${c.emAtraso !== undefined ? c.emAtraso : "-"}</td>
+      <td style="font-size:12px;color:var(--texto-suave)">${porPredio}</td>`;
+      
+    // CRIANDO A COLUNA DE AÇÕES (ABRIR E APAGAR)
+    const tdAcoes = document.createElement("td");
+    
+    const btnLoad = document.createElement("button");
+    btnLoad.className = "btn ghost";
+    btnLoad.textContent = "Abrir";
+    btnLoad.addEventListener("click", () => {
+        selecionarCiclo(c.id);
+        irParaAba("dashboard"); // Pula direto pro dashboard quando carregar!
+    });
+    
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn ghost";
+    btnDel.textContent = "Apagar Tudo";
+    btnDel.addEventListener("click", () => deletarRegistro('ciclos', c.id));
+    
+    tdAcoes.appendChild(btnLoad);
+    tdAcoes.appendChild(btnDel);
+    tr.appendChild(tdAcoes);
+
+    tbody.appendChild(tr);
+  });
 }
 async function selecionarCiclo(id) {
 
