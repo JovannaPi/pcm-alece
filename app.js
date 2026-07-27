@@ -964,16 +964,15 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
 async function registrarOrdemServico(item) {
   const agora = new Date();
   
-  // 1. Limpa ordens antigas (se você fez testes antes, isso apaga as duplicadas)
   const ordensAntigas = ESTADO.ordens.filter(o => o.equipamentoId === item.id);
   if (ordensAntigas.length > 0) {
     const batch = writeBatch(db);
-    ordensAntigas.forEach(o => batch.delete(doc(db, "ordens", o.id)));
+    ordensAntigas.forEach(o => batch.delete(doc(db, "ciclos", ESTADO.cicloAtual, "ordens", o.id)));
     await batch.commit();
   }
 
-  // 2. Cria a OS nova travada no ID do equipamento (garante que só exista uma)
-  await setDoc(doc(db, "ordens", item.id), {
+  // Agora ele grava a OS dentro da pasta do ciclo correto!
+  await setDoc(doc(db, "ciclos", ESTADO.cicloAtual, "ordens", item.id), {
     equipamentoId: item.id,
     patrimonio: item.patrimonio || "",
     setor: item.setor || "",
@@ -987,11 +986,10 @@ async function registrarOrdemServico(item) {
 }
 
 async function removerOrdemServico(equipamentoId) {
-  // Busca a OS amarrada a este equipamento e apaga
   const ordensDoEquipamento = ESTADO.ordens.filter(o => o.equipamentoId === equipamentoId);
   if (ordensDoEquipamento.length > 0) {
     const batch = writeBatch(db);
-    ordensDoEquipamento.forEach(o => batch.delete(doc(db, "ordens", o.id)));
+    ordensDoEquipamento.forEach(o => batch.delete(doc(db, "ciclos", ESTADO.cicloAtual, "ordens", o.id)));
     await batch.commit();
   }
 }
@@ -1012,8 +1010,9 @@ function iniciarSincronizacaoOrdens() {
 iniciarSincronizacaoOrdens();
 
 function iniciarSincronizacaoHistorico(){
+  if (!ESTADO.cicloAtual) return; // Trava de segurança
   if(ESTADO.unsubscribeHistorico) ESTADO.unsubscribeHistorico();
-  const q = query(collection(db,"historico"), orderBy("registradoEm","desc"));
+  const q = query(collection(db, "ciclos", ESTADO.cicloAtual, "historico"), orderBy("registradoEm","desc"));
 
   ESTADO.unsubscribeHistorico = onSnapshot(q, (snap) => {
     ESTADO.historico = snap.docs.map((doc) => ({
@@ -2126,7 +2125,8 @@ async function deletarRegistro(colecao, id) {
   const ok = window.confirm("Excluir este registro permanentemente?");
   if (!ok) return;
   try {
-    await deleteDoc(doc(db, colecao, id));
+    // Agora ele exclui o item de dentro do ciclo atual!
+    await deleteDoc(doc(db, "ciclos", ESTADO.cicloAtual, colecao, id));
     toast("Registro excluído!");
   } catch (err) {
     console.error(err);
