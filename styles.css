@@ -439,5 +439,62 @@ tbody tr:hover { background: var(--latao-claro); }
   padding: 8px 9px; border: 1px solid var(--borda); border-radius: 8px;
   font-size: 14px; font-family: var(--fonte);
 }
+
+/* ---- Painel lateral de detalhes do equipamento ---- */
+.drawer-overlay {
+  position: fixed; inset: 0;
+  background: rgba(28,37,48,.45);
+  z-index: 200;
+}
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 420px; max-width: 92vw;
+  background: var(--branco);
+  border-left: 1px solid var(--borda);
+  box-shadow: -4px 0 24px rgba(0,0,0,.12);
+  z-index: 201;
+  display: flex; flex-direction: column;
+}
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px; border-bottom: 1px solid var(--borda);
+}
+.drawer-head h2 { margin: 0; font-size: 16px; color: var(--azul-escuro); }
+.drawer-close {
+  background: none; border: none; font-size: 26px; line-height: 1;
+  color: var(--texto-suave); cursor: pointer; padding: 0 4px;
+}
+.drawer-close:hover { color: var(--texto); }
+.drawer-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+.drawer-secao { margin-bottom: 22px; }
+.drawer-secao h3 {
+  margin: 0 0 10px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--texto-suave);
+}
+.drawer-campo {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--borda); font-size: 13.5px;
+}
+.drawer-campo .rotulo { color: var(--texto-suave); flex-shrink: 0; }
+.drawer-campo .valor { text-align: right; font-weight: 600; }
+
+.drawer-form label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 12.5px; color: var(--texto-suave); font-weight: 600; margin-bottom: 12px;
+}
+.drawer-form input, .drawer-form select {
+  padding: 9px 10px; border: 1px solid var(--borda); border-radius: 8px;
+  font-size: 14px; color: var(--texto); font-family: var(--fonte);
+}
+.drawer-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+.linha-clicavel { cursor: pointer; }
+.linha-clicavel:hover { background: var(--azul-claro) !important; }
+.btn-menu {
+  background: none; border: none; cursor: pointer; font-size: 18px;
+  color: var(--texto-suave); padding: 2px 8px; border-radius: 6px; line-height: 1;
+}
+.btn-menu:hover { background: var(--azul-claro); color: var(--azul-escuro); }
 .local-pill:hover { border-color: var(--azul); }
 .local-pill.active { background: var(--azul); color: white; border-color: var(--azul); }
