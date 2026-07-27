@@ -909,19 +909,33 @@ function renderCalendar() {
     }
 
     if (itensDoDia.length) {
-      const concluidas = itensDoDia.filter((i) => i.statusPreventiva === "Concluída").length;
-      const andamento = itensDoDia.filter((i) => i.statusPreventiva === "Em andamento").length;
-      const temAtrasado = iso < hojeISO && concluidas < itensDoDia.length;
+    // Agrupa os itens do dia por prédio/anexo
+    const porPredio = {};
+    itensDoDia.forEach(i => {
+      const p = i.local || "SEDE";
+      (porPredio[p] = porPredio[p] || []).push(i);
+    });
+
+    // Cria uma etiqueta (badge) separada para cada prédio no mesmo dia
+    Object.entries(porPredio).forEach(([predio, itensPredio]) => {
+      const concluidas = itensPredio.filter((i) => i.statusPreventiva === "Concluída").length;
+      const andamento = itensPredio.filter((i) => i.statusPreventiva === "Em andamento").length;
+      const temAtrasado = iso < hojeISO && concluidas < itensPredio.length;
+      
       const badge = document.createElement("div");
       let classe = "pendente";
-      if (concluidas === itensDoDia.length) classe = "concluido";
+      if (concluidas === itensPredio.length) classe = "concluido";
       else if (andamento > 0 || concluidas > 0) classe = "andamento";
       if (temAtrasado) classe = "atrasado";
+      
       badge.className = "cal-day-badge " + classe;
-      badge.textContent = `${itensDoDia.length} aparelho${itensDoDia.length > 1 ? "s" : ""}`;
+      // Agora o texto mostra o nome do anexo antes da quantidade
+      badge.textContent = `${predio}: ${itensPredio.length} aparelho${itensPredio.length > 1 ? "s" : ""}`;
       el.appendChild(badge);
-      el.addEventListener("click", () => selecionarDia(iso));
-    }
+    });
+    
+    el.addEventListener("click", () => selecionarDia(iso));
+  }
     grid.appendChild(el);
   }
 }
@@ -935,12 +949,14 @@ function selecionarDia(iso) {
   $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${itensDoDia.length} aparelho(s)`;
 
   const table = $("#dayDetailTable");
-  table.innerHTML = `<thead><tr><th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Equipe</th><th>Status</th></tr></thead><tbody></tbody>`;
+  // Adicionada a coluna "Prédio" aqui:
+  table.innerHTML = `<thead><tr><th>Patrimônio</th><th>Prédio</th><th>Setor</th><th>Ambiente</th><th>Equipe</th><th>Status</th></tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
 
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
+    // E inserido o item.local na tabela:
+    tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.local || "SEDE"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
     const tdStatus = document.createElement("td");
     const select = document.createElement("select");
     select.className = "status-select " + classeStatus(item.statusPreventiva);
