@@ -89,6 +89,8 @@ const ESTADO = {
   feriados: [],
   ordens: [],
   historico: [],
+  chamadosCorretivos: [],
+  chamadosCorretivosCarregadosEm: null,
   cicloAtual: null,
   ciclos: [],
   unsubscribeCiclos: null,
@@ -105,6 +107,87 @@ const ESTADO = {
   localFiltro: "Todos",
 };
 
+const URL_CHAMADOS_CORRETIVOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR2Ysf9JofZL_2Xn_JPJFaPrMX6IGiwMQWFyhgJcqu8BK_4imC_lmrMgfpDWLnI6MIdcC0OYSDUQFPw/pub?gid=1978174237&single=true&output=csv";
+const INTERVALO_ATUALIZACAO_CORRETIVOS_MS = 5 * 60 * 1000; // 5 minutos
+
+const COL_CORRETIVA = {
+  DATA: 0, EQUIPE: 1, CHAMADO: 2, ANEXO: 4,
+  GABINETE: 6, SALA: 7, NOME_SETOR: 8, SALA_SETOR: 9,
+  TOMBO: 12, TAG: 13,
+  SEDE: 23, ANEXO1: 24, ANEXO2: 25, ANEXO3: 26, ANEXO4: 27,
+  SOLUCIONADO: 28, DESCRICAO_PROBLEMA: 29, PECA_FALTANTE: 30,
+};
+
+async function carregarChamadosCorretivos(forcar) {
+  const agora = Date.now();
+  if (!forcar && ESTADO.chamadosCorretivosCarregadosEm &&
+      (agora - ESTADO.chamadosCorretivosCarregadosEm) < INTERVALO_ATUALIZACAO_CORRETIVOS_MS) {
+    return;
+  }
+  try {
+    const resp = await fetch(URL_CHAMADOS_CORRETIVOS, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const texto = await resp.text();
+    const wb = XLSX.read(texto, { type: "string" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    const dados = linhas.slice(1);
+
+    ESTADO.chamadosCorretivos = dados.map((linha) => {
+      const localAdicional = [linha[COL_CORRETIVA.SEDE], linha[COL_CORRETIVA.ANEXO1],
+        linha[COL_CORRETIVA.ANEXO2], linha[COL_CORRETIVA.ANEXO3], linha[COL_CORRETIVA.ANEXO4]]
+        .find((v) => String(v || "").trim()) || "";
+      return {
+        data: linha[COL_CORRETIVA.DATA] || "",
+        equipe: linha[COL_CORRETIVA.EQUIPE] || "",
+        chamado: linha[COL_CORRETIVA.CHAMADO] || "",
+        anexo: String(linha[COL_CORRETIVA.ANEXO] || "").trim(),
+        gabinete: linha[COL_CORRETIVA.GABINETE] || "",
+        sala: linha[COL_CORRETIVA.SALA] || "",
+        nomeSetor: linha[COL_CORRETIVA.NOME_SETOR] || "",
+        salaSetor: linha[COL_CORRETIVA.SALA_SETOR] || "",
+        localAdicional,
+        tombo: String(linha[COL_CORRETIVA.TOMBO] || "").trim(),
+        tag: String(linha[COL_CORRETIVA.TAG] || "").trim(),
+        solucionado: linha[COL_CORRETIVA.SOLUCIONADO] || "",
+        descricaoProblema: linha[COL_CORRETIVA.DESCRICAO_PROBLEMA] || "",
+        pecaFaltante: linha[COL_CORRETIVA.PECA_FALTANTE] || "",
+      };
+    });
+    ESTADO.chamadosCorretivosCarregadosEm = agora;
+  } catch (err) {
+    console.error("Erro ao carregar chamados corretivos:", err);
+  }
+}
+
+function normalizarTexto(v) {
+  return String(v || "").trim().toUpperCase();
+}
+
+function chamadosDoEquipamento(item) {
+  const patrimonio = normalizarTexto(item.patrimonio);
+  const localItem = normalizarTexto(item.local);
+  const setorAmbiente = normalizarTexto(`${item.setor} ${item.ambiente}`);
+  const exatos = [];
+  const aproximados = [];
+
+  ESTADO.chamadosCorretivos.forEach((c) => {
+    const tomboTag = normalizarTexto(c.tombo) || normalizarTexto(c.tag);
+    if (patrimonio && tomboTag && tomboTag === patrimonio) {
+      exatos.push(c);
+      return;
+    }
+    const anexoChamado = normalizarTexto(c.anexo);
+    if (localItem && anexoChamado && (anexoChamado === localItem || localItem.includes(anexoChamado) || anexoChamado.includes(localItem))) {
+      const poolLocal = normalizarTexto(`${c.gabinete} ${c.sala} ${c.nomeSetor} ${c.salaSetor} ${c.localAdicional}`);
+      const partes = setorAmbiente.split(/\s+/).filter((p) => p.length > 3);
+      if (partes.some((p) => poolLocal.includes(p))) aproximados.push(c);
+    }
+  });
+
+  const porData = (a, b) => String(b.data).localeCompare(String(a.data));
+  return { exatos: exatos.sort(porData), aproximados: aproximados.sort(porData) };
+}
 const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => Array.from(document.querySelectorAll(sel));
 
@@ -685,6 +768,9 @@ function iniciarSincronizacao() {
 (async () => {
 
     await carregarCicloAtual();
+    carregarConfig();
+    carregarChamadosCorretivos(true);
+    setInterval(() => carregarChamadosCorretivos(), INTERVALO_ATUALIZACAO_CORRETIVOS_MS);
     iniciarSincronizacao();
     iniciarSincronizacaoHistorico();
     iniciarSincronizacaoOrdens();
@@ -1289,7 +1375,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") fecharDrawer();
 });
 
-function abrirDrawerEquipamento(id) {
+async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos();
   const item = ESTADO.equipamentos.find((e) => e.id === id);
   if (!item) return;
 
@@ -1302,6 +1388,10 @@ function abrirDrawerEquipamento(id) {
     : "Nunca registrada";
 
   const totalPreventivas = conclusoes.length;
+  const { exatos, aproximados } = chamadosDoEquipamento(item);
+  const linhaChamado = (c) =>
+    `<div class="drawer-campo"><span class="rotulo">${c.data || "-"}</span>
+     <span class="valor">${c.solucionado || "-"} — ${c.descricaoProblema || c.pecaFaltante || "sem descrição"} (${c.equipe || "-"})</span></div>`;
 
   $("#drawerTitulo").textContent = item.patrimonio ? `Patrimônio ${item.patrimonio}` : item.ambiente;
 
@@ -1327,6 +1417,15 @@ function abrirDrawerEquipamento(id) {
       <div class="drawer-campo"><span class="rotulo">Piso</span><span class="valor">${item.pisoPCM === 99 ? "Não identificado" : item.pisoPCM}</span></div>
       <div class="drawer-campo"><span class="rotulo">Condição (levantamento)</span><span class="valor">${item.statusCondicao || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Origem do cadastro</span><span class="valor">${item.origem === "manual" ? "Manual" : "Planilha"}</span></div>
+    </div>
+
+    <div class="drawer-secao">
+      <h3>Chamados corretivos (planilha)</h3>
+      ${exatos.length ? exatos.map(linhaChamado).join("") : '<div class="drawer-campo"><span class="rotulo">Vinculados por patrimônio</span><span class="valor">Nenhum</span></div>'}
+      ${aproximados.length ? `
+        <div style="margin-top:8px;font-size:11px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.03em">Prováveis (mesmo local, sem patrimônio no chamado)</div>
+        ${aproximados.map(linhaChamado).join("")}
+      ` : ""}
     </div>
 
     <div class="drawer-secao drawer-form">
