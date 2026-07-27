@@ -492,7 +492,7 @@ async function gerarCronograma() {
       pedaco.forEach((item) => batch.set(
           doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id),
           item
-      );
+      ));
       await batch.commit();
       toast(`Salvando... ${Math.min(inicio + TAMANHO_LOTE, itens.length)}/${itens.length}`);
     }
