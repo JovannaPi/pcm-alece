@@ -481,7 +481,7 @@ async function gerarCronograma() {
       for (let inicio = 0; inicio < idsAntigos.length; inicio += TAMANHO_LOTE) {
         const pedacoIds = idsAntigos.slice(inicio, inicio + TAMANHO_LOTE);
         const batchDel = writeBatch(db);
-        pedacoIds.forEach((id) => batchDel.delete(doc(db, "equipamentos", id)));
+        pedacoIds.forEach((id) => batchDel.delete(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id)));
         await batchDel.commit();
       }
     }
@@ -599,7 +599,7 @@ async function reagendarTudo() {
       const pedaco = atualizacoes.slice(inicio, inicio + TAMANHO_LOTE);
       const batch = writeBatch(db);
       pedaco.forEach((u) => {
-        batch.update(doc(db, "equipamentos", u.id), {
+        batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", u.id), {
           dataAgendada: u.dataAgendada, diaPlanejado: u.diaPlanejado, semanaPlanejada: u.semanaPlanejada,
         });
         if (u.dataAntiga && u.dataAntiga < hojeISO) {
@@ -870,7 +870,7 @@ function selecionarDia(iso) {
           statusPreventiva: statusNovo,
           dataConclusao: statusNovo === "Concluída" ? formatISO(new Date()) : "",
         };
-        await updateDoc(doc(db, "equipamentos", item.id), camposStatus);
+        await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
         item.statusPreventiva = statusNovo;
         item.dataConclusao = camposStatus.dataConclusao;
         
@@ -1162,7 +1162,7 @@ async function adicionarEquipamentoManual() {
   if (idEquipamentoEmEdicao) {
     const local = $("#eqLocal")?.value || "SEDE";
     try {
-      await updateDoc(doc(db, "equipamentos", idEquipamentoEmEdicao), {
+      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", idEquipamentoEmEdicao), {
         patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM
       });
       toast("Equipamento atualizado com sucesso!");
@@ -1201,7 +1201,7 @@ async function adicionarEquipamentoManual() {
     };
 
     try {
-      await setDoc(doc(db, "equipamentos", id), item);
+      await setDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), item);
       ESTADO.equipamentos.push(item);
       toast("Equipamento adicionado. Agendando automaticamente...");
       await reagendarTudo();
@@ -1221,7 +1221,7 @@ async function removerEquipamento(id, descricao) {
   const ok = window.confirm(`Remover "${descricao}"? Essa ação não pode ser desfeita.`);
   if (!ok) return;
   try {
-    await deleteDoc(doc(db, "equipamentos", id));
+    await deleteDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id));
     toast("Equipamento removido.");
   } catch (err) {
     console.error(err);
@@ -1373,7 +1373,7 @@ function abrirDrawerEquipamento(id) {
     }
     const setorPCM = identificarSetor(setor, ambiente);
     try {
-      await updateDoc(doc(db, "equipamentos", id), {
+      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
         patrimonio, setor, ambiente, local, setorPCM,
         prioridadeSetor: PRIORIDADE[setorPCM] || 7,
         pisoPCM: descobrirPiso(setor),
@@ -1412,7 +1412,7 @@ function abrirDrawerEquipamento(id) {
     }
 
     try {
-      await updateDoc(doc(db, "equipamentos", id), {
+      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
         dataAgendada: novaData,
         diaPlanejado: novoDia,
       });
@@ -1440,7 +1440,7 @@ function abrirDrawerEquipamento(id) {
     const ok = window.confirm(`Remover "${item.patrimonio || item.ambiente}"? Essa ação não pode ser desfeita.`);
     if (!ok) return;
     try {
-      await deleteDoc(doc(db, "equipamentos", id));
+      await deleteDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id));
       toast("Equipamento removido.");
       fecharDrawer();
     } catch (err) {
@@ -1918,7 +1918,7 @@ async function apagarCronograma() {
     for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
       const pedaco = ids.slice(inicio, inicio + TAMANHO_LOTE);
       const batch = writeBatch(db);
-      pedaco.forEach((id) => batch.delete(doc(db, "equipamentos", id)));
+      pedaco.forEach((id) => batch.delete(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id)));
       await batch.commit();
     }
 
@@ -2327,7 +2327,7 @@ async function fecharCicloEIniciarProximo() {
   for (let inicio = 0; inicio < atualizacoes.length; inicio += TAMANHO_LOTE) {
     const pedaco = atualizacoes.slice(inicio, inicio + TAMANHO_LOTE);
     const batch = writeBatch(db);
-    pedaco.forEach((u) => batch.update(doc(db, "equipamentos", u.id), {
+    pedaco.forEach((u) => batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", u.id), {
       dataAgendada: u.dataAgendada,
       diaPlanejado: u.diaPlanejado,
       statusPreventiva: "Pendente",
