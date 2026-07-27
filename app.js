@@ -194,7 +194,6 @@ function chamadosDoEquipamento(item) {
   const porData = (a, b) => String(b.data).localeCompare(String(a.data));
   return { exatos: exatos.sort(porData), aproximados: aproximados.sort(porData) };
 }
-}
 const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => Array.from(document.querySelectorAll(sel));
 
