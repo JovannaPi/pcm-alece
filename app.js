@@ -180,13 +180,20 @@ function chamadosDoEquipamento(item) {
     const anexoChamado = normalizarTexto(c.anexo);
     if (localItem && anexoChamado && (anexoChamado === localItem || localItem.includes(anexoChamado) || anexoChamado.includes(localItem))) {
       const poolLocal = normalizarTexto(`${c.gabinete} ${c.sala} ${c.nomeSetor} ${c.salaSetor} ${c.localAdicional}`);
-      const partes = setorAmbiente.split(/\s+/).filter((p) => p.length > 3);
-      if (partes.some((p) => poolLocal.includes(p))) aproximados.push(c);
+      // Só compara pelos NÚMEROS de sala/gabinete (ignorando o andar, que é 1
+      // dígito) — palavras genéricas tipo "sala"/"gabinete"/"assessores"
+      // aparecem em quase todo chamado do prédio e geravam falso positivo.
+      const numerosItem = (setorAmbiente.match(/[0-9]+/g) || []).filter((n) => n.length >= 2);
+      const numerosChamado = poolLocal.match(/[0-9]+/g) || [];
+      if (numerosItem.length && numerosItem.some((n) => numerosChamado.includes(n))) {
+        aproximados.push(c);
+      }
     }
   });
 
   const porData = (a, b) => String(b.data).localeCompare(String(a.data));
   return { exatos: exatos.sort(porData), aproximados: aproximados.sort(porData) };
+}
 }
 const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => Array.from(document.querySelectorAll(sel));
