@@ -658,6 +658,7 @@ async function carregarCicloAtual() {
     ESTADO.cicloAtual = snap.docs[0].id;
 }
 function iniciarSincronizacao() {
+  if (!ESTADO.cicloAtual) return;
   if (ESTADO.unsubscribe) ESTADO.unsubscribe();
   const q = query( collection(db, "ciclos", ESTADO.cicloAtual, "equipamentos"),orderBy("ordemExecucao")
 );
@@ -684,11 +685,12 @@ function iniciarSincronizacao() {
 (async () => {
 
     await carregarCicloAtual();
-
     iniciarSincronizacao();
     iniciarSincronizacaoHistorico();
+    iniciarSincronizacaoOrdens();
     iniciarSincronizacaoCiclos();
 
+  
     carregarConfig();
 
 })();
