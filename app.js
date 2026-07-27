@@ -89,6 +89,7 @@ const ESTADO = {
   feriados: [],
   ordens: [],
   historico: [],
+  cicloAtual: null,
   ciclos: [],
   unsubscribeCiclos: null,
   fechandoCiclo: false,
@@ -393,6 +394,14 @@ async function gerarCronograma() {
 
   $("#btnGerar").disabled = true;
   try {
+    const cicloRef = doc(collection(db, "ciclos")); 
+    ESTADO.cicloAtual = cicloRef.id;
+
+    await setDoc(cicloRef, {
+        criadoEm: new Date().toISOString(),
+        dataInicio: formatISO(primeiraDataUtilGlobal),
+        status: "Ativo"
+    });
     ESTADO.config = { diasSemana, dataInicio: formatISO(primeiraDataUtilGlobal), capacidades };
     await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
 
@@ -480,7 +489,10 @@ async function gerarCronograma() {
     for (let inicio = 0; inicio < itens.length; inicio += TAMANHO_LOTE) {
       const pedaco = itens.slice(inicio, inicio + TAMANHO_LOTE);
       const batch = writeBatch(db);
-      pedaco.forEach((item) => batch.set(doc(db, "equipamentos", item.id), item));
+      pedaco.forEach((item) => batch.set(
+          doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id),
+          item
+      );
       await batch.commit();
       toast(`Salvando... ${Math.min(inicio + TAMANHO_LOTE, itens.length)}/${itens.length}`);
     }
@@ -591,7 +603,7 @@ async function reagendarTudo() {
           dataAgendada: u.dataAgendada, diaPlanejado: u.diaPlanejado, semanaPlanejada: u.semanaPlanejada,
         });
         if (u.dataAntiga && u.dataAntiga < hojeISO) {
-          const novoLogRef = doc(collection(db, "historico"));
+          const novoLogRef = doc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ));
           batch.set(novoLogRef, {
             equipamentoId: u.refCompleta.id,
             patrimonio: u.refCompleta.patrimonio || "",
@@ -628,10 +640,27 @@ async function carregarConfig() {
     console.error(err);
   }
 }
+async function carregarCicloAtual() {
 
+    const snap = await getDocs(
+        query(
+            collection(db, "ciclos"),
+            orderBy("criadoEm", "desc"),
+            limit(1)
+        )
+    );
+
+    if (snap.empty) {
+        ESTADO.cicloAtual = null;
+        return;
+    }
+
+    ESTADO.cicloAtual = snap.docs[0].id;
+}
 function iniciarSincronizacao() {
   if (ESTADO.unsubscribe) ESTADO.unsubscribe();
-  const q = query(collection(db, "equipamentos"), orderBy("ordemExecucao"));
+  const q = query( collection(db, "ciclos", ESTADO.cicloAtual, "equipamentos"),orderBy("ordemExecucao")
+);
   ESTADO.unsubscribe = onSnapshot(q, (snap) => {
     ESTADO.equipamentos = snap.docs.map((d) => d.data());
     if (!ESTADO.calYear && ESTADO.equipamentos.length) {
@@ -652,9 +681,16 @@ function iniciarSincronizacao() {
   });
 }
 
-iniciarSincronizacao();
-iniciarSincronizacaoHistorico();
-carregarConfig();
+(async () => {
+
+    await carregarCicloAtual();
+
+    iniciarSincronizacao();
+    iniciarSincronizacaoHistorico();
+
+    carregarConfig();
+
+})();
 
 function slugLocal(local) {
   return String(local).replace(/[^a-zA-Z0-9]/g, "_");
@@ -908,7 +944,7 @@ function renderDashboard() {
 
 async function registrarHistorico(item, statusAnterior, statusNovo) {
   const agora = new Date();
-  await addDoc(collection(db, "historico"), {
+  await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
     equipamentoId: item.id,
     patrimonio: item.patrimonio || "",
     setor: item.setor || "",
@@ -959,7 +995,7 @@ async function removerOrdemServico(equipamentoId) {
 
 function iniciarSincronizacaoOrdens() {
   if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
-  const q = query(collection(db, "ordens"), orderBy("registradoEm", "desc"), limit(300));
+  const q = query(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "ordens" ), orderBy("registradoEm", "desc"), limit(300));
   ESTADO.unsubscribeOrdens = onSnapshot(q, (snap) => {
     ESTADO.ordens = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderOrdens();
@@ -1375,7 +1411,7 @@ function abrirDrawerEquipamento(id) {
         dataAgendada: novaData,
         diaPlanejado: novoDia,
       });
-      await addDoc(collection(db, "historico"), {
+      await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
         equipamentoId: id,
         patrimonio: item.patrimonio || "",
         setor: item.setor || "",
@@ -1909,26 +1945,66 @@ async function apagarCronograma() {
 }
 
 async function apagarColecaoCompleta(nomeColecao, mensagem) {
+
+  if (!ESTADO.cicloAtual) {
+    toast("Nenhum ciclo selecionado.");
+    return;
+  }
+
   const confirmado = window.confirm(mensagem);
   if (!confirmado) return;
+
   try {
-    const snap = await getDocs(collection(db, nomeColecao));
+
+    const colecaoRef = collection(
+      db,
+      "ciclos",
+      ESTADO.cicloAtual,
+      nomeColecao
+    );
+
+    const snap = await getDocs(colecaoRef);
+
     const ids = snap.docs.map((d) => d.id);
+
     if (!ids.length) {
       toast("Não há registros para apagar.");
       return;
     }
+
     const TAMANHO_LOTE = 400;
+
     for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
-      const pedaco = ids.slice(inicio, inicio + TAMANHO_LOTE);
+
       const batch = writeBatch(db);
-      pedaco.forEach((id) => batch.delete(doc(db, nomeColecao, id)));
+
+      ids
+        .slice(inicio, inicio + TAMANHO_LOTE)
+        .forEach((id) => {
+
+          batch.delete(
+            doc(
+              db,
+              "ciclos",
+              ESTADO.cicloAtual,
+              nomeColecao,
+              id
+            )
+          );
+
+        });
+
       await batch.commit();
+
     }
+
     toast(`${ids.length} registro(s) apagado(s).`);
+
   } catch (err) {
+
     console.error(err);
     toast("Erro ao apagar: " + err.message);
+
   }
 }
 
