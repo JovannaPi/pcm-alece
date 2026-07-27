@@ -935,7 +935,7 @@ function renderDashboard() {
   $("#kpiRow").innerHTML = cartoes.map(([cls, num, label]) =>
     `<div class="kpi-card ${cls}"><div class="num">${num}</div><div class="label">${label}</div></div>`
   ).join("");
-  const cicloAtual = (ESTADO.config && ESTADO.config.cicloAtual) || 1;
+  const cicloAtual = numeroDoCiclo(ESTADO.cicloAtual);
   const pct = total ? Math.round((concluidas / total) * 100) : 0;
   const elCiclo = $("#cicloResumo");
   if (elCiclo) {
@@ -2188,8 +2188,13 @@ function iniciarSincronizacaoCiclos() {
       });
       
     // RASTREADOR: Vai imprimir no console tudo que achou no banco!
-    console.log("🚀 CICLOS ENCONTRADOS NO BANCO:", ESTADO.ciclos);
-    
+    console.log(" CICLOS ENCONTRADOS NO BANCO:", ESTADO.ciclos);
+    function numeroDoCiclo(id) {
+  const ordenado = [...ESTADO.ciclos].sort((a, b) =>
+    String(a.criadoEm || a.dataInicio || "").localeCompare(String(b.criadoEm || b.dataInicio || "")));
+  const idx = ordenado.findIndex((c) => c.id === id);
+  return idx === -1 ? ordenado.length + 1 : idx + 1;
+}
     renderCiclos();
   }, (err) => {
     console.error("Erro na busca de ciclos:", err);
@@ -2228,7 +2233,7 @@ function renderCiclos() {
       ? `<span class="status-select andamento" style="cursor:default">Em andamento</span>` 
       : `<span class="status-select concluido" style="cursor:default">Encerrado</span>`;
     
-    const numeroCiclo = c.numero || (ESTADO.config && ESTADO.config.cicloAtual) || 1;
+    const numeroCiclo = numeroDoCiclo(c.id);
     const dataDeInicio = c.dataInicio || (c.criadoEm ? c.criadoEm.split('T')[0] : '');
 
     const tr = document.createElement("tr");
@@ -2299,11 +2304,9 @@ async function verificarFechamentoCiclo() {
 async function fecharCicloEIniciarProximo() {
   const itens = ESTADO.equipamentos;
   const hojeISO = formatISO(new Date());
-  const numero = (ESTADO.config && ESTADO.config.cicloAtual) || 1;
-  const dataInicioCiclo = (ESTADO.config && ESTADO.config.cicloInicio)
-    || (ESTADO.config && ESTADO.config.dataInicio) || hojeISO;
+  const cicloAntigoId = ESTADO.cicloAtual;
 
-  // 1. Arquiva os números do ciclo que está fechando
+  // 1. Calcula os números do ciclo que está fechando
   const porPredio = {};
   let noPrazo = 0, emAtraso = 0;
   itens.forEach((i) => {
@@ -2313,19 +2316,19 @@ async function fecharCicloEIniciarProximo() {
     if (i.dataAgendada && concl > i.dataAgendada) emAtraso++; else noPrazo++;
   });
 
-  await addDoc(collection(db, "ciclos"), {
-    numero,
-    dataInicio: dataInicioCiclo,
+  // 2. Marca a gaveta ATUAL como encerrada — os dados dela (equipamentos,
+  // histórico, ordens) continuam intactos e acessíveis pela aba Ciclos.
+  await updateDoc(doc(db, "ciclos", cicloAntigoId), {
+    status: "Encerrado",
     dataFechamento: hojeISO,
     total: itens.length,
     noPrazo,
     emAtraso,
     porPredio,
-    registradoEm: new Date().toISOString(),
   });
 
-  // 2. Calcula as datas do próximo ciclo: conclusão de cada um + 4 meses,
-  //    empacotando por prédio e respeitando capacidade e feriados.
+  // 3. Calcula as novas datas (conclusão + 4 meses) por prédio, respeitando
+  // capacidade e feriados
   const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
   const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
@@ -2339,7 +2342,7 @@ async function fecharCicloEIniciarProximo() {
     porPredioItens.get(local).push(i);
   });
 
-  const atualizacoes = [];
+  const novosItens = [];
   let menorDataNova = null;
 
   porPredioItens.forEach((itensDoPredio, local) => {
@@ -2365,35 +2368,43 @@ async function fecharCicloEIniciarProximo() {
       const novaData = formatISO(cursor);
       ocupacao[novaData] = (ocupacao[novaData] || 0) + 1;
       if (!menorDataNova || novaData < menorDataNova) menorDataNova = novaData;
-      atualizacoes.push({
-        id: item.id,
+
+      novosItens.push({
+        ...item,
         dataAgendada: novaData,
         diaPlanejado: NOMES_DIAS[(cursor.getDay() + 6) % 7],
+        statusPreventiva: "Pendente",
+        dataConclusao: "",
       });
     });
   });
 
-  // 3. Grava: todos voltam a Pendente com a data nova
+  novosItens.forEach((item, idx) => { item.ordemExecucao = idx + 1; });
+
+  // 4. Cria a gaveta NOVA e migra os aparelhos reagendados pra ela
+  const novoCicloRef = doc(collection(db, "ciclos"));
+  await setDoc(novoCicloRef, {
+    criadoEm: new Date().toISOString(),
+    dataInicio: menorDataNova || hojeISO,
+    status: "Ativo",
+  });
+
   const TAMANHO_LOTE = 400;
-  for (let inicio = 0; inicio < atualizacoes.length; inicio += TAMANHO_LOTE) {
-    const pedaco = atualizacoes.slice(inicio, inicio + TAMANHO_LOTE);
+  for (let inicio = 0; inicio < novosItens.length; inicio += TAMANHO_LOTE) {
+    const pedaco = novosItens.slice(inicio, inicio + TAMANHO_LOTE);
     const batch = writeBatch(db);
-    pedaco.forEach((u) => batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", u.id), {
-      dataAgendada: u.dataAgendada,
-      diaPlanejado: u.diaPlanejado,
-      statusPreventiva: "Pendente",
-      dataConclusao: "",
-      cicloNumero: numero + 1,
-    }));
+    pedaco.forEach((item) => batch.set(doc(db, "ciclos", novoCicloRef.id, "equipamentos", item.id), item));
     await batch.commit();
   }
 
-  ESTADO.config = {
-    ...(ESTADO.config || {}),
-    cicloAtual: numero + 1,
-    cicloInicio: menorDataNova || hojeISO,
-  };
+  // 5. A partir de agora, o ciclo ativo é o novo
+  ESTADO.cicloAtual = novoCicloRef.id;
+  ESTADO.config = { ...(ESTADO.config || {}), dataInicio: menorDataNova || hojeISO };
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
 
-  toast(`Ciclo ${numero} encerrado! Ciclo ${numero + 1} agendado a partir de ${formatarDataBR(menorDataNova)}.`);
+  iniciarSincronizacao();
+  iniciarSincronizacaoHistorico();
+  iniciarSincronizacaoOrdens();
+
+  toast(`Ciclo encerrado! Novo ciclo agendado a partir de ${formatarDataBR(menorDataNova)}.`);
 }
