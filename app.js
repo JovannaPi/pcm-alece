@@ -1431,7 +1431,9 @@ async function removerFeriado(id, label) {
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "feriados", id));
-    toast("Removido.");
+    ESTADO.feriados = ESTADO.feriados.filter((f) => f.id !== id);
+    toast("Removido. Reorganizando cronograma...");
+    await reagendarTudo();
   } catch (err) {
     console.error(err);
     toast("Erro ao remover: " + err.message);
