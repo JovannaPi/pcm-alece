@@ -499,3 +499,19 @@ tbody tr:hover { background: var(--latao-claro); }
 .btn-menu:hover { background: var(--azul-claro); color: var(--azul-escuro); }
 .local-pill:hover { border-color: var(--azul); }
 .local-pill.active { background: var(--azul); color: white; border-color: var(--azul); }
+.ciclo-resumo {
+  background: var(--azul-claro);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 14px 18px;
+  font-size: 13.5px;
+  color: var(--azul-escuro);
+}
+.ciclo-resumo strong { font-size: 15px; }
+.ciclo-resumo .ciclo-barra {
+  height: 8px; background: var(--branco); border-radius: 999px;
+  overflow: hidden; margin-top: 10px;
+}
+.ciclo-resumo .ciclo-barra span {
+  display: block; height: 100%; background: var(--verde); border-radius: 999px;
+}
