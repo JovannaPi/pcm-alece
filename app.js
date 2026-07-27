@@ -997,8 +997,9 @@ async function removerOrdemServico(equipamentoId) {
 }
 
 function iniciarSincronizacaoOrdens() {
+  if (!ESTADO.cicloAtual) return; // <-- TRAVA DE SEGURANÇA ADICIONADA AQUI
   if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
-  const q = query(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "ordens" ), orderBy("registradoEm", "desc"), limit(300));
+  const q = query(collection(db, "ciclos", ESTADO.cicloAtual, "ordens" ), orderBy("registradoEm", "desc"), limit(300));
   ESTADO.unsubscribeOrdens = onSnapshot(q, (snap) => {
     ESTADO.ordens = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderOrdens();
@@ -1007,6 +1008,7 @@ function iniciarSincronizacaoOrdens() {
     toast("Erro ao ler ordens de serviço: " + err.message);
   });
 }
+// APAGUEI A CHAMADA SOLTA QUE FICAVA AQUI EMBAIXO
 iniciarSincronizacaoOrdens();
 
 function iniciarSincronizacaoHistorico(){
