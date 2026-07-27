@@ -2172,44 +2172,68 @@ console.log("Botão ordens:", $("#btnLimparOrdens"));
 // ------------------------------------------------------------------
 function iniciarSincronizacaoCiclos() {
   if (ESTADO.unsubscribeCiclos) ESTADO.unsubscribeCiclos();
-  const q = query(collection(db, "ciclos"), orderBy("numero", "desc"));
+  
+  // Removemos o orderBy do Firebase para não dar erro de índice,
+  // e buscamos todos os documentos da pasta 'ciclos'
+  const q = query(collection(db, "ciclos"));
+  
   ESTADO.unsubscribeCiclos = onSnapshot(q, (snap) => {
-    ESTADO.ciclos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    ESTADO.ciclos = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        // Ordena no JS da data mais recente para a mais antiga
+        const dataA = a.dataFechamento || a.criadoEm || a.dataInicio || "";
+        const dataB = b.dataFechamento || b.criadoEm || b.dataInicio || "";
+        return dataB.localeCompare(dataA);
+      });
     renderCiclos();
   }, (err) => {
     console.error(err);
     toast("Erro ao ler ciclos: " + err.message);
   });
 }
-iniciarSincronizacaoCiclos();
 
 function renderCiclos() {
   const table = $("#ciclosTable");
   if (!table) return;
-  $("#ciclosCount").textContent = `${ESTADO.ciclos.length} ciclo(s) encerrado(s)`;
+  
+  const encerrados = ESTADO.ciclos.filter(c => c.dataFechamento);
+  const ativos = ESTADO.ciclos.filter(c => !c.dataFechamento);
+
+  $("#ciclosCount").textContent = `${encerrados.length} ciclo(s) encerrado(s) | ${ativos.length} ativo(s)`;
 
   table.innerHTML = `<thead><tr>
-      <th>Ciclo</th><th>Início</th><th>Encerramento</th><th>Aparelhos</th>
+      <th>Ciclo</th><th>Status</th><th>Início</th><th>Encerramento</th><th>Aparelhos</th>
       <th>No prazo</th><th>Em atraso</th><th>Por prédio</th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
 
   if (!ESTADO.ciclos.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--texto-suave)">Nenhum ciclo encerrado ainda.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--texto-suave)">Nenhum ciclo encontrado.</td></tr>`;
     return;
   }
 
   ESTADO.ciclos.forEach((c) => {
     const porPredio = Object.entries(c.porPredio || {})
       .map(([local, qtd]) => `${local}: ${qtd}`).join(" · ") || "-";
+      
+    const isAtivo = !c.dataFechamento;
+    const statusLabel = isAtivo 
+      ? `<span class="status-select andamento" style="cursor:default">Em andamento</span>` 
+      : `<span class="status-select concluido" style="cursor:default">Encerrado</span>`;
+    
+    // Se for o ciclo ativo, pega o número da configuração global
+    const numeroCiclo = c.numero || (ESTADO.config && ESTADO.config.cicloAtual) || 1;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><strong>Ciclo ${c.numero}</strong></td>
-      <td>${formatarDataBR(c.dataInicio)}</td>
-      <td>${formatarDataBR(c.dataFechamento)}</td>
-      <td>${c.total}</td>
-      <td>${c.noPrazo}</td>
-      <td>${c.emAtraso}</td>
+      <td><strong>Ciclo ${numeroCiclo}</strong></td>
+      <td>${statusLabel}</td>
+      <td>${formatarDataBR(c.dataInicio || c.criadoEm?.split('T')[0])}</td>
+      <td>${c.dataFechamento ? formatarDataBR(c.dataFechamento) : "-"}</td>
+      <td>${c.total || ESTADO.equipamentos.length}</td>
+      <td>${c.noPrazo !== undefined ? c.noPrazo : "-"}</td>
+      <td>${c.emAtraso !== undefined ? c.emAtraso : "-"}</td>
       <td style="font-size:12px;color:var(--texto-suave)">${porPredio}</td>`;
     tbody.appendChild(tr);
   });
