@@ -687,6 +687,7 @@ function iniciarSincronizacao() {
 
     iniciarSincronizacao();
     iniciarSincronizacaoHistorico();
+    iniciarSincronizacaoCiclos();
 
     carregarConfig();
 
@@ -2208,6 +2209,19 @@ function renderCiclos() {
       <td style="font-size:12px;color:var(--texto-suave)">${porPredio}</td>`;
     tbody.appendChild(tr);
   });
+}
+async function selecionarCiclo(id) {
+
+    ESTADO.cicloAtual = id;
+
+    iniciarSincronizacao();
+
+    iniciarSincronizacaoHistorico();
+
+    iniciarSincronizacaoOrdens();
+
+    toast("Ciclo carregado.");
+
 }
 
 async function verificarFechamentoCiclo() {
