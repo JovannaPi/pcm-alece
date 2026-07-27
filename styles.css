@@ -314,8 +314,8 @@ thead th {
   font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em;
   white-space: nowrap;
 }
-tbody td { padding: 9px 12px; border-top: 1px solid var(--borda); white-space: nowrap; }
-tbody tr:nth-child(even) { background: var(--azul-claro); }
+tbody td { padding: 9px 12px; border-top: 1px solid var(--borda); vertical-align: middle; }
+tbody td:nth-child(2), tbody td:nth-child(3) { white-space: normal; min-width: 150px; }
 tbody tr:hover { background: var(--latao-claro); }
 
 /* ------------------------------------------------------------------ */
@@ -515,3 +515,33 @@ tbody tr:hover { background: var(--latao-claro); }
 .ciclo-resumo .ciclo-barra span {
   display: block; height: 100%; background: var(--verde); border-radius: 999px;
 }
+
+/* ---- Faixa de alerta de atrasados ---- */
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  background: var(--amarelo-bg);
+  border-bottom: 1px solid #E8D9A8;
+  color: var(--amarelo);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.alert-banner[hidden] { display: none; }
+.alert-banner-icon { font-size: 16px; line-height: 1; }
+.alert-banner-text { flex: 1; }
+.alert-banner-close {
+  background: none; border: none; font-size: 22px; line-height: 1;
+  color: var(--amarelo); cursor: pointer; padding: 0 4px; opacity: .7;
+}
+.alert-banner-close:hover { opacity: 1; }
+
+/* ---- Estado "atrasado" ---- */
+.cal-day-badge.atrasado {
+  background: var(--vermelho); color: white;
+}
+.status-select.atrasado {
+  background: var(--vermelho); color: white; border-color: transparent;
+}
+.kpi-card.atrasado { background: linear-gradient(135deg, #D14343, var(--vermelho)); }
