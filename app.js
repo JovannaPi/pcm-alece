@@ -1026,69 +1026,32 @@ function classeStatus(status) {
 }
 
 function renderDashboard() {
+  // O aplicarFiltroLocal já garante que os números mudem quando você clica no filtro lá em cima
   const itens = aplicarFiltroLocal(ESTADO.equipamentos);
+  const total = itens.length;
+  const concluidas = itens.filter((i) => i.statusPreventiva === "Concluída").length;
+  const andamento = itens.filter((i) => i.statusPreventiva === "Em andamento").length;
+  const pendentes = total - concluidas - andamento;
+  const execucao = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
 
-  // Função auxiliar para gerar o HTML dos cartões de uma lista de itens
-  const criarCartoes = (lista, titulo) => {
-    const total = lista.length;
-    const concluidas = lista.filter((i) => i.statusPreventiva === "Concluída").length;
-    const andamento = lista.filter((i) => i.statusPreventiva === "Em andamento").length;
-    const pendentes = total - concluidas - andamento;
-    const execucao = total ? Math.round((concluidas / total) * 1000) / 10 : 0;
-
-    const htmlCartoes = [
-      ["total", total, "Equipamentos"],
-      ["concluido", concluidas, "Concluídas"],
-      ["andamento", andamento, "Em andamento"],
-      ["pendente", pendentes, "Pendentes"],
-      ["execucao", `${execucao}%`, "Execução"],
-    ].map(([cls, num, label]) =>
-      `<div class="kpi-card ${cls}"><div class="num">${num}</div><div class="label">${label}</div></div>`
-    ).join("");
-
-    // Adiciona um título acima dos cartões se houver quebra por prédio
-    const htmlTitulo = titulo ? `<h3 style="width:100%; font-size:16px; margin: 20px 0 10px 0; color: var(--texto);">${titulo}</h3>` : "";
-    
-    // Retorna os cartões envelopados em um container flexível
-    return `${htmlTitulo}<div style="display: flex; gap: 15px; flex-wrap: wrap; width: 100%; margin-bottom: 20px;">${htmlCartoes}</div>`;
-  };
-
-  const container = $("#kpiRow");
-  container.innerHTML = "";
-  // Garante que o container mestre vai quebrar as linhas corretamente
-  container.style.display = "flex";
-  container.style.flexWrap = "wrap";
-
-  if (ESTADO.localFiltro === "Todos") {
-    // 1. Renderiza o Total Global
-    container.innerHTML += criarCartoes(itens, "Visão Geral (Todos os Prédios)");
-
-    // 2. Agrupa os itens por prédio/anexo
-    const porPredio = {};
-    itens.forEach(i => {
-      const p = i.local || "SEDE";
-      (porPredio[p] = porPredio[p] || []).push(i);
-    });
-
-    // 3. Cria uma linha de cartões para cada prédio encontrado
-    Object.keys(porPredio).sort().forEach(predio => {
-      container.innerHTML += criarCartoes(porPredio[predio], predio);
-    });
-  } else {
-    // Se o usuário já clicou no botão de filtro de um prédio específico, exibe só os cartões normais
-    container.innerHTML = criarCartoes(itens, "");
-  }
-
-  // --- Lógica da barra de progresso do Ciclo (mantida intacta) ---
-  const totalGlobal = itens.length;
-  const concluidasGlobal = itens.filter((i) => i.statusPreventiva === "Concluída").length;
-  const pct = totalGlobal ? Math.round((concluidasGlobal / totalGlobal) * 100) : 0;
-  const cicloAtual = numeroDoCiclo(ESTADO.cicloAtual);
+  const cartoes = [
+    ["total", total, "Equipamentos"],
+    ["concluido", concluidas, "Concluídas"],
+    ["andamento", andamento, "Em andamento"],
+    ["pendente", pendentes, "Pendentes"],
+    ["execucao", `${execucao}%`, "Execução"],
+  ];
   
+  $("#kpiRow").innerHTML = cartoes.map(([cls, num, label]) =>
+    `<div class="kpi-card ${cls}"><div class="num">${num}</div><div class="label">${label}</div></div>`
+  ).join("");
+  
+  const cicloAtual = numeroDoCiclo(ESTADO.cicloAtual);
+  const pct = total ? Math.round((concluidas / total) * 100) : 0;
   const elCiclo = $("#cicloResumo");
   if (elCiclo) {
     elCiclo.innerHTML = `
-      <strong>Ciclo ${cicloAtual}</strong> — ${concluidasGlobal} de ${totalGlobal} aparelhos concluídos (${pct}%)
+      <strong>Ciclo ${cicloAtual}</strong> — ${concluidas} de ${total} aparelhos concluídos (${pct}%)
       <div class="ciclo-barra"><span style="width:${pct}%"></span></div>`;
   }
 }
