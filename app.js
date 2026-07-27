@@ -1174,12 +1174,13 @@ function renderEquipamentosCadastro() {
   $("#equipamentosCount").textContent = `${itens.length} itens`;
   table.innerHTML = `<thead><tr>
       <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Prédio</th><th>Setor PCM</th>
-      <th>Status</th><th>Origem</th><th>Ações</th>
+      <th>Status</th><th>Origem</th><th></th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
 
   itens.forEach((item) => {
     const tr = document.createElement("tr");
+    tr.className = "linha-clicavel";
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.local || "SEDE"}</td>
       <td>${item.setorPCM}</td>
@@ -1189,24 +1190,198 @@ function renderEquipamentosCadastro() {
       </td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>`;
 
-    const tdBtn = document.createElement("td");
+    const tdMenu = document.createElement("td");
+    const btnMenu = document.createElement("button");
+    btnMenu.className = "btn-menu";
+    btnMenu.textContent = "⋯";
+    btnMenu.title = "Ver detalhes";
+    btnMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+      abrirDrawerEquipamento(item.id);
+    });
+    tdMenu.appendChild(btnMenu);
+    tr.appendChild(tdMenu);
 
-    const btnEdit = document.createElement("button");
-    btnEdit.className = "btn ghost";
-    btnEdit.textContent = "Editar";
-    btnEdit.style.marginRight = "6px";
-    btnEdit.addEventListener("click", () => prepararEdicao(item));
-
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn ghost";
-    btnDel.textContent = "Remover";
-    btnDel.addEventListener("click", () => removerEquipamento(item.id, item.patrimonio || item.ambiente));
-
-    tdBtn.appendChild(btnEdit);
-    tdBtn.appendChild(btnDel);
-    tr.appendChild(tdBtn);
+    tr.addEventListener("click", () => abrirDrawerEquipamento(item.id));
     tbody.appendChild(tr);
   });
+}
+
+// ------------------------------------------------------------------
+// Painel lateral com detalhes do equipamento
+// ------------------------------------------------------------------
+function fecharDrawer() {
+  $("#drawerEquipamento").hidden = true;
+  $("#drawerOverlay").hidden = true;
+}
+
+$("#drawerFechar")?.addEventListener("click", fecharDrawer);
+$("#drawerOverlay")?.addEventListener("click", fecharDrawer);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fecharDrawer();
+});
+
+function abrirDrawerEquipamento(id) {
+  const item = ESTADO.equipamentos.find((e) => e.id === id);
+  if (!item) return;
+
+  // Última preventiva concluída deste aparelho, a partir do histórico
+  const conclusoes = ESTADO.historico
+    .filter((h) => h.equipamentoId === id && h.statusNovo === "Concluída")
+    .sort((a, b) => String(b.registradoEm).localeCompare(String(a.registradoEm)));
+  const ultimaPreventiva = conclusoes.length
+    ? new Date(conclusoes[0].registradoEm).toLocaleString("pt-BR")
+    : "Nunca registrada";
+
+  const totalPreventivas = conclusoes.length;
+
+  $("#drawerTitulo").textContent = item.patrimonio ? `Patrimônio ${item.patrimonio}` : item.ambiente;
+
+  $("#drawerCorpo").innerHTML = `
+    <div class="drawer-secao">
+      <h3>Situação</h3>
+      <div class="drawer-campo"><span class="rotulo">Status</span>
+        <span class="valor"><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
+        ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Próxima preventiva</span><span class="valor">${formatarDataBR(item.dataAgendada)} ${item.diaPlanejado ? "(" + item.diaPlanejado + ")" : ""}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Semana planejada</span><span class="valor">${item.semanaPlanejada || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${item.equipeResponsavel || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Última preventiva concluída</span><span class="valor">${ultimaPreventiva}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Total de preventivas feitas</span><span class="valor">${totalPreventivas}</span></div>
+    </div>
+
+    <div class="drawer-secao">
+      <h3>Localização e classificação</h3>
+      <div class="drawer-campo"><span class="rotulo">Prédio</span><span class="valor">${item.local || "SEDE"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Setor</span><span class="valor">${item.setor || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Ambiente</span><span class="valor">${item.ambiente || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Setor PCM</span><span class="valor">${item.setorPCM || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Piso</span><span class="valor">${item.pisoPCM === 99 ? "Não identificado" : item.pisoPCM}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Condição (levantamento)</span><span class="valor">${item.statusCondicao || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Origem do cadastro</span><span class="valor">${item.origem === "manual" ? "Manual" : "Planilha"}</span></div>
+    </div>
+
+    <div class="drawer-secao drawer-form">
+      <h3>Editar cadastro</h3>
+      <label>Patrimônio<input type="text" id="drawerPatrimonio" value="${item.patrimonio || ""}"></label>
+      <label>Setor<input type="text" id="drawerSetor" value="${item.setor || ""}"></label>
+      <label>Ambiente<input type="text" id="drawerAmbiente" value="${item.ambiente || ""}"></label>
+      <label>Prédio
+        <select id="drawerLocal">
+          ${["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"].map((l) =>
+            `<option value="${l}" ${(item.local || "SEDE") === l ? "selected" : ""}>${l}</option>`).join("")}
+        </select>
+      </label>
+      <div class="drawer-acoes">
+        <button class="btn primary" id="drawerSalvarCadastro">Salvar cadastro</button>
+      </div>
+    </div>
+
+    <div class="drawer-secao drawer-form">
+      <h3>Reagendar</h3>
+      <label>Nova data da preventiva<input type="date" id="drawerNovaData" value="${item.dataAgendada || ""}"></label>
+      <div class="drawer-acoes">
+        <button class="btn primary" id="drawerSalvarData">Salvar nova data</button>
+      </div>
+    </div>
+
+    <div class="drawer-secao drawer-form">
+      <h3>Zona de risco</h3>
+      <div class="drawer-acoes">
+        <button class="btn ghost" id="drawerExcluir" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir equipamento</button>
+      </div>
+    </div>
+  `;
+
+  $("#drawerSalvarCadastro").addEventListener("click", async () => {
+    const patrimonio = $("#drawerPatrimonio").value.trim();
+    const setor = $("#drawerSetor").value.trim();
+    const ambiente = $("#drawerAmbiente").value.trim();
+    const local = $("#drawerLocal").value;
+    if (!setor || !ambiente) {
+      toast("Preencha pelo menos Setor e Ambiente.");
+      return;
+    }
+    const setorPCM = identificarSetor(setor, ambiente);
+    try {
+      await updateDoc(doc(db, "equipamentos", id), {
+        patrimonio, setor, ambiente, local, setorPCM,
+        prioridadeSetor: PRIORIDADE[setorPCM] || 7,
+        pisoPCM: descobrirPiso(setor),
+      });
+      toast("Cadastro atualizado.");
+      fecharDrawer();
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao salvar: " + err.message);
+    }
+  });
+
+  $("#drawerSalvarData").addEventListener("click", async () => {
+    const novaData = $("#drawerNovaData").value;
+    if (!novaData) {
+      toast("Escolha uma data.");
+      return;
+    }
+    const [a, m, d] = novaData.split("-");
+    const dataObj = new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0);
+    const novoDia = NOMES_DIAS[(dataObj.getDay() + 6) % 7];
+
+    // Avisa se o dia escolhido já está no limite da capacidade daquele prédio
+    const localItem = item.local || "SEDE";
+    const cap = (ESTADO.config?.capacidades || {})[localItem] || { nEquipes: 1, aparelhosDia: 2 };
+    const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
+    const jaNoDia = ESTADO.equipamentos.filter(
+      (e) => e.id !== id && (e.local || "SEDE") === localItem && e.dataAgendada === novaData
+    ).length;
+
+    if (jaNoDia >= capacidadeDia) {
+      const ok = window.confirm(
+        `Esse dia já tem ${jaNoDia} aparelho(s) em ${localItem}, no limite da capacidade (${capacidadeDia}/dia). Agendar mesmo assim?`
+      );
+      if (!ok) return;
+    }
+
+    try {
+      await updateDoc(doc(db, "equipamentos", id), {
+        dataAgendada: novaData,
+        diaPlanejado: novoDia,
+      });
+      await addDoc(collection(db, "historico"), {
+        equipamentoId: id,
+        patrimonio: item.patrimonio || "",
+        setor: item.setor || "",
+        ambiente: item.ambiente || "",
+        local: item.local || "SEDE",
+        equipe: item.equipeResponsavel || "",
+        tipo: "Reagendamento manual",
+        dataAnterior: item.dataAgendada || "",
+        dataNova: novaData,
+        registradoEm: new Date().toISOString(),
+      });
+      toast(`Reagendado para ${formatarDataBR(novaData)}.`);
+      fecharDrawer();
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao reagendar: " + err.message);
+    }
+  });
+
+  $("#drawerExcluir").addEventListener("click", async () => {
+    const ok = window.confirm(`Remover "${item.patrimonio || item.ambiente}"? Essa ação não pode ser desfeita.`);
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, "equipamentos", id));
+      toast("Equipamento removido.");
+      fecharDrawer();
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao remover: " + err.message);
+    }
+  });
+
+  $("#drawerEquipamento").hidden = false;
+  $("#drawerOverlay").hidden = false;
 }
 
 const feriadoTipoSelect = $("#feriadoTipo");
