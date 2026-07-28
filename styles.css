@@ -592,6 +592,7 @@ tbody tr:hover { background: var(--latao-claro); }
   background: linear-gradient(135deg, var(--azul), var(--azul-escuro));
   display: flex; align-items: center; justify-content: center;
 }
+.auth-overlay[hidden] { display: none; }
 .auth-card {
   background: white; border-radius: 14px; padding: 32px 28px; width: 340px; max-width: 90vw;
   box-shadow: 0 12px 40px rgba(0,0,0,.25);
