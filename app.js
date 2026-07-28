@@ -1,9 +1,11 @@
-import { db } from "./firebase-config.js?v=2";
+import { db, auth } from "./firebase-config.js?v=3";
 import {
   collection, collectionGroup, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query,
   orderBy, where, writeBatch, deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+import {
+  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const PRIORIDADE = {
   "1 - Presidência": 1, "2 - Primeiro Secretário": 2, "3 - Gabinetes": 3,
@@ -93,6 +95,7 @@ const ESTADO = {
   chamadosCorretivos: [],
   ordenacaoEquipamentos: null,
   chamadosCorretivosCarregadosEm: null,
+  usuarioEmail: null,
   cicloAtual: null,
   ciclos: [],
   unsubscribeCiclos: null,
@@ -792,8 +795,7 @@ function iniciarSincronizacao() {
   });
 }
 
-(async () => {
-
+async function inicializarApp() {
     await carregarCicloAtual();
     carregarConfig();
     carregarChamadosCorretivos(true);
@@ -802,11 +804,66 @@ function iniciarSincronizacao() {
     iniciarSincronizacaoHistorico();
     iniciarSincronizacaoOrdens();
     iniciarSincronizacaoCiclos();
+}
 
-  
-    carregarConfig();
+let modoCadastro = false;
 
-})();
+function mostrarErroAuth(msg) {
+  const el = $("#authErro");
+  if (el) el.textContent = msg;
+}
+
+$("#btnAuthCriarConta")?.addEventListener("click", () => {
+  modoCadastro = !modoCadastro;
+  $("#authTitulo").textContent = modoCadastro ? "Criar conta" : "Entrar";
+  $("#btnAuthEntrar").textContent = modoCadastro ? "Criar conta" : "Entrar";
+  $("#btnAuthCriarConta").textContent = modoCadastro ? "Já tenho conta, entrar" : "Criar uma conta nova";
+  mostrarErroAuth("");
+});
+
+$("#btnAuthEntrar")?.addEventListener("click", async () => {
+  const email = $("#authEmail").value.trim();
+  const senha = $("#authSenha").value;
+  if (!email || !senha) { mostrarErroAuth("Preencha e-mail e senha."); return; }
+  mostrarErroAuth("");
+  try {
+    if (modoCadastro) {
+      await createUserWithEmailAndPassword(auth, email, senha);
+    } else {
+      await signInWithEmailAndPassword(auth, email, senha);
+    }
+  } catch (err) {
+    const mensagens = {
+      "auth/email-already-in-use": "Esse e-mail já tem conta. Clique em \"Já tenho conta\".",
+      "auth/invalid-email": "E-mail inválido.",
+      "auth/weak-password": "Senha muito curta (mínimo 6 caracteres).",
+      "auth/user-not-found": "E-mail não encontrado.",
+      "auth/wrong-password": "Senha incorreta.",
+      "auth/invalid-credential": "E-mail ou senha incorretos.",
+    };
+    mostrarErroAuth(mensagens[err.code] || ("Erro: " + err.message));
+  }
+});
+
+$("#btnSair")?.addEventListener("click", () => signOut(auth));
+
+let appJaInicializado = false;
+onAuthStateChanged(auth, (user) => {
+  const overlay = $("#authOverlay");
+  const appRoot = $("#appRoot");
+  if (user) {
+    if (overlay) overlay.hidden = true;
+    if (appRoot) appRoot.hidden = false;
+    ESTADO.usuarioEmail = user.email;
+    if (!appJaInicializado) {
+      appJaInicializado = true;
+      inicializarApp();
+    }
+  } else {
+    if (overlay) overlay.hidden = false;
+    if (appRoot) appRoot.hidden = true;
+  }
+});
 
 function slugLocal(local) {
   return String(local).replace(/[^a-zA-Z0-9]/g, "_");
