@@ -833,6 +833,7 @@ $("#btnAuthEntrar")?.addEventListener("click", async () => {
       await signInWithEmailAndPassword(auth, email, senha);
     }
   } catch (err) {
+    console.error("Erro de autenticação:", err.code, err.message);
     const mensagens = {
       "auth/email-already-in-use": "Esse e-mail já tem conta. Clique em \"Já tenho conta\".",
       "auth/invalid-email": "E-mail inválido.",
