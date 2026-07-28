@@ -1212,11 +1212,12 @@ function renderHistorico(){
     `;
 
     const tdAcao = document.createElement("td");
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn ghost";
-    btnDel.textContent = "🗑️";
-    btnDel.addEventListener("click", () => deletarRegistroHistorico(h.cicloId, h.id));
-    tdAcao.appendChild(btnDel);
+    tdAcao.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
+      <div class="menu-linha-opcoes">
+        <button class="menu-linha-item menu-linha-excluir" data-acao="excluir">Excluir</button>
+      </div>
+    </details>`;
+    tdAcao.querySelector('[data-acao="excluir"]').addEventListener("click", () => deletarRegistroHistorico(h.cicloId, h.id));
     tr.appendChild(tdAcao);
     tbody.appendChild(tr);
   });
@@ -1253,19 +1254,14 @@ function renderOrdens() {
     `;
 
     const tdBtn = document.createElement("td");
-
-    const btnPrint = document.createElement("button");
-    btnPrint.className = "btn ghost";
-    btnPrint.textContent = "🖨️ PMOC";
-    btnPrint.addEventListener("click", () => gerarPDFPMOC(o));
-
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn ghost";
-    btnDel.textContent = "🗑️";
-    btnDel.addEventListener("click", () => deletarRegistroOrdem(o.cicloId, o.id));
-
-    tdBtn.appendChild(btnPrint);
-    tdBtn.appendChild(btnDel);
+    tdBtn.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
+      <div class="menu-linha-opcoes">
+        <button class="menu-linha-item" data-acao="pmoc">🖨️ Imprimir PMOC</button>
+        <button class="menu-linha-item menu-linha-excluir" data-acao="excluir">Excluir</button>
+      </div>
+    </details>`;
+    tdBtn.querySelector('[data-acao="pmoc"]').addEventListener("click", () => gerarPDFPMOC(o));
+    tdBtn.querySelector('[data-acao="excluir"]').addEventListener("click", () => deletarRegistroOrdem(o.cicloId, o.id));
     tr.appendChild(tdBtn);
     tbody.appendChild(tr);
   });
