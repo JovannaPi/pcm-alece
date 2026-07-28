@@ -1098,11 +1098,15 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
 
 async function registrarOrdemServico(item) {
   const agora = new Date();
-  
-  const ordensAntigas = ESTADO.ordens.filter(o => o.equipamentoId === item.id);
+
+  // Só apaga ordens duplicadas DENTRO do ciclo atual — ordens de ciclos
+  // fechados são histórico e não devem ser tocadas.
+  const ordensAntigas = ESTADO.ordens.filter(
+    (o) => o.equipamentoId === item.id && o.cicloId === ESTADO.cicloAtual
+  );
   if (ordensAntigas.length > 0) {
     const batch = writeBatch(db);
-    ordensAntigas.forEach(o => batch.delete(doc(db, "ciclos", ESTADO.cicloAtual, "ordens", o.id)));
+    ordensAntigas.forEach((o) => batch.delete(doc(db, "ciclos", o.cicloId, "ordens", o.id)));
     await batch.commit();
   }
 
@@ -1121,10 +1125,14 @@ async function registrarOrdemServico(item) {
 }
 
 async function removerOrdemServico(equipamentoId) {
-  const ordensDoEquipamento = ESTADO.ordens.filter(o => o.equipamentoId === equipamentoId);
+  // Só remove a ordem do ciclo ATUAL — se esse aparelho já teve ordem em
+  // ciclos anteriores (fechados), aquilo é histórico e continua intacto.
+  const ordensDoEquipamento = ESTADO.ordens.filter(
+    (o) => o.equipamentoId === equipamentoId && o.cicloId === ESTADO.cicloAtual
+  );
   if (ordensDoEquipamento.length > 0) {
     const batch = writeBatch(db);
-    ordensDoEquipamento.forEach(o => batch.delete(doc(db, "ciclos", ESTADO.cicloAtual, "ordens", o.id)));
+    ordensDoEquipamento.forEach((o) => batch.delete(doc(db, "ciclos", o.cicloId, "ordens", o.id)));
     await batch.commit();
   }
 }
