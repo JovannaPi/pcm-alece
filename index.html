@@ -9,6 +9,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 </head>
 <body>
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <h2 id="authTitulo">Entrar</h2>
+    <label>E-mail<input type="email" id="authEmail" placeholder="seuemail@exemplo.com"></label>
+    <label>Senha<input type="password" id="authSenha" placeholder="Mínimo 6 caracteres"></label>
+    <button class="btn primary" id="btnAuthEntrar" style="width:100%;margin-top:6px">Entrar</button>
+    <button class="btn ghost" id="btnAuthCriarConta" style="width:100%;margin-top:8px">Criar uma conta nova</button>
+    <p class="muted" id="authErro" style="color:var(--vermelho);min-height:18px"></p>
+  </div>
+</div>
+<div id="appRoot" hidden>
+
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
@@ -54,6 +66,9 @@
     <div class="sidenav-spacer"></div>
     <button class="sidenav-item sidenav-danger" id="btnApagarCronograma">
       <span class="sidenav-icon"></span> Apagar cronograma
+    </button>
+    <button class="sidenav-item" id="btnSair" style="margin-top:8px">
+      <span class="sidenav-icon"></span> Sair
     </button>
   </nav>
 
@@ -270,6 +285,7 @@
       </div>
     </section>
   </main>
+</div>
 </div>
 <div class="drawer-overlay" id="drawerOverlay" hidden></div>
 <aside class="drawer" id="drawerEquipamento" hidden>
