@@ -1332,7 +1332,8 @@ async function removerEquipamento(id, descricao) {
   if (!ok) return;
   try {
     await deleteDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id));
-    toast("Equipamento removido.");
+    toast("Equipamento removido. Reorganizando cronograma...");
+    await reagendarTudo();
   } catch (err) {
     console.error(err);
     toast("Erro ao remover: " + err.message);
@@ -1564,8 +1565,9 @@ async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos()
     if (!ok) return;
     try {
       await deleteDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id));
-      toast("Equipamento removido.");
+      toast("Equipamento removido. Reorganizando cronograma...");
       fecharDrawer();
+      await reagendarTudo();
     } catch (err) {
       console.error(err);
       toast("Erro ao remover: " + err.message);
