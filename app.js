@@ -834,6 +834,7 @@ $("#btnAuthCriarConta")?.addEventListener("click", () => {
 });
 
 $("#btnAuthEntrar")?.addEventListener("click", async () => {
+  console.log("cliquei no botao de entrar");
   const usuarioDigitado = $("#authEmail").value.trim();
   const senha = $("#authSenha").value;
   if (!usuarioDigitado || !senha) { mostrarErroAuth("Preencha usuário e senha."); return; }
