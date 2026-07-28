@@ -2492,8 +2492,7 @@ async function fecharCicloEIniciarProximo() {
     if (i.dataAgendada && concl > i.dataAgendada) emAtraso++; else noPrazo++;
   });
 
-  // 2. Marca a gaveta ATUAL como encerrada — os dados dela (equipamentos,
-  // histórico, ordens) continuam intactos e acessíveis pela aba Ciclos.
+  // 2. Marca a gaveta ATUAL como encerrada
   await updateDoc(doc(db, "ciclos", cicloAntigoId), {
     status: "Encerrado",
     dataFechamento: hojeISO,
@@ -2503,8 +2502,14 @@ async function fecharCicloEIniciarProximo() {
     porPredio,
   });
 
-  // 3. Calcula as novas datas (conclusão + 4 meses) por prédio, respeitando
-  // capacidade e feriados
+  // 3. Data-base do PRÓXIMO ciclo: a PRIMEIRA conclusão registrada neste
+  // ciclo + 4 meses. Todos os aparelhos usam essa mesma data-base — o ritmo
+  // de 4 em 4 meses é do ciclo inteiro, não de cada aparelho individualmente.
+  const datasConclusao = itens.map((i) => i.dataConclusao).filter(Boolean).sort();
+  const primeiraConclusao = datasConclusao.length ? datasConclusao[0] : hojeISO;
+  const [pa, pm, pd] = primeiraConclusao.split("-");
+  const dataBaseProximoCiclo = adicionarMeses(new Date(pa, parseInt(pm, 10) - 1, pd, 12, 0, 0), MESES_CICLO);
+
   const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
   const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
@@ -2521,28 +2526,22 @@ async function fecharCicloEIniciarProximo() {
   const novosItens = [];
   let menorDataNova = null;
 
+  // 4. Empacota por prédio a partir da mesma data-base, respeitando
+  // capacidade e feriados (mesmo esquema usado no gerarCronograma original)
   porPredioItens.forEach((itensDoPredio, local) => {
     const cap = capacidades[local] || { nEquipes: 1, aparelhosDia: 2 };
     const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
-    const ocupacao = {};
 
-    const comAlvo = itensDoPredio.map((i) => {
-      const base = i.dataConclusao || hojeISO;
-      const [a, m, d] = base.split("-");
-      const alvo = adicionarMeses(new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0), MESES_CICLO);
-      return { item: i, alvo: formatISO(alvo) };
-    }).sort((x, y) =>
-      x.alvo.localeCompare(y.alvo) || (x.item.ordemExecucao || 0) - (y.item.ordemExecucao || 0)
+    let cursor = new Date(dataBaseProximoCiclo.getTime());
+    while (!ehDiaUtilLocal(cursor)) cursor.setDate(cursor.getDate() + 1);
+
+    let contador = 0;
+    const itensOrdenados = [...itensDoPredio].sort(
+      (a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0)
     );
 
-    comAlvo.forEach(({ item, alvo }) => {
-      const [a, m, d] = alvo.split("-");
-      const cursor = new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0);
-      while (!ehDiaUtilLocal(cursor) || (ocupacao[formatISO(cursor)] || 0) >= capacidadeDia) {
-        cursor.setDate(cursor.getDate() + 1);
-      }
+    itensOrdenados.forEach((item) => {
       const novaData = formatISO(cursor);
-      ocupacao[novaData] = (ocupacao[novaData] || 0) + 1;
       if (!menorDataNova || novaData < menorDataNova) menorDataNova = novaData;
 
       novosItens.push({
@@ -2552,12 +2551,18 @@ async function fecharCicloEIniciarProximo() {
         statusPreventiva: "Pendente",
         dataConclusao: "",
       });
+
+      contador++;
+      if (contador >= capacidadeDia) {
+        contador = 0;
+        do { cursor.setDate(cursor.getDate() + 1); } while (!ehDiaUtilLocal(cursor));
+      }
     });
   });
 
   novosItens.forEach((item, idx) => { item.ordemExecucao = idx + 1; });
 
-  // 4. Cria a gaveta NOVA e migra os aparelhos reagendados pra ela
+  // 5. Cria a gaveta NOVA e migra os aparelhos reagendados pra ela
   const novoCicloRef = doc(collection(db, "ciclos"));
   await setDoc(novoCicloRef, {
     criadoEm: new Date().toISOString(),
@@ -2573,7 +2578,6 @@ async function fecharCicloEIniciarProximo() {
     await batch.commit();
   }
 
-  // 5. A partir de agora, o ciclo ativo é o novo
   ESTADO.cicloAtual = novoCicloRef.id;
   ESTADO.config = { ...(ESTADO.config || {}), dataInicio: menorDataNova || hojeISO };
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
