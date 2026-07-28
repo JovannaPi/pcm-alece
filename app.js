@@ -2422,7 +2422,7 @@ function renderCiclos() {
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "Apagar Tudo";
-    btnDel.addEventListener("click", () => deletarRegistro('ciclos', c.id));
+    btnDel.addEventListener("click", () => deletarCiclo(c.id));
     
     tdAcoes.appendChild(btnLoad);
     tdAcoes.appendChild(btnDel);
