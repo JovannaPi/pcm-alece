@@ -12,7 +12,7 @@
 <div class="auth-overlay" id="authOverlay">
   <div class="auth-card">
     <h2 id="authTitulo">Entrar</h2>
-    <label>E-mail<input type="email" id="authEmail" placeholder="seuemail@exemplo.com"></label>
+    <label>Usuário<input type="text" id="authEmail" placeholder="ex: joana.feira"></label>
     <label>Senha<input type="password" id="authSenha" placeholder="Mínimo 6 caracteres"></label>
     <button class="btn primary" id="btnAuthEntrar" style="width:100%;margin-top:6px">Entrar</button>
     <button class="btn ghost" id="btnAuthCriarConta" style="width:100%;margin-top:8px">Criar uma conta nova</button>
@@ -50,6 +50,9 @@
 
 <div class="body-layout">
   <nav class="sidenav">
+    <button class="tab sidenav-item" data-view="usuarios" id="navUsuarios" hidden>
+      <span class="sidenav-icon"></span> Usuários
+    </button>
     <div class="sidenav-label" style="font-size: 15px; text-align: center; display: block; width: 100%; margin-bottom: 5px;">Gestão</div>
     <button class="tab sidenav-item" data-view="ordens">
       <span class="sidenav-icon"></span> Ordens de serviço
@@ -281,6 +284,33 @@
         <input type="text" class="search-input" id="buscaFeriados" placeholder="Buscar por descrição ou tipo...">
         <div class="table-wrap">
           <table id="feriadosTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 10: USUÁRIOS (admin) -->
+    <section class="view" id="view-usuarios">
+      <div class="card">
+        <h2>Criar nova conta</h2>
+        <div class="grid-form">
+          <label>Usuário<input type="text" id="novoUsuarioNome" placeholder="ex: joana.ferreira"></label>
+          <label>Senha temporária<input type="password" id="novoUsuarioSenha" placeholder="Mínimo 6 caracteres"></label>
+          <label>Permissão
+            <select id="novoUsuarioPermissao">
+              <option value="padrao">Padrão</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </label>
+        </div>
+        <button class="btn primary" id="btnCriarUsuario">+ Criar conta</button>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Contas cadastradas</h2>
+          <span class="pill" id="usuariosCount">0 contas</span>
+        </div>
+        <div class="table-wrap">
+          <table id="usuariosTable"></table>
         </div>
       </div>
     </section>
