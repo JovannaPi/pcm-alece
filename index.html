@@ -39,9 +39,6 @@
 <div class="body-layout">
   <nav class="sidenav">
     <div class="sidenav-label" style="font-size: 15px; text-align: center; display: block; width: 100%; margin-bottom: 5px;">Gestão</div>
-    <button class="tab sidenav-item" data-view="ciclos">
-      <span class="sidenav-icon"></span> Ciclos
-    </button>
     <button class="tab sidenav-item" data-view="ordens">
       <span class="sidenav-icon"></span> Ordens de serviço
     </button>
@@ -131,33 +128,21 @@
         <p class="muted">Baixa uma planilha .xlsx com os dados atuais (status incluído).</p>
         <button class="btn secondary" id="btnExport">Baixar planilha (.xlsx)</button>
       </div>
+      <details class="ciclos-discreto">
+        <summary>Ver ciclos anteriores</summary>
+        <div class="card" style="margin-top:10px">
+          <div class="card-head">
+            <h2>Histórico de Ciclos</h2>
+            <span class="pill" id="ciclosCount">0 ciclos</span>
+          </div>
+          <p class="muted">Todos os cronogramas gerados a partir deste levantamento ficam salvos aqui. Ao gerar um cronograma a partir de um levantamento novo, esse histórico é reiniciado.</p>
+          <div class="table-wrap">
+            <table id="ciclosTable"></table>
+          </div>
+        </div>
+      </details>
     </section>
-
-    <section class="view" id="view-ciclos">
-
-  <div class="card">
-
-    <div class="card-head">
-      <h2>Histórico de Ciclos</h2>
-
-      <span class="pill" id="ciclosCount">
-        0 ciclos
-      </span>
-
-    </div>
-
-    <p class="muted">
-      Todos os cronogramas gerados permanecem salvos.
-      Você pode abrir qualquer ciclo anterior.
-    </p>
-
-    <div class="table-wrap">
-      <table id="ciclosTable"></table>
-    </div>
-
-  </div>
-
-</section>
+    
     <!-- VIEW 6: ORDENS DE SERVIÇO -->
     <section class="view" id="view-ordens">
       <div class="card">
