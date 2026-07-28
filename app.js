@@ -119,6 +119,32 @@ const COL_CORRETIVA = {
   SEDE: 23, ANEXO1: 24, ANEXO2: 25, ANEXO3: 26, ANEXO4: 27,
   SOLUCIONADO: 28, DESCRICAO_PROBLEMA: 29, PECA_FALTANTE: 30,
 };
+// Converte o valor bruto da coluna de data/hora, que pode vir como número de
+// série do Excel/Planilhas (dias desde 1899) OU como texto "DD/MM/AAAA HH:MM"
+function converterDataCorretiva(valor) {
+  if (typeof valor === "number") {
+    const ms = Math.round((valor - 25569) * 86400 * 1000);
+    return new Date(ms);
+  }
+  if (typeof valor === "string" && valor.trim()) {
+    const m = valor.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+      const [, d, mo, y, h, mi, s] = m;
+      return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s || 0));
+    }
+  }
+  return null;
+}
+
+function formatarDataHoraCorretiva(dataObj) {
+  if (!dataObj) return "-";
+  const dia = String(dataObj.getDate()).padStart(2, "0");
+  const mes = String(dataObj.getMonth() + 1).padStart(2, "0");
+  const ano = dataObj.getFullYear();
+  const hora = String(dataObj.getHours()).padStart(2, "0");
+  const min = String(dataObj.getMinutes()).padStart(2, "0");
+  return `${dia}/${mes}/${ano} ${hora}:${min}`;
+}
 
 async function carregarChamadosCorretivos(forcar) {
   const agora = Date.now();
@@ -139,8 +165,10 @@ async function carregarChamadosCorretivos(forcar) {
       const localAdicional = [linha[COL_CORRETIVA.SEDE], linha[COL_CORRETIVA.ANEXO1],
         linha[COL_CORRETIVA.ANEXO2], linha[COL_CORRETIVA.ANEXO3], linha[COL_CORRETIVA.ANEXO4]]
         .find((v) => String(v || "").trim()) || "";
+      const dataObj = converterDataCorretiva(linha[COL_CORRETIVA.DATA]);
       return {
-        data: linha[COL_CORRETIVA.DATA] || "",
+        data: dataObj ? dataObj.toISOString() : "", // formato que ordena certo
+        dataFormatada: formatarDataHoraCorretiva(dataObj), // formato que aparece na tela
         equipe: linha[COL_CORRETIVA.EQUIPE] || "",
         chamado: linha[COL_CORRETIVA.CHAMADO] || "",
         anexo: String(linha[COL_CORRETIVA.ANEXO] || "").trim(),
@@ -1467,7 +1495,7 @@ async function abrirDrawerEquipamento(id) {
   const totalPreventivas = conclusoes.length;
   const { exatos, aproximados } = chamadosDoEquipamento(item);
   const linhaChamado = (c) =>
-    `<div class="drawer-campo"><span class="rotulo">${c.data || "-"}</span>
+    `<div class="drawer-campo"><span class="rotulo">${c.dataFormatada || "-"}</span>
      <span class="valor">${c.solucionado || "-"} — ${c.descricaoProblema || c.pecaFaltante || "sem descrição"} (${c.equipe || "-"})</span></div>`;
 
   $("#drawerTitulo").textContent = item.patrimonio ? `Patrimônio ${item.patrimonio}` : item.ambiente;
