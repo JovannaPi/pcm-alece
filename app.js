@@ -1130,11 +1130,14 @@ async function removerOrdemServico(equipamentoId) {
 }
 
 function iniciarSincronizacaoOrdens() {
-  if (!ESTADO.cicloAtual) return; // <-- TRAVA DE SEGURANÇA ADICIONADA AQUI
   if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
-  const q = query(collection(db, "ciclos", ESTADO.cicloAtual, "ordens" ), orderBy("registradoEm", "desc"), limit(300));
+  const q = query(collectionGroup(db, "ordens"), orderBy("registradoEm", "desc"), limit(300));
   ESTADO.unsubscribeOrdens = onSnapshot(q, (snap) => {
-    ESTADO.ordens = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    ESTADO.ordens = snap.docs.map((d) => ({
+      id: d.id,
+      cicloId: d.ref.parent.parent.id,
+      ...d.data()
+    }));
     renderOrdens();
   }, (err) => {
     console.error(err);
@@ -1251,7 +1254,7 @@ function renderOrdens() {
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "🗑️";
-    btnDel.addEventListener("click", () => deletarRegistro('ordens', o.id));
+    btnDel.addEventListener("click", () => deletarRegistroOrdem(o.cicloId, o.id));
 
     tdBtn.appendChild(btnPrint);
     tdBtn.appendChild(btnDel);
@@ -2249,12 +2252,32 @@ async function apagarTodoHistoricoTodosOsCiclos() {
 
 const btnLimparOrdens = $("#btnLimparOrdens");
 if (btnLimparOrdens) {
-  btnLimparOrdens.addEventListener("click", () => {
-    apagarColecaoCompleta(
-      "ordens",
-      "Isso vai apagar TODAS as ordens de serviço emitidas, permanentemente. Continuar?"
-    );
-  });
+  btnLimparOrdens.addEventListener("click", apagarTodasOrdensTodosOsCiclos);
+}
+
+async function apagarTodasOrdensTodosOsCiclos() {
+  const ok = window.confirm(
+    "Isso vai apagar TODAS as ordens de serviço de TODOS os ciclos, permanentemente. Continuar?"
+  );
+  if (!ok) return;
+  try {
+    const snap = await getDocs(collectionGroup(db, "ordens"));
+    const refs = snap.docs.map((d) => d.ref);
+    if (!refs.length) {
+      toast("Não há registros para apagar.");
+      return;
+    }
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < refs.length; inicio += TAMANHO_LOTE) {
+      const batch = writeBatch(db);
+      refs.slice(inicio, inicio + TAMANHO_LOTE).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
+    toast(`${refs.length} registro(s) apagado(s).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao apagar: " + err.message);
+  }
 }
 
 function gerarPDFPMOC(ordem) {
@@ -2405,6 +2428,17 @@ async function deletarCiclo(id) {
   }
 }
 
+async function deletarRegistroOrdem(cicloId, id) {
+  const ok = window.confirm("Excluir este registro permanentemente?");
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "ciclos", cicloId, "ordens", id));
+    toast("Registro excluído!");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
+}
 
 async function deletarRegistroHistorico(cicloId, id) {
   const ok = window.confirm("Excluir este registro permanentemente?");
