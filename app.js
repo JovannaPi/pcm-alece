@@ -1141,11 +1141,13 @@ function iniciarSincronizacaoOrdens() {
   if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
   const q = query(collectionGroup(db, "ordens"), orderBy("registradoEm", "desc"), limit(300));
   ESTADO.unsubscribeOrdens = onSnapshot(q, (snap) => {
-    ESTADO.ordens = snap.docs.map((d) => ({
-      id: d.id,
-      cicloId: d.ref.parent.parent.id,
-      ...d.data()
-    }));
+    ESTADO.ordens = snap.docs
+      .filter((d) => d.ref.parent.parent) // ignora lixo de fora da estrutura de ciclos
+      .map((d) => ({
+        id: d.id,
+        cicloId: d.ref.parent.parent.id,
+        ...d.data()
+      }));
     renderOrdens();
   }, (err) => {
     console.error(err);
@@ -1160,11 +1162,13 @@ function iniciarSincronizacaoHistorico(){
   const q = query(collectionGroup(db, "historico"), orderBy("registradoEm", "desc"));
 
   ESTADO.unsubscribeHistorico = onSnapshot(q, (snap) => {
-    ESTADO.historico = snap.docs.map((d) => ({
-      id: d.id,
-      cicloId: d.ref.parent.parent.id, // guarda de qual ciclo veio, pra poder apagar certo
-      ...d.data()
-    }));
+    ESTADO.historico = snap.docs
+      .filter((d) => d.ref.parent.parent)
+      .map((d) => ({
+        id: d.id,
+        cicloId: d.ref.parent.parent.id,
+        ...d.data()
+      }));
     renderHistorico();
   }, (err) => {
     console.error(err);
