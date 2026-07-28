@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js?v=2";
 import {
-  collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query, orderBy, writeBatch,
-  deleteDoc, addDoc, limit,
+  collection, collectionGroup, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query,
+  orderBy, where, writeBatch, deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
@@ -1392,14 +1392,27 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") fecharDrawer();
 });
 
-async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos();
+async function abrirDrawerEquipamento(id) {
+  await carregarChamadosCorretivos();
   const item = ESTADO.equipamentos.find((e) => e.id === id);
   if (!item) return;
 
-  // Última preventiva concluída deste aparelho, a partir do histórico
-  const conclusoes = ESTADO.historico
-    .filter((h) => h.equipamentoId === id && h.statusNovo === "Concluída")
-    .sort((a, b) => String(b.registradoEm).localeCompare(String(a.registradoEm)));
+  // Busca o histórico desse aparelho em TODOS os ciclos, não só no atual —
+  // senão, ao virar de ciclo, parecia que nunca tinha sido feita preventiva.
+  let conclusoes = [];
+  try {
+    const qHist = query(collectionGroup(db, "historico"), where("equipamentoId", "==", id));
+    const snapHist = await getDocs(qHist);
+    conclusoes = snapHist.docs
+      .map((d) => d.data())
+      .filter((h) => h.statusNovo === "Concluída")
+      .sort((a, b) => String(b.registradoEm).localeCompare(String(a.registradoEm)));
+  } catch (err) {
+    console.error("Erro ao buscar histórico completo:", err);
+    conclusoes = ESTADO.historico
+      .filter((h) => h.equipamentoId === id && h.statusNovo === "Concluída")
+      .sort((a, b) => String(b.registradoEm).localeCompare(String(a.registradoEm)));
+  }
   const ultimaPreventiva = conclusoes.length
     ? new Date(conclusoes[0].registradoEm).toLocaleString("pt-BR")
     : "Nunca registrada";
