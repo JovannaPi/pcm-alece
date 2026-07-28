@@ -892,6 +892,37 @@ async function registrarUsuarioLogado(user) {
   return snap.data();
 }
 
+onAuthStateChanged(auth, async (user) => {
+  const overlay = $("#authOverlay");
+  const appRoot = $("#appRoot");
+  if (user) {
+    ESTADO.usuarioEmail = user.email;
+    ESTADO.usuarioNome = extrairUsuario(user.email);
+    try {
+      const dadosUsuario = await registrarUsuarioLogado(user);
+      if (dadosUsuario && dadosUsuario.bloqueado) {
+        mostrarErroAuth("Sua conta está bloqueada. Fale com a administradora.");
+        await signOut(auth);
+        return;
+      }
+      ESTADO.permissao = (dadosUsuario && dadosUsuario.permissao) || "padrao";
+    } catch (err) {
+      console.error("Erro ao verificar usuário:", err);
+    }
+    if (overlay) overlay.hidden = true;
+    if (appRoot) appRoot.hidden = false;
+    atualizarVisibilidadeAdmin();
+    if (!appJaInicializado) {
+      appJaInicializado = true;
+      inicializarApp();
+      if (ESTADO.permissao === "admin") iniciarSincronizacaoUsuarios();
+    }
+  } else {
+    if (overlay) overlay.hidden = false;
+    if (appRoot) appRoot.hidden = true;
+  }
+});
+
 function atualizarVisibilidadeAdmin() {
   const btn = $("#navUsuarios");
   if (btn) btn.hidden = ESTADO.permissao !== "admin";
