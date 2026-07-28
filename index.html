@@ -15,7 +15,6 @@
     <label>Usuário<input type="text" id="authEmail" placeholder="ex: joana.feira"></label>
     <label>Senha<input type="password" id="authSenha" placeholder="Mínimo 6 caracteres"></label>
     <button class="btn primary" id="btnAuthEntrar" style="width:100%;margin-top:6px">Entrar</button>
-    <button class="btn ghost" id="btnAuthCriarConta" style="width:100%;margin-top:8px">Criar uma conta nova</button>
     <p class="muted" id="authErro" style="color:var(--vermelho);min-height:18px"></p>
   </div>
 </div>
@@ -50,9 +49,6 @@
 
 <div class="body-layout">
   <nav class="sidenav">
-    <button class="tab sidenav-item" data-view="usuarios" id="navUsuarios" hidden>
-      <span class="sidenav-icon"></span> Usuários
-    </button>
     <div class="sidenav-label" style="font-size: 15px; text-align: center; display: block; width: 100%; margin-bottom: 5px;">Gestão</div>
     <button class="tab sidenav-item" data-view="ordens">
       <span class="sidenav-icon"></span> Ordens de serviço
@@ -69,6 +65,9 @@
     <div class="sidenav-spacer"></div>
     <button class="sidenav-item sidenav-danger" id="btnApagarCronograma">
       <span class="sidenav-icon"></span> Apagar cronograma
+    </button>
+    <button class="tab sidenav-item" data-view="usuarios" id="navUsuarios" hidden>
+      <span class="sidenav-icon"></span> Usuários
     </button>
     <button class="sidenav-item" id="btnSair" style="margin-top:8px">
       <span class="sidenav-icon"></span> Sair
