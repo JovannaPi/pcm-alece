@@ -468,11 +468,18 @@ tbody tr:hover { background: var(--latao-claro); }
 .drawer-close:hover { color: var(--texto); }
 .drawer-body { padding: 20px; overflow-y: auto; flex: 1; }
 
-.drawer-secao { margin-bottom: 22px; }
-.drawer-secao h3 {
+.drawer-secao { margin-bottom: 14px; border-bottom: 1px solid var(--borda); padding-bottom: 14px; }
+.drawer-secao:last-child { border-bottom: none; }
+.drawer-secao summary {
   margin: 0 0 10px; font-size: 12px; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--texto-suave);
+  letter-spacing: .04em; color: var(--texto-suave); font-weight: 700;
+  cursor: pointer; list-style: none; user-select: none;
 }
+.drawer-secao summary::-webkit-details-marker { display: none; }
+.drawer-secao summary::before { content: "▸ "; }
+.drawer-secao[open] summary::before { content: "▾ "; }
+.drawer-secao summary:hover { color: var(--azul); }
+.drawer-secao[open] summary { margin-bottom: 10px; }
 .drawer-campo {
   display: flex; justify-content: space-between; gap: 12px;
   padding: 8px 0; border-bottom: 1px solid var(--borda); font-size: 13.5px;
