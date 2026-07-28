@@ -1,11 +1,20 @@
-import { db, auth } from "./firebase-config.js?v=3";
+import { db, auth, firebaseConfig } from "./firebase-config.js?v=4";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   collection, collectionGroup, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query,
   orderBy, where, writeBatch, deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const SUFIXO_LOGIN = "@pcm-alece.local";
+function usuarioParaEmail(usuario) {
+  return usuario.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") + SUFIXO_LOGIN;
+}
+function extrairUsuario(email) {
+  return String(email || "").split("@")[0];
+}
 
 const PRIORIDADE = {
   "1 - Presidência": 1, "2 - Primeiro Secretário": 2, "3 - Gabinetes": 3,
@@ -93,6 +102,9 @@ const ESTADO = {
   ordens: [],
   historico: [],
   chamadosCorretivos: [],
+  usuarioNome: null,
+  permissao: "padrao",
+  usuarios: [],
   ordenacaoEquipamentos: null,
   chamadosCorretivosCarregadosEm: null,
   usuarioEmail: null,
@@ -822,9 +834,10 @@ $("#btnAuthCriarConta")?.addEventListener("click", () => {
 });
 
 $("#btnAuthEntrar")?.addEventListener("click", async () => {
-  const email = $("#authEmail").value.trim();
+  const usuarioDigitado = $("#authEmail").value.trim();
   const senha = $("#authSenha").value;
-  if (!email || !senha) { mostrarErroAuth("Preencha e-mail e senha."); return; }
+  if (!usuarioDigitado || !senha) { mostrarErroAuth("Preencha usuário e senha."); return; }
+  const email = usuarioParaEmail(usuarioDigitado);
   mostrarErroAuth("");
   try {
     if (modoCadastro) {
@@ -859,22 +872,153 @@ $("#btnSair")?.addEventListener("click", () => {
 });
 
 let appJaInicializado = false;
-onAuthStateChanged(auth, (user) => {
+async function registrarUsuarioLogado(user) {
+  const ref = doc(db, "usuarios", user.uid);
+  const snap = await getDoc(ref);
+  const agora = new Date().toISOString();
+  if (!snap.exists()) {
+    const dados = {
+      usuario: extrairUsuario(user.email),
+      permissao: "padrao",
+      bloqueado: false,
+      criadoEm: agora,
+      ultimoLogin: agora,
+    };
+    await setDoc(ref, dados);
+    return dados;
+  }
+  await updateDoc(ref, { ultimoLogin: agora });
+  return snap.data();
+}
+
+function atualizarVisibilidadeAdmin() {
+  const btn = $("#navUsuarios");
+  if (btn) btn.hidden = ESTADO.permissao !== "admin";
+}
+
+let appJaInicializado = false;
+onAuthStateChanged(auth, async (user) => {
   const overlay = $("#authOverlay");
   const appRoot = $("#appRoot");
   if (user) {
+    ESTADO.usuarioEmail = user.email;
+    ESTADO.usuarioNome = extrairUsuario(user.email);
+    try {
+      const dadosUsuario = await registrarUsuarioLogado(user);
+      if (dadosUsuario && dadosUsuario.bloqueado) {
+        mostrarErroAuth("Sua conta está bloqueada. Fale com a administradora.");
+        await signOut(auth);
+        return;
+      }
+      ESTADO.permissao = (dadosUsuario && dadosUsuario.permissao) || "padrao";
+    } catch (err) {
+      console.error("Erro ao verificar usuário:", err);
+    }
     if (overlay) overlay.hidden = true;
     if (appRoot) appRoot.hidden = false;
-    ESTADO.usuarioEmail = user.email;
+    atualizarVisibilidadeAdmin();
     if (!appJaInicializado) {
       appJaInicializado = true;
       inicializarApp();
+      if (ESTADO.permissao === "admin") iniciarSincronizacaoUsuarios();
     }
   } else {
     if (overlay) overlay.hidden = false;
     if (appRoot) appRoot.hidden = true;
   }
 });
+
+// ------------------------------------------------------------------
+// Administração de usuários (só visível/funcional para permissao=="admin";
+// a trava de verdade está nas regras do Firestore, não só aqui)
+// ------------------------------------------------------------------
+async function criarContaAdmin(usuario, senha, permissao) {
+  const nomeAppTemp = "temp_" + Date.now();
+  const appTemp = initializeApp(firebaseConfig, nomeAppTemp);
+  const authTemp = getAuth(appTemp);
+  try {
+    const email = usuarioParaEmail(usuario);
+    const cred = await createUserWithEmailAndPassword(authTemp, email, senha);
+    const uid = cred.user.uid;
+    await signOut(authTemp);
+    await setDoc(doc(db, "usuarios", uid), {
+      usuario: usuario.trim().toLowerCase(),
+      permissao,
+      bloqueado: false,
+      criadoEm: new Date().toISOString(),
+      ultimoLogin: "",
+      criadoPor: ESTADO.usuarioNome || "",
+    });
+  } finally {
+    await deleteApp(appTemp);
+  }
+}
+
+$("#btnCriarUsuario")?.addEventListener("click", async () => {
+  const usuario = $("#novoUsuarioNome").value.trim();
+  const senha = $("#novoUsuarioSenha").value;
+  const permissao = $("#novoUsuarioPermissao").value;
+  if (!usuario || senha.length < 6) {
+    toast("Preencha o usuário e uma senha com 6 ou mais caracteres.");
+    return;
+  }
+  try {
+    await criarContaAdmin(usuario, senha, permissao);
+    toast(`Conta "${usuario}" criada com sucesso!`);
+    $("#novoUsuarioNome").value = "";
+    $("#novoUsuarioSenha").value = "";
+  } catch (err) {
+    console.error(err);
+    const msgs = {
+      "auth/email-already-in-use": "Esse nome de usuário já existe.",
+      "auth/weak-password": "Senha muito curta.",
+    };
+    toast(msgs[err.code] || ("Erro: " + err.message));
+  }
+});
+
+function iniciarSincronizacaoUsuarios() {
+  const q = query(collection(db, "usuarios"), orderBy("criadoEm", "desc"));
+  onSnapshot(q, (snap) => {
+    ESTADO.usuarios = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderUsuarios();
+  }, (err) => console.error("Erro ao ler usuários:", err));
+}
+
+function renderUsuarios() {
+  const table = $("#usuariosTable");
+  if (!table) return;
+  $("#usuariosCount").textContent = `${ESTADO.usuarios.length} conta(s)`;
+  table.innerHTML = `<thead><tr>
+      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th>Status</th><th></th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+  ESTADO.usuarios.forEach((u) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${u.usuario}</td>
+      <td>${u.permissao === "admin" ? "Administrador" : "Padrão"}</td>
+      <td>${u.criadoEm ? new Date(u.criadoEm).toLocaleDateString("pt-BR") : "-"}</td>
+      <td>${u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString("pt-BR") : "-"}</td>
+      <td>${u.bloqueado ? '<span class="status-select atrasado">Bloqueado</span>' : '<span class="status-select concluido">Ativo</span>'}</td>`;
+    const tdBtn = document.createElement("td");
+    const btnBloqueio = document.createElement("button");
+    btnBloqueio.className = "btn ghost";
+    btnBloqueio.textContent = u.bloqueado ? "Desbloquear" : "Bloquear";
+    btnBloqueio.addEventListener("click", async () => {
+      try {
+        await updateDoc(doc(db, "usuarios", u.id), { bloqueado: !u.bloqueado });
+        toast(u.bloqueado ? "Usuário desbloqueado." : "Usuário bloqueado.");
+      } catch (err) {
+        console.error(err);
+        toast("Erro: " + err.message);
+      }
+    });
+    tdBtn.appendChild(btnBloqueio);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
 
 function slugLocal(local) {
   return String(local).replace(/[^a-zA-Z0-9]/g, "_");
@@ -1157,6 +1301,7 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
     ambiente: item.ambiente || "",
     local: item.local || "SEDE",
     equipe: item.equipeResponsavel || "",
+    usuario: ESTADO.usuarioNome || "",
     tipo: "Preventiva",
     statusAnterior: statusAnterior || "Pendente",
     statusNovo: statusNovo,
@@ -1259,7 +1404,7 @@ function renderHistorico(){
 
   table.innerHTML = `<thead><tr>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
-      <th>Equipe</th><th>Tipo</th><th>De</th><th>Para</th><th>Ações</th>
+      <th>Equipe</th><th>Usuário</th><th>Tipo</th><th>De</th><th>Para</th><th>Ações</th>
   </tr></thead><tbody></tbody>`;
 
   const tbody = table.querySelector("tbody");
@@ -1278,6 +1423,7 @@ function renderHistorico(){
         <td>${h.patrimonio || "-"}</td>
         <td>${h.setor}</td>
         <td>${h.equipe}</td>
+        <td>${h.usuario || "-"}</td>
         <td>${h.tipo || "Preventiva"}</td>
         ${colDe}
         ${colPara}
