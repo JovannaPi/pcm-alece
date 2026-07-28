@@ -1145,14 +1145,14 @@ function iniciarSincronizacaoOrdens() {
 iniciarSincronizacaoOrdens();
 
 function iniciarSincronizacaoHistorico(){
-  if (!ESTADO.cicloAtual) return; // Trava de segurança
-  if(ESTADO.unsubscribeHistorico) ESTADO.unsubscribeHistorico();
-  const q = query(collection(db, "ciclos", ESTADO.cicloAtual, "historico"), orderBy("registradoEm","desc"));
+  if (ESTADO.unsubscribeHistorico) ESTADO.unsubscribeHistorico();
+  const q = query(collectionGroup(db, "historico"), orderBy("registradoEm", "desc"));
 
   ESTADO.unsubscribeHistorico = onSnapshot(q, (snap) => {
-    ESTADO.historico = snap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data()
+    ESTADO.historico = snap.docs.map((d) => ({
+      id: d.id,
+      cicloId: d.ref.parent.parent.id, // guarda de qual ciclo veio, pra poder apagar certo
+      ...d.data()
     }));
     renderHistorico();
   }, (err) => {
@@ -1204,7 +1204,7 @@ function renderHistorico(){
     const btnDel = document.createElement("button");
     btnDel.className = "btn ghost";
     btnDel.textContent = "🗑️";
-    btnDel.addEventListener("click", () => deletarRegistro('historico', h.id));
+    btnDel.addEventListener("click", () => deletarRegistroHistorico(h.cicloId, h.id));
     tdAcao.appendChild(btnDel);
     tr.appendChild(tdAcao);
     tbody.appendChild(tr);
@@ -2219,12 +2219,32 @@ async function apagarColecaoCompleta(nomeColecao, mensagem) {
 
 const btnLimparHistorico = $("#btnLimparHistorico");
 if (btnLimparHistorico) {
-  btnLimparHistorico.addEventListener("click", () => {
-    apagarColecaoCompleta(
-      "historico",
-      "Isso vai apagar TODO o histórico de manutenção, permanentemente. Continuar?"
-    );
-  });
+  btnLimparHistorico.addEventListener("click", apagarTodoHistoricoTodosOsCiclos);
+}
+
+async function apagarTodoHistoricoTodosOsCiclos() {
+  const ok = window.confirm(
+    "Isso vai apagar TODO o histórico de manutenção de TODOS os ciclos, permanentemente. Continuar?"
+  );
+  if (!ok) return;
+  try {
+    const snap = await getDocs(collectionGroup(db, "historico"));
+    const refs = snap.docs.map((d) => d.ref);
+    if (!refs.length) {
+      toast("Não há registros para apagar.");
+      return;
+    }
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < refs.length; inicio += TAMANHO_LOTE) {
+      const batch = writeBatch(db);
+      refs.slice(inicio, inicio + TAMANHO_LOTE).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
+    toast(`${refs.length} registro(s) apagado(s).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao apagar: " + err.message);
+  }
 }
 
 const btnLimparOrdens = $("#btnLimparOrdens");
@@ -2384,6 +2404,20 @@ async function deletarCiclo(id) {
     toast("Erro ao excluir ciclo: " + err.message);
   }
 }
+
+
+async function deletarRegistroHistorico(cicloId, id) {
+  const ok = window.confirm("Excluir este registro permanentemente?");
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "ciclos", cicloId, "historico", id));
+    toast("Registro excluído!");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
+}
+
 async function deletarRegistro(colecao, id) {
   const ok = window.confirm("Excluir este registro permanentemente?");
   if (!ok) return;
