@@ -562,3 +562,8 @@ tbody tr:hover { background: var(--latao-claro); }
 .ciclos-discreto summary::before { content: "▸ "; }
 .ciclos-discreto[open] summary::before { content: "▾ "; }
 .ciclos-discreto summary:hover { color: var(--azul); }
+.filtros-equipamentos { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.filtros-equipamentos select {
+  padding: 7px 10px; border: 1px solid var(--borda); border-radius: 8px;
+  font-size: 13px; color: var(--texto); font-family: var(--fonte); background: white; cursor: pointer;
+}
