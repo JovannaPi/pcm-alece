@@ -2464,6 +2464,13 @@ async function verificarFechamentoCiclo() {
   if (ESTADO.fechandoCiclo) return;
   const itens = ESTADO.equipamentos;
   if (!itens.length) return;
+
+  // Só fecha se o ciclo carregado agora for o ATIVO de verdade — sem essa
+  // checagem, abrir um ciclo já encerrado (onde todo mundo já está
+  // "Concluída") disparava um fechamento novo só de consultar.
+  const cicloInfo = ESTADO.ciclos.find((c) => c.id === ESTADO.cicloAtual);
+  if (cicloInfo && cicloInfo.dataFechamento) return;
+
   if (!itens.every((i) => i.statusPreventiva === "Concluída")) return;
 
   ESTADO.fechandoCiclo = true;
