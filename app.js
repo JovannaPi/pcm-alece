@@ -2244,7 +2244,43 @@ function gerarPDFPMOC(ordem) {
     janela.print();
   }, 250);
 }
+async function deletarCiclo(id) {
+  const ok = window.confirm(
+    "Excluir este ciclo permanentemente? Isso também apaga os equipamentos, o histórico e as ordens de serviço salvos dentro dele."
+  );
+  if (!ok) return;
 
+  try {
+    // Apaga as subcoleções primeiro — apagar o documento do ciclo NÃO apaga
+    // o que está dentro dele sozinho, ficaria órfão no Firestore pra sempre.
+    for (const sub of ["equipamentos", "historico", "ordens"]) {
+      const snap = await getDocs(collection(db, "ciclos", id, sub));
+      const ids = snap.docs.map((d) => d.id);
+      const TAMANHO_LOTE = 400;
+      for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+        const batch = writeBatch(db);
+        ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((docId) =>
+          batch.delete(doc(db, "ciclos", id, sub, docId))
+        );
+        await batch.commit();
+      }
+    }
+
+    await deleteDoc(doc(db, "ciclos", id));
+    toast("Ciclo excluído!");
+
+    // Se apagou o ciclo que estava aberto no momento, troca pra outro válido
+    if (id === ESTADO.cicloAtual) {
+      await carregarCicloAtual();
+      iniciarSincronizacao();
+      iniciarSincronizacaoHistorico();
+      iniciarSincronizacaoOrdens();
+    }
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir ciclo: " + err.message);
+  }
+}
 async function deletarRegistro(colecao, id) {
   const ok = window.confirm("Excluir este registro permanentemente?");
   if (!ok) return;
