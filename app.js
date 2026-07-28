@@ -1412,8 +1412,8 @@ async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos()
   $("#drawerTitulo").textContent = item.patrimonio ? `Patrimônio ${item.patrimonio}` : item.ambiente;
 
   $("#drawerCorpo").innerHTML = `
-    <div class="drawer-secao">
-      <h3>Situação</h3>
+    <details class="drawer-secao" open>
+      <summary>Situação</summary>
       <div class="drawer-campo"><span class="rotulo">Status</span>
         <span class="valor"><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
         ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}</span></div>
@@ -1422,10 +1422,10 @@ async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos()
       <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${item.equipeResponsavel || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Última preventiva concluída</span><span class="valor">${ultimaPreventiva}</span></div>
       <div class="drawer-campo"><span class="rotulo">Total de preventivas feitas</span><span class="valor">${totalPreventivas}</span></div>
-    </div>
+    </details>
 
-    <div class="drawer-secao">
-      <h3>Localização e classificação</h3>
+    <details class="drawer-secao">
+      <summary>Localização e classificação</summary>
       <div class="drawer-campo"><span class="rotulo">Prédio</span><span class="valor">${item.local || "SEDE"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Setor</span><span class="valor">${item.setor || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Ambiente</span><span class="valor">${item.ambiente || "-"}</span></div>
@@ -1433,19 +1433,19 @@ async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos()
       <div class="drawer-campo"><span class="rotulo">Piso</span><span class="valor">${item.pisoPCM === 99 ? "Não identificado" : item.pisoPCM}</span></div>
       <div class="drawer-campo"><span class="rotulo">Condição (levantamento)</span><span class="valor">${item.statusCondicao || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Origem do cadastro</span><span class="valor">${item.origem === "manual" ? "Manual" : "Planilha"}</span></div>
-    </div>
+    </details>
 
-    <div class="drawer-secao">
-      <h3>Chamados corretivos (planilha)</h3>
+    <details class="drawer-secao">
+      <summary>Chamados corretivos (planilha)</summary>
       ${exatos.length ? exatos.map(linhaChamado).join("") : '<div class="drawer-campo"><span class="rotulo">Vinculados por patrimônio</span><span class="valor">Nenhum</span></div>'}
       ${aproximados.length ? `
         <div style="margin-top:8px;font-size:11px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.03em">Prováveis (mesmo local, sem patrimônio no chamado)</div>
         ${aproximados.map(linhaChamado).join("")}
       ` : ""}
-    </div>
+    </details>
 
-    <div class="drawer-secao drawer-form">
-      <h3>Editar cadastro</h3>
+    <details class="drawer-secao drawer-form">
+      <summary>Editar cadastro</summary>
       <label>Patrimônio<input type="text" id="drawerPatrimonio" value="${item.patrimonio || ""}"></label>
       <label>Setor<input type="text" id="drawerSetor" value="${item.setor || ""}"></label>
       <label>Ambiente<input type="text" id="drawerAmbiente" value="${item.ambiente || ""}"></label>
@@ -1458,22 +1458,22 @@ async function abrirDrawerEquipamento(id) {   await carregarChamadosCorretivos()
       <div class="drawer-acoes">
         <button class="btn primary" id="drawerSalvarCadastro">Salvar cadastro</button>
       </div>
-    </div>
+    </details>
 
-    <div class="drawer-secao drawer-form">
-      <h3>Reagendar</h3>
+    <details class="drawer-secao drawer-form">
+      <summary>Reagendar</summary>
       <label>Nova data da preventiva<input type="date" id="drawerNovaData" value="${item.dataAgendada || ""}"></label>
       <div class="drawer-acoes">
         <button class="btn primary" id="drawerSalvarData">Salvar nova data</button>
       </div>
-    </div>
+    </details>
 
-    <div class="drawer-secao drawer-form">
-      <h3>Zona de risco</h3>
+    <details class="drawer-secao drawer-form">
+      <summary style="color:var(--vermelho)">Zona de risco</summary>
       <div class="drawer-acoes">
         <button class="btn ghost" id="drawerExcluir" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir equipamento</button>
       </div>
-    </div>
+    </details>
   `;
 
   $("#drawerSalvarCadastro").addEventListener("click", async () => {
