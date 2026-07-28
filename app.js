@@ -483,9 +483,20 @@ async function gerarCronograma() {
 
   $("#btnGerar").disabled = true;
   try {
-    const cicloRef = doc(collection(db, "ciclos")); 
-    ESTADO.cicloAtual = cicloRef.id;
+    // Captura os cadastros manuais e o status/observação de itens que já
+    // existiam, ANTES de apagar tudo — assim nada se perde no reset.
+    const existentes = {};
+    const manuaisPreservados = [];
+    ESTADO.equipamentos.forEach((dados) => {
+      existentes[dados.id] = dados;
+      if (dados.origem === "manual") manuaisPreservados.push({ ...dados });
+    });
 
+    toast("Apagando ciclos anteriores...");
+    await apagarTodosOsCiclos();
+
+    const cicloRef = doc(collection(db, "ciclos"));
+    ESTADO.cicloAtual = cicloRef.id;
     await setDoc(cicloRef, {
         criadoEm: new Date().toISOString(),
         dataInicio: formatISO(primeiraDataUtilGlobal),
@@ -493,19 +504,8 @@ async function gerarCronograma() {
     });
     ESTADO.config = { diasSemana, dataInicio: formatISO(primeiraDataUtilGlobal), capacidades };
     await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
-
     const itensPlanilha = ESTADO.itensCarregados.map((i) => ({ ...i }));
-    toast("Lendo dados anteriores...");
-
-    const existentes = {};
-    const idsAntigos = [];
-    const manuaisPreservados = [];
-    ESTADO.equipamentos.forEach((dados) => {
-      existentes[dados.id] = dados;
-      idsAntigos.push(dados.id);
-      if (dados.origem === "manual") manuaisPreservados.push({ ...dados });
-    });
-
+    toast("Salvando...");
     const itens = [...itensPlanilha, ...manuaisPreservados];
 
     // Agrupa por prédio — cada grupo anda no próprio ritmo, com sua própria capacidade
@@ -564,16 +564,6 @@ async function gerarCronograma() {
       (manuaisPreservados.length ? `<br>${manuaisPreservados.length} cadastrado(s) manualmente incluído(s)` : "");
 
     const TAMANHO_LOTE = 400;
-
-    if (idsAntigos.length) {
-      toast("Limpando dados antigos...");
-      for (let inicio = 0; inicio < idsAntigos.length; inicio += TAMANHO_LOTE) {
-        const pedacoIds = idsAntigos.slice(inicio, inicio + TAMANHO_LOTE);
-        const batchDel = writeBatch(db);
-        pedacoIds.forEach((id) => batchDel.delete(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id)));
-        await batchDel.commit();
-      }
-    }
 
     for (let inicio = 0; inicio < itens.length; inicio += TAMANHO_LOTE) {
       const pedaco = itens.slice(inicio, inicio + TAMANHO_LOTE);
@@ -2246,6 +2236,28 @@ function gerarPDFPMOC(ordem) {
     janela.print();
   }, 250);
 }
+
+// Apaga TODOS os ciclos (e suas subcoleções) — usado quando um levantamento
+// novo é gerado, já que cada levantamento começa do zero (Ciclo 1).
+async function apagarTodosOsCiclos() {
+  const snap = await getDocs(collection(db, "ciclos"));
+  const TAMANHO_LOTE = 400;
+  for (const cicloDoc of snap.docs) {
+    for (const sub of ["equipamentos", "historico", "ordens"]) {
+      const subSnap = await getDocs(collection(db, "ciclos", cicloDoc.id, sub));
+      const ids = subSnap.docs.map((d) => d.id);
+      for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+        const batch = writeBatch(db);
+        ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((docId) =>
+          batch.delete(doc(db, "ciclos", cicloDoc.id, sub, docId))
+        );
+        await batch.commit();
+      }
+    }
+    await deleteDoc(doc(db, "ciclos", cicloDoc.id));
+  }
+}
+
 async function deletarCiclo(id) {
   const ok = window.confirm(
     "Excluir este ciclo permanentemente? Isso também apaga os equipamentos, o histórico e as ordens de serviço salvos dentro dele."
