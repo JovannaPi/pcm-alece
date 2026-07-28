@@ -846,7 +846,17 @@ $("#btnAuthEntrar")?.addEventListener("click", async () => {
   }
 });
 
-$("#btnSair")?.addEventListener("click", () => signOut(auth));
+$("#btnSair")?.addEventListener("click", () => {
+  // Desliga todos os "escutadores" do Firestore antes de sair — senão eles
+  // continuam tentando sincronizar sem permissão e enchem o console de erro.
+  if (ESTADO.unsubscribe) ESTADO.unsubscribe();
+  if (ESTADO.unsubscribeFeriados) ESTADO.unsubscribeFeriados();
+  if (ESTADO.unsubscribeOrdens) ESTADO.unsubscribeOrdens();
+  if (ESTADO.unsubscribeHistorico) ESTADO.unsubscribeHistorico();
+  if (ESTADO.unsubscribeCiclos) ESTADO.unsubscribeCiclos();
+  appJaInicializado = false; // permite reiniciar tudo se logar de novo sem recarregar a página
+  signOut(auth);
+});
 
 let appJaInicializado = false;
 onAuthStateChanged(auth, (user) => {
