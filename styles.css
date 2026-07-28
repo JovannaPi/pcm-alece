@@ -545,3 +545,13 @@ tbody tr:hover { background: var(--latao-claro); }
   background: var(--vermelho); color: white; border-color: transparent;
 }
 .kpi-card.atrasado { background: linear-gradient(135deg, #D14343, var(--vermelho)); }
+
+.ciclos-discreto { margin-top: 4px; }
+.ciclos-discreto summary {
+  cursor: pointer; font-size: 12.5px; color: var(--texto-suave);
+  list-style: none; user-select: none; padding: 6px 2px;
+}
+.ciclos-discreto summary::-webkit-details-marker { display: none; }
+.ciclos-discreto summary::before { content: "▸ "; }
+.ciclos-discreto[open] summary::before { content: "▾ "; }
+.ciclos-discreto summary:hover { color: var(--azul); }
