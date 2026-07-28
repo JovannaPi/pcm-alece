@@ -2505,9 +2505,9 @@ async function fecharCicloEIniciarProximo() {
   // 3. Data-base do PRÓXIMO ciclo: a PRIMEIRA conclusão registrada neste
   // ciclo + 4 meses. Todos os aparelhos usam essa mesma data-base — o ritmo
   // de 4 em 4 meses é do ciclo inteiro, não de cada aparelho individualmente.
-  const datasConclusao = itens.map((i) => i.dataConclusao).filter(Boolean).sort();
-  const primeiraConclusao = datasConclusao.length ? datasConclusao[0] : hojeISO;
-  const [pa, pm, pd] = primeiraConclusao.split("-");
+  const datasAgendadas = itens.map((i) => i.dataAgendada).filter(Boolean).sort();
+  const primeiraData = datasAgendadas.length ? datasAgendadas[0] : hojeISO;
+  const [pa, pm, pd] = primeiraData.split("-");
   const dataBaseProximoCiclo = adicionarMeses(new Date(pa, parseInt(pm, 10) - 1, pd, 12, 0, 0), MESES_CICLO);
 
   const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
