@@ -209,6 +209,30 @@
           <span class="pill" id="equipamentosCount">0 itens</span>
         </div>
         <div class="local-filtro" id="localFiltroEquipamentos"></div>
+        <div class="filtros-equipamentos">
+          <select id="filtroStatus">
+            <option value="">Status: todos</option>
+            <option value="Pendente">Pendente</option>
+            <option value="Em andamento">Em andamento</option>
+            <option value="Concluída">Concluída</option>
+            <option value="Atrasado">Atrasado</option>
+          </select>
+          <select id="filtroSetorPCM">
+            <option value="">Categoria: todas</option>
+            <option value="1 - Presidência">Presidência</option>
+            <option value="2 - Primeiro Secretário">Primeiro Secretário</option>
+            <option value="3 - Gabinetes">Gabinetes</option>
+            <option value="4 - TI/Racks">TI/Racks</option>
+            <option value="5 - Plenário">Plenário</option>
+            <option value="6 - Administração">Administração</option>
+            <option value="7 - Todo o resto">Todo o resto</option>
+          </select>
+          <select id="filtroOrigem">
+            <option value="">Origem: todas</option>
+            <option value="planilha">Planilha</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
         <input type="text" class="search-input" id="buscaEquipamentos" placeholder="Buscar por patrimônio, setor ou ambiente...">
         <div class="table-wrap">
           <table id="equipamentosTable"></table>
