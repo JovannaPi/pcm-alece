@@ -91,6 +91,7 @@ const ESTADO = {
   ordens: [],
   historico: [],
   chamadosCorretivos: [],
+  ordenacaoEquipamentos: null,
   chamadosCorretivosCarregadosEm: null,
   cicloAtual: null,
   ciclos: [],
@@ -156,6 +157,7 @@ async function carregarChamadosCorretivos(forcar) {
       };
     });
     ESTADO.chamadosCorretivosCarregadosEm = agora;
+    renderEquipamentosCadastro();
   } catch (err) {
     console.error("Erro ao carregar chamados corretivos:", err);
   }
@@ -831,6 +833,9 @@ ligarBusca("buscaEquipamentos", "equipamentos", renderEquipamentosCadastro);
 ligarBusca("buscaFeriados", "feriados", renderFeriados);
 ligarBusca("buscaOrdens", "ordens", renderOrdens);
 ligarBusca("buscaHistorico", "historico", renderHistorico);
+["filtroStatus", "filtroSetorPCM", "filtroOrigem"].forEach((id) => {
+  $(`#${id}`)?.addEventListener("change", renderEquipamentosCadastro);
+});
 
 $("#prevMonth").addEventListener("click", () => mudarMes(-1));
 $("#nextMonth").addEventListener("click", () => mudarMes(1));
@@ -1336,20 +1341,53 @@ function renderEquipamentosCadastro() {
   if (!table) return;
 
   const termo = ESTADO.filtros.equipamentos;
-  const itens = aplicarFiltroLocal(ESTADO.equipamentos).filter((item) => {
-    if (!termo) return true;
-    const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""}`.toLowerCase();
-    return alvo.includes(termo);
+  const statusFiltro = $("#filtroStatus")?.value || "";
+  const setorPCMFiltro = $("#filtroSetorPCM")?.value || "";
+  const origemFiltro = $("#filtroOrigem")?.value || "";
+
+  const filtrados = aplicarFiltroLocal(ESTADO.equipamentos).filter((item) => {
+    if (termo) {
+      const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""}`.toLowerCase();
+      if (!alvo.includes(termo)) return false;
+    }
+    if (statusFiltro) {
+      if (statusFiltro === "Atrasado") {
+        if (!estaAtrasado(item)) return false;
+      } else if (item.statusPreventiva !== statusFiltro) {
+        return false;
+      }
+    }
+    if (setorPCMFiltro && item.setorPCM !== setorPCMFiltro) return false;
+    if (origemFiltro) {
+      const origemItem = item.origem === "manual" ? "manual" : "planilha";
+      if (origemItem !== origemFiltro) return false;
+    }
+    return true;
   });
 
-  $("#equipamentosCount").textContent = `${itens.length} itens`;
+  let itensComCorretivas = filtrados.map((item) => {
+    const { exatos, aproximados } = chamadosDoEquipamento(item);
+    return { item, totalCorretivas: exatos.length + aproximados.length };
+  });
+
+  if (ESTADO.ordenacaoEquipamentos === "corretivas_desc") {
+    itensComCorretivas.sort((a, b) => b.totalCorretivas - a.totalCorretivas);
+  } else if (ESTADO.ordenacaoEquipamentos === "corretivas_asc") {
+    itensComCorretivas.sort((a, b) => a.totalCorretivas - b.totalCorretivas);
+  }
+
+  $("#equipamentosCount").textContent = `${itensComCorretivas.length} itens`;
+  const setaOrdenacao = ESTADO.ordenacaoEquipamentos === "corretivas_desc" ? " ▼"
+    : ESTADO.ordenacaoEquipamentos === "corretivas_asc" ? " ▲" : " ⇅";
   table.innerHTML = `<thead><tr>
       <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Prédio</th><th>Setor PCM</th>
-      <th>Status</th><th>Origem</th><th></th>
+      <th>Status</th><th>Origem</th>
+      <th id="thCorretivas" style="cursor:pointer" title="Clique para ordenar">Corretivas${setaOrdenacao}</th>
+      <th></th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
 
-  itens.forEach((item) => {
+  itensComCorretivas.forEach(({ item, totalCorretivas }) => {
     const tr = document.createElement("tr");
     tr.className = "linha-clicavel";
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
@@ -1359,7 +1397,8 @@ function renderEquipamentosCadastro() {
         <span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
         ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}
       </td>
-      <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>`;
+      <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>
+      <td style="text-align:center">${totalCorretivas > 0 ? `<strong>${totalCorretivas}</strong>` : "-"}</td>`;
 
     const tdMenu = document.createElement("td");
     const btnMenu = document.createElement("button");
@@ -1376,6 +1415,14 @@ function renderEquipamentosCadastro() {
     tr.addEventListener("click", () => abrirDrawerEquipamento(item.id));
     tbody.appendChild(tr);
   });
+
+  const thCorretivas = $("#thCorretivas");
+  if (thCorretivas) {
+    thCorretivas.addEventListener("click", () => {
+      ESTADO.ordenacaoEquipamentos = ESTADO.ordenacaoEquipamentos === "corretivas_desc" ? "corretivas_asc" : "corretivas_desc";
+      renderEquipamentosCadastro();
+    });
+  }
 }
 
 // ------------------------------------------------------------------
