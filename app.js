@@ -2291,6 +2291,13 @@ if (btnReagendar) {
 console.log("Botão histórico:", $("#btnLimparHistorico"));
 console.log("Botão ordens:", $("#btnLimparOrdens"));
 
+function numeroDoCiclo(id) {
+  const ordenado = [...ESTADO.ciclos].sort((a, b) =>
+    String(a.criadoEm || a.dataInicio || "").localeCompare(String(b.criadoEm || b.dataInicio || "")));
+  const idx = ordenado.findIndex((c) => c.id === id);
+  return idx === -1 ? ordenado.length + 1 : idx + 1;
+}
+
 // ------------------------------------------------------------------
 // Ciclos de 4 meses — fecha quando todos concluem e reagenda o próximo
 // ------------------------------------------------------------------
@@ -2311,14 +2318,8 @@ function iniciarSincronizacaoCiclos() {
         return dataB.localeCompare(dataA);
       });
       
-    // RASTREADOR: Vai imprimir no console tudo que achou no banco!
+    // RASTREADOR: Vai imprimir no console tudo que achou no banco
     console.log(" CICLOS ENCONTRADOS NO BANCO:", ESTADO.ciclos);
-function numeroDoCiclo(id) {
-  const ordenado = [...ESTADO.ciclos].sort((a, b) =>
-    String(a.criadoEm || a.dataInicio || "").localeCompare(String(b.criadoEm || b.dataInicio || "")));
-  const idx = ordenado.findIndex((c) => c.id === id);
-  return idx === -1 ? ordenado.length + 1 : idx + 1;
-}
     renderCiclos();
   }, (err) => {
     console.error("Erro na busca de ciclos:", err);
