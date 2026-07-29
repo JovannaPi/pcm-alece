@@ -965,8 +965,18 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function atualizarVisibilidadeAdmin() {
+  const isAdmin = ESTADO.permissao === "admin";
+  
+  // Esconde a aba de usuários da barra lateral
   const btn = $("#navUsuarios");
-  if (btn) btn.hidden = ESTADO.permissao !== "admin";
+  if (btn) btn.hidden = !isAdmin;
+
+  // Ativa o "Escudo" de Somente Leitura se for usuário padrão
+  if (isAdmin) {
+    document.body.classList.remove("modo-padrao");
+  } else {
+    document.body.classList.add("modo-padrao");
+  }
 }
 
 
