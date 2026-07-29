@@ -721,9 +721,20 @@ async function reagendarTudo() {
     let dataCursor = new Date(dataCursorInicial);
 
     pendentes.forEach((item) => {
+      
+      // NOVA REGRA: Impede que o item seja puxado para trás.
+      // Se o item já tem uma data e ela está à frente do cursor atual,
+      // avançamos o cursor para a data original dele.
+      if (item.dataAgendada && item.dataAgendada > formatISO(dataCursor)) {
+        const [aA, mA, dA] = item.dataAgendada.split("-");
+        dataCursor = new Date(aA, parseInt(mA, 10) - 1, dA, 12, 0, 0);
+      }
+
+      // Continua com a lógica padrão: se o dia não for útil ou estiver cheio, empurra para frente.
       while (!ehDiaUtilLocal(dataCursor) || (ocupacao[formatISO(dataCursor)] || 0) >= capacidadeDia) {
         dataCursor.setDate(dataCursor.getDate() + 1);
       }
+      
       const novaData = formatISO(dataCursor);
       const novoDia = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
       const diffDias = Math.floor((dataCursor - primeiraDataUtil) / 86400000);
