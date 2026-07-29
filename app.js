@@ -473,6 +473,7 @@ function classificar(rows) {
   const itens = rows.map((row, idx) => {
     const setor = row[colSetor];
     const ambiente = row[colAmbiente];
+    const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     const setorPCM = identificarSetor(setor, ambiente);
     const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     return {
@@ -1834,11 +1835,10 @@ async function abrirDrawerEquipamento(id) {
     const setorPCM = identificarSetor(setor, ambiente);
     try {
       await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
-        dataAgendada: novaData,
-        diaPlanejado: novoDia,
-        fixadoManualmente: true,
+        patrimonio, setor, ambiente, local, setorPCM,
+        prioridadeSetor: PRIORIDADE[setorPCM] || 7,
+        pisoPCM: descobrirPiso(setor),
       });
-      await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
       toast("Cadastro atualizado.");
       fecharDrawer();
     } catch (err) {
