@@ -1428,21 +1428,18 @@ function iniciarSincronizacaoHistorico(){
 function renderHistorico(){
   const table = $("#historicoTable");
   if(!table) return;
-
   const termo = ESTADO.filtros.historico;
   const historico = aplicarFiltroLocal(ESTADO.historico).filter((h) => {
     if (!termo) return true;
     const alvo = `${h.patrimonio || ""} ${h.setor || ""} ${h.equipe || ""}`.toLowerCase();
     return alvo.includes(termo);
   });
-
   $("#historicoCount").textContent = `${historico.length} registros`;
-
   table.innerHTML = `<thead><tr>
+      <th style="width:30px"><input type="checkbox" id="checkTodosHistorico"></th>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
       <th>Equipe</th><th>Usuário</th><th>Tipo</th><th>De</th><th>Para</th><th>Ações</th>
   </tr></thead><tbody></tbody>`;
-
   const tbody = table.querySelector("tbody");
 
   historico.forEach(h => {
@@ -1455,6 +1452,7 @@ function renderHistorico(){
       ? `<td>${formatarDataBR(h.dataNova)}</td>`
       : `<td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>`;
     tr.innerHTML = `
+        <td></td>
         <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
         <td>${h.patrimonio || "-"}</td>
         <td>${h.setor}</td>
@@ -1464,6 +1462,18 @@ function renderHistorico(){
         ${colDe}
         ${colPara}
     `;
+
+    const chaveSel = `${h.cicloId}::${h.id}`;
+    const tdCheck = tr.children[0];
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = ESTADO.selecaoHistorico.has(chaveSel);
+    chk.addEventListener("change", () => {
+      if (chk.checked) ESTADO.selecaoHistorico.add(chaveSel);
+      else ESTADO.selecaoHistorico.delete(chaveSel);
+      atualizarBarraSelecao("selecaoHistorico", "selecaoHistorico", "selecaoHistoricoTexto");
+    });
+    tdCheck.appendChild(chk);
 
     const tdAcao = document.createElement("td");
     tdAcao.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
@@ -1475,37 +1485,90 @@ function renderHistorico(){
     tr.appendChild(tdAcao);
     tbody.appendChild(tr);
   });
+
+  const checkTodos = $("#checkTodosHistorico");
+  if (checkTodos) {
+    checkTodos.checked = historico.length > 0 &&
+      historico.every((h) => ESTADO.selecaoHistorico.has(`${h.cicloId}::${h.id}`));
+    checkTodos.addEventListener("change", () => {
+      historico.forEach((h) => {
+        const chave = `${h.cicloId}::${h.id}`;
+        if (checkTodos.checked) ESTADO.selecaoHistorico.add(chave);
+        else ESTADO.selecaoHistorico.delete(chave);
+      });
+      renderHistorico();
+    });
+  }
+
+  atualizarBarraSelecao("selecaoHistorico", "selecaoHistorico", "selecaoHistoricoTexto");
 }
+
+$("#btnExcluirSelecionadosHistorico")?.addEventListener("click", async () => {
+  const chaves = [...ESTADO.selecaoHistorico];
+  if (!chaves.length) return;
+  const ok = window.confirm(`Excluir ${chaves.length} registro(s) do histórico selecionado(s)?`);
+  if (!ok) return;
+  try {
+    const porCiclo = {};
+    chaves.forEach((ch) => {
+      const [cicloId, id] = ch.split("::");
+      (porCiclo[cicloId] ||= []).push(id);
+    });
+    const TAMANHO_LOTE = 400;
+    for (const [cicloId, ids] of Object.entries(porCiclo)) {
+      for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+        const batch = writeBatch(db);
+        ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((id) => batch.delete(doc(db, "ciclos", cicloId, "historico", id)));
+        await batch.commit();
+      }
+    }
+    ESTADO.selecaoHistorico.clear();
+    toast(`${chaves.length} registro(s) excluído(s).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
+});
 
 function renderOrdens() {
   const table = $("#ordensTable");
   if (!table) return;
-
   const termo = ESTADO.filtros.ordens;
   const ordens = aplicarFiltroLocal(ESTADO.ordens).filter((o) => {
     if (!termo) return true;
     const alvo = `${o.patrimonio || ""} ${o.setor || ""} ${o.ambiente || ""} ${o.equipe || ""}`.toLowerCase();
     return alvo.includes(termo);
   });
-
   $("#ordensCount").textContent = `${ordens.length} OS Emitidas`;
-
   table.innerHTML = `<thead><tr>
+      <th style="width:30px"><input type="checkbox" id="checkTodosOrdens"></th>
       <th>Data de Conclusão</th><th>Patrimônio</th><th>Setor</th><th>Ambiente</th>
       <th>Equipe</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
-
   const tbody = table.querySelector("tbody");
 
   ordens.forEach((o) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td></td>
       <td>${new Date(o.registradoEm).toLocaleString("pt-BR")}</td>
       <td>${o.patrimonio || "-"}</td>
       <td>${o.setor || ""}</td>
       <td>${o.ambiente || ""}</td>
       <td>${o.equipe || ""}</td>
     `;
+
+    const chaveSel = `${o.cicloId}::${o.id}`;
+    const tdCheck = tr.children[0];
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = ESTADO.selecaoOrdens.has(chaveSel);
+    chk.addEventListener("change", () => {
+      if (chk.checked) ESTADO.selecaoOrdens.add(chaveSel);
+      else ESTADO.selecaoOrdens.delete(chaveSel);
+      atualizarBarraSelecao("selecaoOrdens", "selecaoOrdens", "selecaoOrdensTexto");
+    });
+    tdCheck.appendChild(chk);
 
     const tdBtn = document.createElement("td");
     tdBtn.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
@@ -1519,12 +1582,50 @@ function renderOrdens() {
     tr.appendChild(tdBtn);
     tbody.appendChild(tr);
   });
+
+  const checkTodos = $("#checkTodosOrdens");
+  if (checkTodos) {
+    checkTodos.checked = ordens.length > 0 &&
+      ordens.every((o) => ESTADO.selecaoOrdens.has(`${o.cicloId}::${o.id}`));
+    checkTodos.addEventListener("change", () => {
+      ordens.forEach((o) => {
+        const chave = `${o.cicloId}::${o.id}`;
+        if (checkTodos.checked) ESTADO.selecaoOrdens.add(chave);
+        else ESTADO.selecaoOrdens.delete(chave);
+      });
+      renderOrdens();
+    });
+  }
+
+  atualizarBarraSelecao("selecaoOrdens", "selecaoOrdens", "selecaoOrdensTexto");
 }
 
-const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
-if (btnAdicionarEquipamento) {
-  btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
-}
+$("#btnExcluirSelecionadosOrdens")?.addEventListener("click", async () => {
+  const chaves = [...ESTADO.selecaoOrdens];
+  if (!chaves.length) return;
+  const ok = window.confirm(`Excluir ${chaves.length} ordem(ns) de serviço selecionada(s)?`);
+  if (!ok) return;
+  try {
+    const porCiclo = {};
+    chaves.forEach((ch) => {
+      const [cicloId, id] = ch.split("::");
+      (porCiclo[cicloId] ||= []).push(id);
+    });
+    const TAMANHO_LOTE = 400;
+    for (const [cicloId, ids] of Object.entries(porCiclo)) {
+      for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+        const batch = writeBatch(db);
+        ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((id) => batch.delete(doc(db, "ciclos", cicloId, "ordens", id)));
+        await batch.commit();
+      }
+    }
+    ESTADO.selecaoOrdens.clear();
+    toast(`${chaves.length} registro(s) excluído(s).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
+});
 
 function prepararEdicao(item) {
   idEquipamentoEmEdicao = item.id;
@@ -1625,26 +1726,30 @@ async function removerEquipamento(id, descricao) {
   }
 }
 
+function atualizarBarraSelecao(nomeSet, containerId, textoId) {
+  const set = ESTADO[nomeSet];
+  const container = $(`#${containerId}`);
+  const texto = $(`#${textoId}`);
+  if (!container) return;
+  container.hidden = set.size === 0;
+  if (texto) texto.textContent = `${set.size} selecionado(s)`;
+}
+
 function renderEquipamentosCadastro() {
   const table = $("#equipamentosTable");
   if (!table) return;
-
   const termo = ESTADO.filtros.equipamentos;
   const statusFiltro = $("#filtroStatus")?.value || "";
   const setorPCMFiltro = $("#filtroSetorPCM")?.value || "";
   const origemFiltro = $("#filtroOrigem")?.value || "";
-
   const filtrados = aplicarFiltroLocal(ESTADO.equipamentos).filter((item) => {
     if (termo) {
       const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""}`.toLowerCase();
       if (!alvo.includes(termo)) return false;
     }
     if (statusFiltro) {
-      if (statusFiltro === "Atrasado") {
-        if (!estaAtrasado(item)) return false;
-      } else if (item.statusPreventiva !== statusFiltro) {
-        return false;
-      }
+      if (statusFiltro === "Atrasado") { if (!estaAtrasado(item)) return false; }
+      else if (item.statusPreventiva !== statusFiltro) return false;
     }
     if (setorPCMFiltro && item.setorPCM !== setorPCMFiltro) return false;
     if (origemFiltro) {
@@ -1658,7 +1763,6 @@ function renderEquipamentosCadastro() {
     const { exatos, aproximados } = chamadosDoEquipamento(item);
     return { item, totalCorretivas: exatos.length + aproximados.length };
   });
-
   if (ESTADO.ordenacaoEquipamentos === "corretivas_desc") {
     itensComCorretivas.sort((a, b) => b.totalCorretivas - a.totalCorretivas);
   } else if (ESTADO.ordenacaoEquipamentos === "corretivas_asc") {
@@ -1669,6 +1773,7 @@ function renderEquipamentosCadastro() {
   const setaOrdenacao = ESTADO.ordenacaoEquipamentos === "corretivas_desc" ? " ▼"
     : ESTADO.ordenacaoEquipamentos === "corretivas_asc" ? " ▲" : " ⇅";
   table.innerHTML = `<thead><tr>
+      <th style="width:30px"><input type="checkbox" id="checkTodosEquipamentos"></th>
       <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Prédio</th><th>Setor PCM</th>
       <th>Status</th><th>Origem</th>
       <th id="thCorretivas" style="cursor:pointer" title="Clique para ordenar">Corretivas${setaOrdenacao}</th>
@@ -1679,7 +1784,7 @@ function renderEquipamentosCadastro() {
   itensComCorretivas.forEach(({ item, totalCorretivas }) => {
     const tr = document.createElement("tr");
     tr.className = "linha-clicavel";
-    tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
+    tr.innerHTML = `<td></td><td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.local || "SEDE"}</td>
       <td>${item.setorPCM}</td>
       <td>
@@ -1688,6 +1793,18 @@ function renderEquipamentosCadastro() {
       </td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>
       <td style="text-align:center">${totalCorretivas > 0 ? `<strong>${totalCorretivas}</strong>` : "-"}</td>`;
+
+    const tdCheck = tr.children[0];
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = ESTADO.selecaoEquipamentos.has(item.id);
+    chk.addEventListener("click", (e) => e.stopPropagation());
+    chk.addEventListener("change", () => {
+      if (chk.checked) ESTADO.selecaoEquipamentos.add(item.id);
+      else ESTADO.selecaoEquipamentos.delete(item.id);
+      atualizarBarraSelecao("selecaoEquipamentos", "selecaoEquipamentos", "selecaoEquipamentosTexto");
+    });
+    tdCheck.appendChild(chk);
 
     const tdMenu = document.createElement("td");
     const btnMenu = document.createElement("button");
@@ -1700,10 +1817,22 @@ function renderEquipamentosCadastro() {
     });
     tdMenu.appendChild(btnMenu);
     tr.appendChild(tdMenu);
-
     tr.addEventListener("click", () => abrirDrawerEquipamento(item.id));
     tbody.appendChild(tr);
   });
+
+  const checkTodos = $("#checkTodosEquipamentos");
+  if (checkTodos) {
+    checkTodos.checked = itensComCorretivas.length > 0 &&
+      itensComCorretivas.every(({ item }) => ESTADO.selecaoEquipamentos.has(item.id));
+    checkTodos.addEventListener("change", () => {
+      itensComCorretivas.forEach(({ item }) => {
+        if (checkTodos.checked) ESTADO.selecaoEquipamentos.add(item.id);
+        else ESTADO.selecaoEquipamentos.delete(item.id);
+      });
+      renderEquipamentosCadastro();
+    });
+  }
 
   const thCorretivas = $("#thCorretivas");
   if (thCorretivas) {
@@ -1712,8 +1841,32 @@ function renderEquipamentosCadastro() {
       renderEquipamentosCadastro();
     });
   }
+
+  atualizarBarraSelecao("selecaoEquipamentos", "selecaoEquipamentos", "selecaoEquipamentosTexto");
 }
 
+$("#btnExcluirSelecionadosEquipamentos")?.addEventListener("click", async () => {
+  const ids = [...ESTADO.selecaoEquipamentos];
+  if (!ids.length) return;
+  const ok = window.confirm(`Excluir ${ids.length} equipamento(s) selecionado(s)? Essa ação não pode ser desfeita.`);
+  if (!ok) return;
+  try {
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+      const batch = writeBatch(db);
+      ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((id) =>
+        batch.delete(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id))
+      );
+      await batch.commit();
+    }
+    ESTADO.selecaoEquipamentos.clear();
+    toast(`${ids.length} equipamento(s) excluído(s). Reorganizando cronograma...`);
+    await reagendarTudo();
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
+});
 // ------------------------------------------------------------------
 // Painel lateral com detalhes do equipamento
 // ------------------------------------------------------------------
