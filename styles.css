@@ -766,28 +766,38 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 }
 .kpi-card {
   background: var(--superficie);
-  border: none; 
+  border: 1px solid var(--borda);
   border-radius: var(--raio);
   padding: var(--sp-5);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Sombra mais elegante */
+  box-shadow: var(--sombra);
+  border-top: 4px solid var(--borda-forte); /* Aumentei um pouco a borda superior */
+  
+  /* Centralização Flexbox */
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s ease;
+  align-items: center;      /* Centraliza horizontalmente */
+  justify-content: center;  /* Centraliza verticalmente */
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .kpi-card .num {
-  font-family: var(--fonte-corpo); /* Use a fonte sans-serif, não a display */
-  font-size: 28px;
-  font-weight: 700;
+  font-family: var(--fonte-display);
+  font-size: 42px;       /* Aumentado de 30px para 42px */
+  font-weight: 700;      /* Um pouco mais pesado */
   color: var(--azul-900);
+  line-height: 1;
+  margin-bottom: 8px;    /* Espaço entre número e rótulo */
 }
 .kpi-card .label {
-  font-size: 12px;
+  font-size: 14px;       /* Aumentado de 12px para 14px */
   color: var(--texto-suave);
-  font-weight: 500;
-  margin-top: 2px;
+  font-weight: 600;      /* Um pouco mais legível */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .kpi-card:hover {
-  transform: translateY(-5px); /* Efeito de elevação ao passar o mouse */
+  transform: translateY(-4px);
+  box-shadow: var(--sombra-elevada);
 }
 .kpi-card.total { border-top-color: var(--azul-700); }
 .kpi-card.concluido { border-top-color: var(--verde-fundo); }
