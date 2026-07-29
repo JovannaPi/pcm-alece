@@ -9,6 +9,9 @@ import {
   setPersistence, inMemoryPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+const $ = (sel) => document.querySelector(sel);
+const $all = (sel) => Array.from(document.querySelectorAll(sel));
+
 const SUFIXO_LOGIN = "@pcm-alece.local";
 function usuarioParaEmail(usuario) {
   return usuario.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") + SUFIXO_LOGIN;
