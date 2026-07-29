@@ -25,6 +25,29 @@ const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
 const CHAVE_VERIFICACAO_ATRASADOS = "pmokVerificacaoAtrasados";
 const MESES_CICLO = 4;
 
+async function calcularProximaData(item) {
+  const local = item.local || "SEDE";
+  const cap = (ESTADO.config?.capacidades || {})[local] || { nEquipes: 1, aparelhosDia: 2 };
+  const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
+  const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
+  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
+  const ehDiaUtilLocal = (dt) => DIAS_UTEIS.includes(NOMES_DIAS[(dt.getDay() + 6) % 7]) && !estaEmFeriado(dt);
+
+  const [a, m, d] = item.dataConclusao.split("-");
+  let cursor = adicionarMeses(new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0), MESES_CICLO);
+  while (!ehDiaUtilLocal(cursor)) cursor.setDate(cursor.getDate() + 1);
+
+  // Conta quantos outros aparelhos do mesmo prédio já têm a próxima
+  // preventiva marcada nesse dia, pra não estourar a capacidade.
+  const contarNoDia = (iso) =>
+    ESTADO.equipamentos.filter((e) => e.id !== item.id && (e.local || "SEDE") === local && e.proximaPreventiva === iso).length;
+
+  while (!ehDiaUtilLocal(cursor) || contarNoDia(formatISO(cursor)) >= capacidadeDia) {
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { data: formatISO(cursor), dia: NOMES_DIAS[(cursor.getDay() + 6) % 7] };
+}
+
 function adicionarMeses(date, meses) {
   const d = new Date(date.getTime());
   const diaOriginal = d.getDate();
@@ -678,7 +701,8 @@ async function reagendarTudo() {
 
     const fixos = itensDoPredio.filter((e) =>
       e.statusPreventiva === "Concluída" ||
-      (e.statusPreventiva === "Em andamento" && !estaAtrasado(e))
+      (e.statusPreventiva === "Em andamento" && !estaAtrasado(e)) ||
+      e.fixadoManualmente === true
     );
     const pendentes = itensDoPredio
       .filter((e) =>
@@ -1215,9 +1239,16 @@ function selecionarDia(iso) {
           statusPreventiva: statusNovo,
           dataConclusao: statusNovo === "Concluída" ? formatISO(new Date()) : "",
         };
+        if (statusNovo === "Concluída") {
+          const proxima = await calcularProximaData({ ...item, dataConclusao: camposStatus.dataConclusao });
+          camposStatus.proximaPreventiva = proxima.data;
+          camposStatus.proximaPreventivaDia = proxima.dia;
+        } else {
+          camposStatus.proximaPreventiva = "";
+          camposStatus.proximaPreventivaDia = "";
+        }
         await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
-        item.statusPreventiva = statusNovo;
-        item.dataConclusao = camposStatus.dataConclusao;
+        Object.assign(item, camposStatus);
         
         const promessasLogs = [registrarHistorico(item, statusAnterior, statusNovo)];
         
@@ -1732,7 +1763,7 @@ async function abrirDrawerEquipamento(id) {
       <div class="drawer-campo"><span class="rotulo">Status</span>
         <span class="valor"><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
         ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}</span></div>
-      <div class="drawer-campo"><span class="rotulo">Próxima preventiva</span><span class="valor">${formatarDataBR(item.dataAgendada)} ${item.diaPlanejado ? "(" + item.diaPlanejado + ")" : ""}</span></div>
+      <div class="drawer-campo"><span class="rotulo">${item.statusPreventiva === "Concluída" ? "Próximo ciclo previsto" : "Próxima preventiva"}</span><span class="valor">${formatarDataBR(item.statusPreventiva === "Concluída" ? item.proximaPreventiva : item.dataAgendada)} ${(item.statusPreventiva === "Concluída" ? item.proximaPreventivaDia : item.diaPlanejado) ? "(" + (item.statusPreventiva === "Concluída" ? item.proximaPreventivaDia : item.diaPlanejado) + ")" : ""}</span></div>
       <div class="drawer-campo"><span class="rotulo">Semana planejada</span><span class="valor">${item.semanaPlanejada || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${item.equipeResponsavel || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Última preventiva concluída</span><span class="valor">${ultimaPreventiva}</span></div>
@@ -1803,10 +1834,11 @@ async function abrirDrawerEquipamento(id) {
     const setorPCM = identificarSetor(setor, ambiente);
     try {
       await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
-        patrimonio, setor, ambiente, local, setorPCM,
-        prioridadeSetor: PRIORIDADE[setorPCM] || 7,
-        pisoPCM: descobrirPiso(setor),
+        dataAgendada: novaData,
+        diaPlanejado: novoDia,
+        fixadoManualmente: true,
       });
+      await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
       toast("Cadastro atualizado.");
       fecharDrawer();
     } catch (err) {
@@ -1857,8 +1889,9 @@ async function abrirDrawerEquipamento(id) {
         dataNova: novaData,
         registradoEm: new Date().toISOString(),
       });
-      toast(`Reagendado para ${formatarDataBR(novaData)}.`);
+      toast(`Reagendado para ${formatarDataBR(novaData)}. Reorganizando o resto do cronograma...`);
       fecharDrawer();
+      await reagendarTudo();
     } catch (err) {
       console.error(err);
       toast("Erro ao reagendar: " + err.message);
@@ -2868,7 +2901,6 @@ async function fecharCicloEIniciarProximo() {
   const hojeISO = formatISO(new Date());
   const cicloAntigoId = ESTADO.cicloAtual;
 
-  // 1. Calcula os números do ciclo que está fechando
   const porPredio = {};
   let noPrazo = 0, emAtraso = 0;
   itens.forEach((i) => {
@@ -2878,83 +2910,34 @@ async function fecharCicloEIniciarProximo() {
     if (i.dataAgendada && concl > i.dataAgendada) emAtraso++; else noPrazo++;
   });
 
-  // 2. Marca a gaveta ATUAL como encerrada
   await updateDoc(doc(db, "ciclos", cicloAntigoId), {
-    status: "Encerrado",
-    dataFechamento: hojeISO,
-    total: itens.length,
-    noPrazo,
-    emAtraso,
-    porPredio,
+    status: "Encerrado", dataFechamento: hojeISO, total: itens.length, noPrazo, emAtraso, porPredio,
   });
 
-  // 3. Data-base do PRÓXIMO ciclo: a PRIMEIRA conclusão registrada neste
-  // ciclo + 4 meses. Todos os aparelhos usam essa mesma data-base — o ritmo
-  // de 4 em 4 meses é do ciclo inteiro, não de cada aparelho individualmente.
-  const datasAgendadas = itens.map((i) => i.dataAgendada).filter(Boolean).sort();
-  const primeiraData = datasAgendadas.length ? datasAgendadas[0] : hojeISO;
-  const [pa, pm, pd] = primeiraData.split("-");
-  const dataBaseProximoCiclo = adicionarMeses(new Date(pa, parseInt(pm, 10) - 1, pd, 12, 0, 0), MESES_CICLO);
+  // Usa a próxima data já calculada individualmente pra cada aparelho (na
+  // hora que ele foi concluído) — não recalcula tudo em bloco aqui.
+  const datasProximas = itens.map((i) => i.proximaPreventiva).filter(Boolean).sort();
+  const menorData = datasProximas.length ? datasProximas[0] : hojeISO;
 
-  const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
-  const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
-  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
-  const ehDiaUtilLocal = (dt) =>
-    DIAS_UTEIS.includes(NOMES_DIAS[(dt.getDay() + 6) % 7]) && !estaEmFeriado(dt);
-
-  const porPredioItens = new Map();
-  itens.forEach((i) => {
-    const local = i.local || "SEDE";
-    if (!porPredioItens.has(local)) porPredioItens.set(local, []);
-    porPredioItens.get(local).push(i);
+  const novosItens = itens.map((item) => {
+    const dataFinal = item.proximaPreventiva || hojeISO;
+    const diffDias = Math.floor((new Date(dataFinal) - new Date(menorData)) / 86400000);
+    return {
+      ...item,
+      dataAgendada: dataFinal,
+      diaPlanejado: item.proximaPreventivaDia || item.diaPlanejado,
+      semanaPlanejada: `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`,
+      statusPreventiva: "Pendente",
+      dataConclusao: "",
+      proximaPreventiva: "",
+      proximaPreventivaDia: "",
+    };
   });
-
-  const novosItens = [];
-  let menorDataNova = null;
-
-  // 4. Empacota por prédio a partir da mesma data-base, respeitando
-  // capacidade e feriados (mesmo esquema usado no gerarCronograma original)
-  porPredioItens.forEach((itensDoPredio, local) => {
-    const cap = capacidades[local] || { nEquipes: 1, aparelhosDia: 2 };
-    const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
-
-    let cursor = new Date(dataBaseProximoCiclo.getTime());
-    while (!ehDiaUtilLocal(cursor)) cursor.setDate(cursor.getDate() + 1);
-
-    let contador = 0;
-    const itensOrdenados = [...itensDoPredio].sort(
-      (a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0)
-    );
-
-    itensOrdenados.forEach((item) => {
-      const novaData = formatISO(cursor);
-      if (!menorDataNova || novaData < menorDataNova) menorDataNova = novaData;
-
-      novosItens.push({
-        ...item,
-        dataAgendada: novaData,
-        diaPlanejado: NOMES_DIAS[(cursor.getDay() + 6) % 7],
-        statusPreventiva: "Pendente",
-        dataConclusao: "",
-      });
-
-      contador++;
-      if (contador >= capacidadeDia) {
-        contador = 0;
-        do { cursor.setDate(cursor.getDate() + 1); } while (!ehDiaUtilLocal(cursor));
-      }
-    });
-  });
-
+  novosItens.sort((a, b) => (a.dataAgendada || "").localeCompare(b.dataAgendada || ""));
   novosItens.forEach((item, idx) => { item.ordemExecucao = idx + 1; });
 
-  // 5. Cria a gaveta NOVA e migra os aparelhos reagendados pra ela
   const novoCicloRef = doc(collection(db, "ciclos"));
-  await setDoc(novoCicloRef, {
-    criadoEm: new Date().toISOString(),
-    dataInicio: menorDataNova || hojeISO,
-    status: "Ativo",
-  });
+  await setDoc(novoCicloRef, { criadoEm: new Date().toISOString(), dataInicio: menorData, status: "Ativo" });
 
   const TAMANHO_LOTE = 400;
   for (let inicio = 0; inicio < novosItens.length; inicio += TAMANHO_LOTE) {
@@ -2965,12 +2948,12 @@ async function fecharCicloEIniciarProximo() {
   }
 
   ESTADO.cicloAtual = novoCicloRef.id;
-  ESTADO.config = { ...(ESTADO.config || {}), dataInicio: menorDataNova || hojeISO };
+  ESTADO.config = { ...(ESTADO.config || {}), dataInicio: menorData };
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
 
   iniciarSincronizacao();
   iniciarSincronizacaoHistorico();
   iniciarSincronizacaoOrdens();
 
-  toast(`Ciclo encerrado! Novo ciclo agendado a partir de ${formatarDataBR(menorDataNova)}.`);
+  toast(`Ciclo encerrado! Novo ciclo iniciado com as datas individuais de cada aparelho.`);
 }
