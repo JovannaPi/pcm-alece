@@ -514,18 +514,24 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 .search-input:focus { background: var(--superficie); border-color: var(--azul-700); }
 
 .filtros-equipamentos {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* Divide em 3 colunas iguais */
+  gap: 8px;
   margin-bottom: var(--sp-3);
+  background: var(--azul-50); /* Um fundo suave para separar do resto */
+  padding: 8px;
+  border-radius: var(--raio-pequeno);
 }
+
 .filtros-equipamentos select {
-  padding: 8px 10px;
+  padding: 4px 8px;
+  font-size: 12px;
   border: 1px solid var(--borda-forte);
   border-radius: var(--raio-pequeno);
-  background: var(--superficie);
-  font-size: 13px;
-  color: var(--texto);
+  background: #fff;
+  cursor: pointer;
+  color: var(--texto-suave);
+  width: 100%;
 }
 
 .dropzone {
