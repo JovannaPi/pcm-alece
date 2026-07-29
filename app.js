@@ -1726,10 +1726,31 @@ function atualizarBarraSelecao(nomeSet, containerId, textoId) {
   const set = ESTADO[nomeSet];
   const container = $(`#${containerId}`);
   const texto = $(`#${textoId}`);
+  
   if (!container) return;
-  container.hidden = set.size === 0;
-  if (texto) texto.textContent = `${set.size} selecionado(s)`;
+  
+  if (set.size > 0) {
+    container.classList.add("visivel");
+  } else {
+    container.classList.remove("visivel");
+  }
+  
+  if (texto) {
+    texto.textContent = `${set.size} selecionado(s)`;
+  }
 }
+
+// Lógica para o botão "X" limpar a seleção
+$("#btnLimparSelecaoEquipamentos")?.addEventListener("click", () => {
+  ESTADO.selecaoEquipamentos.clear(); // Limpa o Set
+  
+  // Desmarca o checkbox "Selecionar Todos" se existir
+  const checkTodos = $("#checkTodosEquipamentos");
+  if (checkTodos) checkTodos.checked = false;
+  
+  atualizarBarraSelecao("selecaoEquipamentos", "selecaoEquipamentos", "selecaoEquipamentosTexto");
+  renderEquipamentosCadastro(); // Re-renderiza a tabela para desmarcar as linhas
+});
 
 function renderEquipamentosCadastro() {
   const table = $("#equipamentosTable");
