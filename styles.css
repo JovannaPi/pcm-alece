@@ -128,6 +128,9 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   padding: var(--sp-4);
 }
 
+.auth-overlay[hidden] {
+  display: none;
+}
 .auth-card {
   background: var(--superficie);
   width: 100%;
