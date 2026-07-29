@@ -1793,7 +1793,6 @@ function renderEquipamentosCadastro() {
 
   itensComCorretivas.forEach(({ item, totalCorretivas }) => {
     const tr = document.createElement("tr");
-    tr.className = "linha-clicavel";
     tr.innerHTML = `<td></td><td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.local || "SEDE"}</td>
       <td>${item.setorPCM}</td>
@@ -1827,7 +1826,6 @@ function renderEquipamentosCadastro() {
     });
     tdMenu.appendChild(btnMenu);
     tr.appendChild(tdMenu);
-    tr.addEventListener("click", () => abrirDrawerEquipamento(item.id));
     tbody.appendChild(tr);
   });
 
