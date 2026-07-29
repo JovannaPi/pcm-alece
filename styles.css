@@ -610,3 +610,77 @@ tbody tr:hover { background: var(--latao-claro); }
   display: flex; align-items: center; gap: 12px; margin: 8px 0;
   font-size: 13px; color: var(--texto-suave);
 }
+/* Container principal flutuante */
+.action-bar-flutuante {
+  position: fixed;
+  bottom: -100px; /* Escondido fora da tela por padrão */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  background-color: #1A73E8; /* Azul padrão Google */
+  color: #FFFFFF;
+  border-radius: 8px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: bottom 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  z-index: 9999;
+  visibility: hidden;
+}
+
+/* Classe ativada pelo JavaScript */
+.action-bar-flutuante.visivel {
+  bottom: 30px; /* Desliza para cima */
+  visibility: visible;
+}
+
+.action-bar-esquerda {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.action-bar-direita {
+  display: flex;
+  gap: 12px;
+}
+
+/* Botão de limpar seleção ("X") */
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.btn-icon:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Botão de excluir com cor invertida para destacar no azul */
+.btn.danger-inverted {
+  background-color: #FFFFFF;
+  color: #D93025; /* Vermelho Google */
+  border: none;
+  font-weight: bold;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn.danger-inverted:hover {
+  background-color: #F1F3F4;
+}
