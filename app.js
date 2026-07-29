@@ -52,7 +52,6 @@ function adicionarMeses(date, meses) {
   const d = new Date(date.getTime());
   const diaOriginal = d.getDate();
   d.setMonth(d.getMonth() + meses);
-  // 31/10 + 4 meses cairia em 03/03; volta pro último dia de fevereiro
   if (d.getDate() !== diaOriginal) d.setDate(0);
   return d;
 }
@@ -110,8 +109,7 @@ function formatarDataBR(iso) {
   const [a, m, d] = iso.split("-");
   return `${d}/${m}/${a}`;
 }
-// Um aparelho é considerado atrasado quando a data agendada já passou e ele
-// ainda não foi marcado como Concluída.
+// Um aparelho é considerado atrasado quando a data agendada já passou e ele ainda não foi marcado como Concluída.
 function estaAtrasado(item) {
   if (!item.dataAgendada || item.statusPreventiva === "Concluída") return false;
   return item.dataAgendada < formatISO(new Date());
@@ -151,7 +149,7 @@ const ESTADO = {
 };
 
 const URL_CHAMADOS_CORRETIVOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR2Ysf9JofZL_2Xn_JPJFaPrMX6IGiwMQWFyhgJcqu8BK_4imC_lmrMgfpDWLnI6MIdcC0OYSDUQFPw/pub?gid=1978174237&single=true&output=csv";
-const INTERVALO_ATUALIZACAO_CORRETIVOS_MS = 5 * 60 * 1000; // 5 minutos
+const INTERVALO_ATUALIZACAO_CORRETIVOS_MS = 5 * 60 * 1000; 
 
 const COL_CORRETIVA = {
   DATA: 0, EQUIPE: 1, CHAMADO: 2, ANEXO: 4,
@@ -160,8 +158,7 @@ const COL_CORRETIVA = {
   SEDE: 23, ANEXO1: 24, ANEXO2: 25, ANEXO3: 26, ANEXO4: 27,
   SOLUCIONADO: 28, DESCRICAO_PROBLEMA: 29, PECA_FALTANTE: 30,
 };
-// Converte o valor bruto da coluna de data/hora, que pode vir como número de
-// série do Excel/Planilhas (dias desde 1899) OU como texto "DD/MM/AAAA HH:MM"
+
 function converterDataCorretiva(valor) {
   if (typeof valor === "number") {
     const ms = Math.round((valor - 25569) * 86400 * 1000);
@@ -478,7 +475,6 @@ function classificar(rows) {
     const ambiente = row[colAmbiente];
     const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     const setorPCM = identificarSetor(setor, ambiente);
-    const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
     return {
       id: patrimonio ? `${patrimonio.replace(/[\s/\\"']/g, "_")}_${idx}` : `item_${idx}`,
       patrimonio,
