@@ -1065,29 +1065,31 @@ function renderUsuarios() {
   
   $("#usuariosCount").textContent = `${ESTADO.usuarios.length} conta(s)`;
   
+  // Cabeçalho sem a coluna Status
   table.innerHTML = `<thead><tr>
-      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th>Status</th><th>Ações</th>
+      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
     
   const tbody = table.querySelector("tbody");
   
   ESTADO.usuarios.forEach((u) => {
     const tr = document.createElement("tr");
+    
+    // Se o usuário estiver bloqueado, aplicamos um estilo CSS sutil (riscado + cinza)
+    const estiloUsuario = u.bloqueado ? 'style="text-decoration: line-through; color: var(--texto-suave);"' : '';
+
     tr.innerHTML = `
-      <td>${u.usuario}</td>
+      <td ${estiloUsuario}>${u.usuario} ${u.bloqueado ? '(Bloqueado)' : ''}</td>
       <td>${u.permissao === "admin" ? "Administrador" : "Padrão"}</td>
       <td>${u.criadoEm ? new Date(u.criadoEm).toLocaleDateString("pt-BR") : "-"}</td>
-      <td>${u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString("pt-BR") : "-"}</td>
-      <td>${u.bloqueado ? '<span class="status-select atrasado">Bloqueado</span>' : '<span class="status-select concluido">Ativo</span>'}</td>`;
+      <td>${u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString("pt-BR") : "-"}</td>`;
       
     const tdMenu = document.createElement("td");
     
-    // Define os rótulos dos botões dependendo do estado atual do usuário
     const acaoBloqueio = u.bloqueado ? "Desbloquear" : "Bloquear";
     const acaoPermissao = u.permissao === "admin" ? "Mudar para Padrão" : "Mudar para Admin";
     const novaPermissao = u.permissao === "admin" ? "padrao" : "admin";
 
-    // Monta o menu de 3 pontinhos (kebab menu)
     tdMenu.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
       <div class="menu-linha-opcoes">
         <button class="menu-linha-item" data-acao="bloqueio">${acaoBloqueio}</button>
@@ -1111,7 +1113,7 @@ function renderUsuarios() {
     tdMenu.querySelector('[data-acao="permissao"]').addEventListener("click", async () => {
       try {
         await updateDoc(doc(db, "usuarios", u.id), { permissao: novaPermissao });
-        toast(`A conta de ${u.usuario} agora é ${novaPermissao === "admin" ? "Administrador" : "Padrão"}.`);
+        toast(`Permissão alterada com sucesso.`);
       } catch (err) {
         console.error(err);
         toast("Erro ao alterar permissão: " + err.message);
@@ -1120,12 +1122,12 @@ function renderUsuarios() {
 
     // Lógica 3: Excluir Conta
     tdMenu.querySelector('[data-acao="excluir"]').addEventListener("click", async () => {
-      const ok = window.confirm(`Tem certeza que deseja excluir o perfil de ${u.usuario}? Essa pessoa perderá todo o acesso ao sistema.`);
+      const ok = window.confirm(`Tem certeza que deseja excluir o perfil de ${u.usuario}?`);
       if(!ok) return;
       
       try {
         await deleteDoc(doc(db, "usuarios", u.id));
-        toast("Conta excluída com sucesso.");
+        toast("Conta excluída.");
       } catch (err) {
         console.error(err);
         toast("Erro ao excluir: " + err.message);
