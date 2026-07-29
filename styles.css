@@ -1043,3 +1043,7 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .tab, .btn, .sidenav-item, .local-pill, .cal-day.has-tasks {
   cursor: pointer;
 }
+
+[hidden] {
+  display: none !important;
+}
