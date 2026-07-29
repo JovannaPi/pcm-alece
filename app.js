@@ -3130,3 +3130,25 @@ async function fecharCicloEIniciarProximo() {
 
   toast(`Ciclo encerrado! Novo ciclo iniciado com as datas individuais de cada aparelho.`);
 }
+
+// Limpar seleção: Ordens
+$("#btnLimparSelecaoOrdens")?.addEventListener("click", () => {
+  ESTADO.selecaoOrdens.clear();
+  
+  const checkTodos = $("#checkTodosOrdens");
+  if (checkTodos) checkTodos.checked = false;
+  
+  atualizarBarraSelecao("selecaoOrdens", "selecaoOrdens", "selecaoOrdensTexto");
+  renderOrdens(); 
+});
+
+// Limpar seleção: Histórico
+$("#btnLimparSelecaoHistorico")?.addEventListener("click", () => {
+  ESTADO.selecaoHistorico.clear();
+  
+  const checkTodos = $("#checkTodosHistorico");
+  if (checkTodos) checkTodos.checked = false;
+  
+  atualizarBarraSelecao("selecaoHistorico", "selecaoHistorico", "selecaoHistoricoTexto");
+  renderHistorico(); 
+});
