@@ -280,6 +280,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   width: 100%; 
   margin: 0;  
   min-height: calc(100vh - 67px);
+  align-items: flex-start;
 }
 
 .sidenav {
@@ -291,6 +292,10 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  position: sticky;    
+  top: 67px;         
+  height: calc(100vh - 67px); 
+  overflow-y: auto;
 }
 
 .sidenav-label {
