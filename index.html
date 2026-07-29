@@ -170,6 +170,10 @@
         <p class="muted">Toda vez que o status de um aparelho é alterado para concluído, um registro é criado aqui automaticamente.</p>
         <div class="local-filtro" id="localFiltroOrdens"></div>
         <input type="text" class="search-input" id="buscaOrdens" placeholder="Buscar por patrimônio, setor, ambiente ou equipe...">
+        <div class="selecao-multipla" id="selecaoOrdens" hidden>
+          <span id="selecaoOrdensTexto">0 selecionado(s)</span>
+          <button class="btn ghost" id="btnExcluirSelecionadosOrdens" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir selecionados</button>
+        </div>
         <div class="table-wrap">
           <table id="ordensTable"></table>
         </div>
@@ -190,6 +194,10 @@
         </div>
         <div class="local-filtro" id="localFiltroHistorico"></div>
         <input type="text" class="search-input" id="buscaHistorico" placeholder="Buscar por patrimônio, setor ou equipe...">
+        <div class="selecao-multipla" id="selecaoHistorico" hidden>
+          <span id="selecaoHistoricoTexto">0 selecionado(s)</span>
+          <button class="btn ghost" id="btnExcluirSelecionadosHistorico" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir selecionados</button>
+        </div>
         <div class="table-wrap">
             <table id="historicoTable"></table>
         </div>
@@ -251,6 +259,10 @@
           </select>
         </div>
         <input type="text" class="search-input" id="buscaEquipamentos" placeholder="Buscar por patrimônio, setor ou ambiente...">
+        <div class="selecao-multipla" id="selecaoEquipamentos" hidden>
+          <span id="selecaoEquipamentosTexto">0 selecionado(s)</span>
+          <button class="btn ghost" id="btnExcluirSelecionadosEquipamentos" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir selecionados</button>
+        </div>
         <div class="table-wrap">
           <table id="equipamentosTable"></table>
         </div>
