@@ -684,3 +684,37 @@ tbody tr:hover { background: var(--latao-claro); }
 .btn.danger-inverted:hover {
   background-color: #F1F3F4;
 }
+/* =========================================
+   MODO SOMENTE LEITURA (USUÁRIO PADRÃO)
+   ========================================= */
+
+/* Esconde formulários, áreas de upload e botões de exclusão/edição */
+body.modo-padrao #dropzone,
+body.modo-padrao #btnGerar,
+body.modo-padrao #btnApagarCronograma,
+body.modo-padrao #navUsuarios,
+body.modo-padrao #btnLimparOrdens,
+body.modo-padrao #btnLimparHistorico,
+body.modo-padrao .action-bar-flutuante,
+body.modo-padrao input[type="checkbox"],
+body.modo-padrao .menu-linha-excluir,
+body.modo-padrao .drawer-form,
+body.modo-padrao #btnReagendarAtrasados,
+body.modo-padrao #view-feriados .card:first-child,
+body.modo-padrao #view-equipamentos .card:first-child {
+  display: none !important;
+}
+
+/* Trava os seletores de status (Calendário) e inputs (Configurações) */
+body.modo-padrao select, 
+body.modo-padrao input:not(.search-input) {
+  pointer-events: none;
+  opacity: 0.7;
+  background-color: #f5f5f5;
+}
+
+/* Esconde botões destrutivos das tabelas (Feriados e Ciclos) */
+body.modo-padrao #feriadosTable button.ghost,
+body.modo-padrao #ciclosTable button.ghost:last-child {
+  display: none !important;
+}
