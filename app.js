@@ -1430,23 +1430,32 @@ function renderHistorico(){
     const alvo = `${h.patrimonio || ""} ${h.setor || ""} ${h.equipe || ""}`.toLowerCase();
     return alvo.includes(termo);
   });
+  
   $("#historicoCount").textContent = `${historico.length} registros`;
+  
+  // CORREÇÃO 1: Removida a palavra "Ações" no final do cabeçalho (deixado apenas <th></th>)
   table.innerHTML = `<thead><tr>
       <th style="width:30px"><input type="checkbox" id="checkTodosHistorico"></th>
       <th>Data/Hora</th><th>Patrimônio</th><th>Setor</th>
-      <th>Equipe</th><th>Usuário</th><th>Tipo</th><th>De</th><th>Para</th><th>Ações</th>
+      <th>Equipe</th><th>Usuário</th><th>Tipo</th><th>De</th><th>Para</th><th></th>
   </tr></thead><tbody></tbody>`;
+  
   const tbody = table.querySelector("tbody");
 
   historico.forEach(h => {
     const tr = document.createElement("tr");
-    const ehReagendamento = h.tipo === "Atraso Reagendado";
+    
+    // CORREÇÃO 2: Agora ele reconhece "Reagendamento manual" e mostra as datas corretamente
+    const ehReagendamento = h.tipo === "Atraso Reagendado" || h.tipo === "Reagendamento manual";
+    
     const colDe = ehReagendamento
       ? `<td>${formatarDataBR(h.dataAnterior)}</td>`
       : `<td><span class="status-select ${classeStatus(h.statusAnterior)}">${h.statusAnterior || "-"}</span></td>`;
+      
     const colPara = ehReagendamento
       ? `<td>${formatarDataBR(h.dataNova)}</td>`
       : `<td><span class="status-select ${classeStatus(h.statusNovo)}">${h.statusNovo}</span></td>`;
+      
     tr.innerHTML = `
         <td></td>
         <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
@@ -1498,33 +1507,6 @@ function renderHistorico(){
 
   atualizarBarraSelecao("selecaoHistorico", "selecaoHistorico", "selecaoHistoricoTexto");
 }
-
-$("#btnExcluirSelecionadosHistorico")?.addEventListener("click", async () => {
-  const chaves = [...ESTADO.selecaoHistorico];
-  if (!chaves.length) return;
-  const ok = window.confirm(`Excluir ${chaves.length} registro(s) do histórico selecionado(s)?`);
-  if (!ok) return;
-  try {
-    const porCiclo = {};
-    chaves.forEach((ch) => {
-      const [cicloId, id] = ch.split("::");
-      (porCiclo[cicloId] ||= []).push(id);
-    });
-    const TAMANHO_LOTE = 400;
-    for (const [cicloId, ids] of Object.entries(porCiclo)) {
-      for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
-        const batch = writeBatch(db);
-        ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((id) => batch.delete(doc(db, "ciclos", cicloId, "historico", id)));
-        await batch.commit();
-      }
-    }
-    ESTADO.selecaoHistorico.clear();
-    toast(`${chaves.length} registro(s) excluído(s).`);
-  } catch (err) {
-    console.error(err);
-    toast("Erro ao excluir: " + err.message);
-  }
-});
 
 function renderOrdens() {
   const table = $("#ordensTable");
