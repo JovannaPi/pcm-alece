@@ -198,7 +198,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   gap: var(--sp-3);
   min-width: 0;
 }
-.brand img { height: 36px; width: auto; flex-shrink: 0; filter: brightness(0) invert(1); opacity: 0.95; }
+.brand img { height: 36px; width: auto; flex-shrink: 0; opacity: 0.95; }
 
 .brand-org {
   font-family: var(--fonte-corpo);
