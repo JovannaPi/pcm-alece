@@ -706,8 +706,8 @@ async function reagendarTudo() {
     );
     const pendentes = itensDoPredio
       .filter((e) =>
-        e.statusPreventiva === "Pendente" ||
-        (e.statusPreventiva === "Em andamento" && estaAtrasado(e))
+        (e.statusPreventiva === "Pendente" || (e.statusPreventiva === "Em andamento" && estaAtrasado(e))) &&
+        e.fixadoManualmente !== true // <--- A correção principal está aqui
       )
       .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
 
