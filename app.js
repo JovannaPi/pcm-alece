@@ -1065,9 +1065,8 @@ function renderUsuarios() {
   
   $("#usuariosCount").textContent = `${ESTADO.usuarios.length} conta(s)`;
   
-  // Cabeçalho sem a coluna Status
   table.innerHTML = `<thead><tr>
-      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th>Ações</th>
+      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th></th>
     </tr></thead><tbody></tbody>`;
     
   const tbody = table.querySelector("tbody");
