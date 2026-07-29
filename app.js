@@ -2049,6 +2049,7 @@ async function abrirDrawerEquipamento(id) {
       await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
         dataAgendada: novaData,
         diaPlanejado: novoDia,
+        fixadoManualmente: true 
       });
       await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
         equipamentoId: id,
