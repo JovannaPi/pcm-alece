@@ -267,12 +267,6 @@ function chamadosDoEquipamento(item) {
   const porData = (a, b) => String(b.data).localeCompare(String(a.data));
   return { exatos: exatos.sort(porData), aproximados: aproximados.sort(porData) };
 }
-// A forma segura de esconder a tela:
-const overlay = document.getElementById('authOverlay');
-if (overlay) overlay.style.display = 'none';
-
-// A forma segura de mostrar a tela:
-if (overlay) overlay.style.display = 'flex';
 
 function toast(msg) {
   const el = $("#toast");
