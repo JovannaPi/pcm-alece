@@ -259,9 +259,14 @@
           </select>
         </div>
         <input type="text" class="search-input" id="buscaEquipamentos" placeholder="Buscar por patrimônio, setor ou ambiente...">
-        <div class="selecao-multipla" id="selecaoEquipamentos" hidden>
-          <span id="selecaoEquipamentosTexto">0 selecionado(s)</span>
-          <button class="btn ghost" id="btnExcluirSelecionadosEquipamentos" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir selecionados</button>
+        <div id="selecaoEquipamentos" class="action-bar-flutuante">
+          <div class="action-bar-esquerda">
+            <button id="btnLimparSelecaoEquipamentos" class="btn-icon" title="Limpar seleção">✕</button>
+            <span id="selecaoEquipamentosTexto">0 selecionado(s)</span>
+          </div>
+          <div class="action-bar-direita">
+            <button id="btnExcluirSelecionadosEquipamentos" class="btn danger-inverted">Excluir</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table id="equipamentosTable"></table>
