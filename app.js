@@ -1005,15 +1005,28 @@ $("#btnCriarUsuario")?.addEventListener("click", async () => {
   const usuario = $("#novoUsuarioNome").value.trim();
   const senha = $("#novoUsuarioSenha").value;
   const permissao = $("#novoUsuarioPermissao").value;
+  
   if (!usuario || senha.length < 6) {
     toast("Preencha o usuário e uma senha com 6 ou mais caracteres.");
     return;
   }
+  
+  // Muda o botão para mostrar que está carregando
+  const btn = $("#btnCriarUsuario");
+  btn.disabled = true;
+  btn.textContent = "Criando...";
+  
   try {
     await criarContaAdmin(usuario, senha, permissao);
     toast(`Conta "${usuario}" criada com sucesso!`);
+    
+    // Limpa os campos
     $("#novoUsuarioNome").value = "";
     $("#novoUsuarioSenha").value = "";
+    
+    // FORÇA O SISTEMA A RECARREGAR A TABELA NA MESMA HORA
+    iniciarSincronizacaoUsuarios();
+    
   } catch (err) {
     console.error(err);
     const msgs = {
@@ -1021,6 +1034,10 @@ $("#btnCriarUsuario")?.addEventListener("click", async () => {
       "auth/weak-password": "Senha muito curta.",
     };
     toast(msgs[err.code] || ("Erro: " + err.message));
+  } finally {
+    // Volta o botão ao normal
+    btn.disabled = false;
+    btn.textContent = "+ Criar conta";
   }
 });
 
