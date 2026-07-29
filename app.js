@@ -6,6 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+  setPersistence, inMemoryPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const SUFIXO_LOGIN = "@pcm-alece.local";
@@ -977,11 +978,16 @@ async function criarContaAdmin(usuario, senha, permissao) {
   const nomeAppTemp = "temp_" + Date.now();
   const appTemp = initializeApp(firebaseConfig, nomeAppTemp);
   const authTemp = getAuth(appTemp);
+  
   try {
+    await setPersistence(authTemp, inMemoryPersistence);
+    
     const email = usuarioParaEmail(usuario);
     const cred = await createUserWithEmailAndPassword(authTemp, email, senha);
     const uid = cred.user.uid;
+    
     await signOut(authTemp);
+
     await setDoc(doc(db, "usuarios", uid), {
       usuario: usuario.trim().toLowerCase(),
       permissao,
