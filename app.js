@@ -280,6 +280,9 @@ $all(".tab").forEach((btn) => {
     $all(".view").forEach((v) => v.classList.remove("active"));
     btn.classList.add("active");
     $(`#view-${btn.dataset.view}`).classList.add("active");
+    if (btn.dataset.view) {
+      localStorage.setItem("ultimaAbaPMOC", btn.dataset.view);
+    }
     if (btn.dataset.view === "calendar") renderCalendar();
     if (btn.dataset.view === "ciclos") renderCiclos();
     if (btn.dataset.view === "dashboard") renderDashboard();
@@ -948,10 +951,12 @@ onAuthStateChanged(auth, async (user) => {
     if (appRoot) appRoot.hidden = false;
     atualizarVisibilidadeAdmin();
     if (!appJaInicializado) {
-      appJaInicializado = true;
-      inicializarApp();
-      if (ESTADO.permissao === "admin") iniciarSincronizacaoUsuarios();
-    }
+          appJaInicializado = true;
+          inicializarApp();
+          if (ESTADO.permissao === "admin") iniciarSincronizacaoUsuarios();
+          const abaSalva = localStorage.getItem("ultimaAbaPMOC") || "dashboard";
+          irParaAba(abaSalva);
+        }
   } else {
     if (overlay) overlay.hidden = false;
     if (appRoot) appRoot.hidden = true;
