@@ -1062,11 +1062,15 @@ function iniciarSincronizacaoUsuarios() {
 function renderUsuarios() {
   const table = $("#usuariosTable");
   if (!table) return;
+  
   $("#usuariosCount").textContent = `${ESTADO.usuarios.length} conta(s)`;
+  
   table.innerHTML = `<thead><tr>
-      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th>Status</th><th></th>
+      <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th>Status</th><th>Ações</th>
     </tr></thead><tbody></tbody>`;
+    
   const tbody = table.querySelector("tbody");
+  
   ESTADO.usuarios.forEach((u) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -1075,11 +1079,25 @@ function renderUsuarios() {
       <td>${u.criadoEm ? new Date(u.criadoEm).toLocaleDateString("pt-BR") : "-"}</td>
       <td>${u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString("pt-BR") : "-"}</td>
       <td>${u.bloqueado ? '<span class="status-select atrasado">Bloqueado</span>' : '<span class="status-select concluido">Ativo</span>'}</td>`;
-    const tdBtn = document.createElement("td");
-    const btnBloqueio = document.createElement("button");
-    btnBloqueio.className = "btn ghost";
-    btnBloqueio.textContent = u.bloqueado ? "Desbloquear" : "Bloquear";
-    btnBloqueio.addEventListener("click", async () => {
+      
+    const tdMenu = document.createElement("td");
+    
+    // Define os rótulos dos botões dependendo do estado atual do usuário
+    const acaoBloqueio = u.bloqueado ? "Desbloquear" : "Bloquear";
+    const acaoPermissao = u.permissao === "admin" ? "Mudar para Padrão" : "Mudar para Admin";
+    const novaPermissao = u.permissao === "admin" ? "padrao" : "admin";
+
+    // Monta o menu de 3 pontinhos (kebab menu)
+    tdMenu.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
+      <div class="menu-linha-opcoes">
+        <button class="menu-linha-item" data-acao="bloqueio">${acaoBloqueio}</button>
+        <button class="menu-linha-item" data-acao="permissao">${acaoPermissao}</button>
+        <button class="menu-linha-item menu-linha-excluir" data-acao="excluir">Excluir conta</button>
+      </div>
+    </details>`;
+
+    // Lógica 1: Bloquear / Desbloquear
+    tdMenu.querySelector('[data-acao="bloqueio"]').addEventListener("click", async () => {
       try {
         await updateDoc(doc(db, "usuarios", u.id), { bloqueado: !u.bloqueado });
         toast(u.bloqueado ? "Usuário desbloqueado." : "Usuário bloqueado.");
@@ -1088,8 +1106,33 @@ function renderUsuarios() {
         toast("Erro: " + err.message);
       }
     });
-    tdBtn.appendChild(btnBloqueio);
-    tr.appendChild(tdBtn);
+
+    // Lógica 2: Mudar Permissão
+    tdMenu.querySelector('[data-acao="permissao"]').addEventListener("click", async () => {
+      try {
+        await updateDoc(doc(db, "usuarios", u.id), { permissao: novaPermissao });
+        toast(`A conta de ${u.usuario} agora é ${novaPermissao === "admin" ? "Administrador" : "Padrão"}.`);
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao alterar permissão: " + err.message);
+      }
+    });
+
+    // Lógica 3: Excluir Conta
+    tdMenu.querySelector('[data-acao="excluir"]').addEventListener("click", async () => {
+      const ok = window.confirm(`Tem certeza que deseja excluir o perfil de ${u.usuario}? Essa pessoa perderá todo o acesso ao sistema.`);
+      if(!ok) return;
+      
+      try {
+        await deleteDoc(doc(db, "usuarios", u.id));
+        toast("Conta excluída com sucesso.");
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao excluir: " + err.message);
+      }
+    });
+
+    tr.appendChild(tdMenu);
     tbody.appendChild(tr);
   });
 }
