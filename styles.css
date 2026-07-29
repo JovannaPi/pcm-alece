@@ -348,8 +348,6 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   flex-direction: column;
   gap: var(--sp-4);
 
-  max-width: 1200px; 
-  margin: 0 auto; 
 }
 
 .view { display: none; flex-direction: column; gap: var(--sp-4); }
