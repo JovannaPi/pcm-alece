@@ -170,9 +170,14 @@
         <p class="muted">Toda vez que o status de um aparelho é alterado para concluído, um registro é criado aqui automaticamente.</p>
         <div class="local-filtro" id="localFiltroOrdens"></div>
         <input type="text" class="search-input" id="buscaOrdens" placeholder="Buscar por patrimônio, setor, ambiente ou equipe...">
-        <div class="selecao-multipla" id="selecaoOrdens" hidden>
-          <span id="selecaoOrdensTexto">0 selecionado(s)</span>
-          <button class="btn ghost" id="btnExcluirSelecionadosOrdens" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir selecionados</button>
+        <div id="selecaoOrdens" class="action-bar-flutuante">
+          <div class="action-bar-esquerda">
+            <button id="btnLimparSelecaoOrdens" class="btn-icon" title="Limpar seleção">✕</button>
+            <span id="selecaoOrdensTexto">0 selecionado(s)</span>
+          </div>
+          <div class="action-bar-direita">
+            <button id="btnExcluirSelecionadosOrdens" class="btn danger-inverted">🗑️ Excluir</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table id="ordensTable"></table>
@@ -194,9 +199,14 @@
         </div>
         <div class="local-filtro" id="localFiltroHistorico"></div>
         <input type="text" class="search-input" id="buscaHistorico" placeholder="Buscar por patrimônio, setor ou equipe...">
-        <div class="selecao-multipla" id="selecaoHistorico" hidden>
-          <span id="selecaoHistoricoTexto">0 selecionado(s)</span>
-          <button class="btn ghost" id="btnExcluirSelecionadosHistorico" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir selecionados</button>
+        <div id="selecaoHistorico" class="action-bar-flutuante">
+          <div class="action-bar-esquerda">
+            <button id="btnLimparSelecaoHistorico" class="btn-icon" title="Limpar seleção">✕</button>
+            <span id="selecaoHistoricoTexto">0 selecionado(s)</span>
+          </div>
+          <div class="action-bar-direita">
+            <button id="btnExcluirSelecionadosHistorico" class="btn danger-inverted">🗑️ Excluir</button>
+          </div>
         </div>
         <div class="table-wrap">
             <table id="historicoTable"></table>
