@@ -431,10 +431,27 @@ function processarArquivo(file) {
         linhas.forEach((linha) => { linha.__local = nomeAba.trim(); });
         todasAsLinhas = todasAsLinhas.concat(linhas);
       });
+
       if (!todasAsLinhas.length) throw new Error("Planilha vazia.");
+
+      // --- O PULO DO GATO ---
+      // 1. Limpamos o estado atual para não mostrar dados velhos
+      ESTADO.equipamentos = []; 
+      ESTADO.ordens = [];
+      ESTADO.historico = [];
+      
+      // 2. Classificamos os novos dados
       classificar(todasAsLinhas);
-      $("#dropzoneLabel").textContent =
-        `"${file.name}" carregado — ${todasAsLinhas.length} itens em ${wb.SheetNames.length} aba(s)`;
+
+      // 3. Forçamos a atualização da UI (Dashboard e Calendar vão ficar vazios ou prontos para o novo ciclo)
+      renderDashboard();
+      renderCalendar();
+
+      $("#dropzoneLabel").textContent = `"${file.name}" carregado — ${todasAsLinhas.length} itens.`;
+
+      toast("Planilha carregada! Configure o cronograma.");
+      irParaAba("config");
+
     } catch (err) {
       toast("Erro ao ler o arquivo: " + err.message);
       $("#dropzoneLabel").textContent = "Clique ou arraste o arquivo aqui";
