@@ -606,3 +606,7 @@ tbody tr:hover { background: var(--latao-claro); }
   padding: 9px 10px; border: 1px solid var(--borda); border-radius: 8px;
   font-size: 14px; font-family: var(--fonte);
 }
+.selecao-multipla {
+  display: flex; align-items: center; gap: 12px; margin: 8px 0;
+  font-size: 13px; color: var(--texto-suave);
+}
