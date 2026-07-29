@@ -199,10 +199,9 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   min-width: 0;
 }
 .brand img { 
-  height: 50px; 
+  height: 60px; 
   width: auto; 
   flex-shrink: 0; 
-  filter: brightness(0) invert(1); 
   opacity: 0.95; 
 }
 
@@ -746,7 +745,20 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .cal-day-badge.pendente { background: var(--vermelho-fundo); color: var(--vermelho-texto); }
 .cal-day-badge.andamento { background: var(--amarelo-fundo); color: var(--amarelo-texto); }
 .cal-day-badge.concluido { background: var(--verde-fundo); color: var(--verde-texto); }
-.cal-day-badge.atrasado { background: var(--azul-900); color: #fff; }
+.cal-day-badge.atrasado {
+  background: #FEF2F2;      /* Fundo vermelho muito claro */
+  color: #B91C1C;           /* Vermelho escuro para o texto */
+  border: 1px solid #FECACA; /* Borda bem fina para contornar */
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Opcional: Efeito hover */
+.cal-day-badge.atrasado:hover {
+  background: #FEE2E2;
+}
 .cal-day-badge.holiday { background: var(--dourado); color: #fff; }
 
 /* ------------------------------------------------------------
