@@ -343,6 +343,20 @@
         </div>
       </div>
     </section>
+
+    <!-- VIEW 11: AUDITORIA (admin) -->
+    <section class="view" id="view-auditoria">
+      <div class="card">
+        <div class="card-head">
+          <h2>Log de auditoria</h2>
+          <span class="pill" id="auditoriaCount">0 registros</span>
+        </div>
+        <p class="muted">Registro de ações administrativas do sistema (login, criação/bloqueio de conta, cronogramas apagados, feriados, etc). Não se apaga junto com os ciclos.</p>
+        <div class="table-wrap">
+          <table id="auditoriaTable"></table>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 </div>
@@ -357,19 +371,6 @@
 <div class="toast" id="toast"></div>
 <script type="module" src="firebase-config.js?v=4"></script>
 <script type="module" src="app.js?v=11"></script>
-<!-- VIEW 11: AUDITORIA (admin) -->
-    <section class="view" id="view-auditoria">
-      <div class="card">
-        <div class="card-head">
-          <h2>Log de auditoria</h2>
-          <span class="pill" id="auditoriaCount">0 registros</span>
-        </div>
-        <p class="muted">Registro de ações administrativas do sistema (login, criação/bloqueio de conta, cronogramas apagados, feriados, etc). Não se apaga junto com os ciclos.</p>
-        <div class="table-wrap">
-          <table id="auditoriaTable"></table>
-        </div>
-      </div>
-    </section>
 </body>
 </html>
 
