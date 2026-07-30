@@ -735,9 +735,27 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .cal-day-badge {
   font-size: 10.5px;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 3px;
-  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: filter 0.12s ease;
+}
+.cal-day-badge:hover { filter: brightness(0.96); }
+.cal-day-badge .badge-predio {
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-day-badge .badge-contagem {
+  margin-left: auto;
+  opacity: 0.75;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -745,15 +763,31 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .cal-day-badge.pendente { background: var(--vermelho-fundo); color: var(--vermelho-texto); }
 .cal-day-badge.andamento { background: var(--amarelo-fundo); color: var(--amarelo-texto); }
 .cal-day-badge.concluido { background: var(--verde-fundo); color: var(--verde-texto); }
-.cal-day-badge.atrasado {
-  background: #FEF2F2;      /* Fundo vermelho muito claro */
-  color: #B91C1C;           /* Vermelho escuro para o texto */
-  border: 1px solid #FECACA; /* Borda bem fina para contornar */
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.cal-day-badge.atrasado { background: var(--azul-900); color: #fff; }
+.cal-day-badge.holiday { background: var(--dourado); color: #fff; }
+
+.cal-badge-tooltip {
+  position: fixed;
+  z-index: 250;
+  background: var(--azul-900);
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: var(--raio-pequeno);
+  font-size: 11.5px;
+  line-height: 1.5;
+  box-shadow: var(--sombra-elevada);
+  max-width: 220px;
+  pointer-events: none;
 }
+.cal-badge-tooltip strong {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--dourado);
+  margin-bottom: 4px;
+}
+.cal-badge-tooltip-mais { opacity: 0.7; margin-top: 2px; }
 
 /* Opcional: Efeito hover */
 .cal-day-badge.atrasado:hover {
