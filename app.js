@@ -702,7 +702,7 @@ async function gerarCronograma() {
 // automaticamente ao cadastrar um feriado novo ou um equipamento manual, para
 // que o cronograma sempre reflita o estado mais recente sem precisar reimportar
 // a planilha.
-async function reagendarTudo() {
+async function reagendarTudo(permitirRecuo = false) {
   if (!ESTADO.equipamentos.length) return;
 
   if (!ESTADO.config) {
@@ -763,10 +763,10 @@ async function reagendarTudo() {
 
     pendentes.forEach((item) => {
       
-      // NOVA REGRA: Impede que o item seja puxado para trás.
-      // Se o item já tem uma data e ela está à frente do cursor atual,
-      // avançamos o cursor para a data original dele.
-      if (item.dataAgendada && item.dataAgendada > formatISO(dataCursor)) {
+      // Impede que o item seja puxado para trás — EXCETO quando quem chamou
+      // pediu explicitamente pra permitir (caso de remover feriado, que deve
+      // liberar a vaga pros aparelhos recuarem).
+      if (!permitirRecuo && item.dataAgendada && item.dataAgendada > formatISO(dataCursor)) {
         const [aA, mA, dA] = item.dataAgendada.split("-");
         dataCursor = new Date(aA, parseInt(mA, 10) - 1, dA, 12, 0, 0);
       }
@@ -2357,7 +2357,7 @@ async function removerFeriado(id, label) {
     ESTADO.feriados = ESTADO.feriados.filter((f) => f.id !== id);
     await registrarAuditoria("Remover feriado/férias", label);
     toast("Removido. Reorganizando cronograma...");
-    await reagendarTudo();
+    await reagendarTudo(true);
   } catch (err) {
     console.error(err);
     toast("Erro ao remover: " + err.message);
