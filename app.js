@@ -2337,7 +2337,6 @@ async function adicionarFeriado() {
   try {
     const novoFeriado = { tipo, label: label || (tipo === "feriado" ? "Feriado" : "Férias"), dataInicio, dataFim };
     const refDoc = await addDoc(collection(db, "feriados"), novoFeriado);
-    ESTADO.feriados.push({ id: refDoc.id, ...novoFeriado });
     await registrarAuditoria("Adicionar feriado/férias", `${novoFeriado.label} (${novoFeriado.dataInicio} a ${novoFeriado.dataFim})`);
     $("#feriadoLabel").value = "";
     $("#feriadoInicio").value = "";
