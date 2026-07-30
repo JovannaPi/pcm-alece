@@ -37,7 +37,7 @@ async function calcularProximaData(item) {
   const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
   const ehDiaUtilLocal = (dt) => DIAS_UTEIS.includes(NOMES_DIAS[(dt.getDay() + 6) % 7]) && !estaEmFeriado(dt);
 
-  const [a, m, d] = item.dataConclusao.split("-");
+  const [a, m, d] = item.dataAgendada.split("-");
   let cursor = adicionarMeses(new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0), MESES_CICLO);
   while (!ehDiaUtilLocal(cursor)) cursor.setDate(cursor.getDate() + 1);
 
