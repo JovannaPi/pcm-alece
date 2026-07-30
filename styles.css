@@ -1131,3 +1131,33 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 [hidden] {
   display: none !important;
 }
+
+body.modo-padrao .status-select,
+body.modo-padrao input:not(.search-input):not(#authEmail):not(#authSenha),
+body.modo-padrao select:not(#filtroStatus):not(#filtroSetorPCM):not(#filtroOrigem),
+body.modo-padrao button.btn.primary,
+body.modo-padrao button.btn.danger-inverted,
+body.modo-padrao button.sidenav-danger,
+body.modo-padrao .menu-linha-item,
+body.modo-padrao .link-discreto,
+body.modo-padrao input[type="checkbox"] {
+  pointer-events: none !important;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+body.modo-padrao .badge-somente-leitura {
+  display: inline-flex;
+}
+.badge-somente-leitura {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-left: 12px;
+}
