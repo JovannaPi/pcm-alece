@@ -364,20 +364,36 @@ if (btnFecharAlertaAtrasados) {
     const banner = $("#alertaAtrasados");
     if (banner) {
       banner.dataset.fechado = formatISO(new Date());
-      banner.hidden = true;
     }
+    atualizarBannerAtrasados();
   });
 }
 
 function atualizarBannerAtrasados() {
   const banner = $("#alertaAtrasados");
+  const btnCal = $("#btnReagendarCalendario");
   if (!banner) return;
+
   const atrasados = ESTADO.equipamentos.filter(estaAtrasado);
+
   if (!atrasados.length) {
     banner.hidden = true;
+    if (btnCal) btnCal.hidden = true;
     return;
   }
-  if (banner.dataset.fechado === formatISO(new Date())) return;
+
+  const jaFechadoHoje = banner.dataset.fechado === formatISO(new Date());
+
+  if (jaFechadoHoje) {
+    // Aviso já foi fechado no X hoje — some o aviso, mas deixa a opção
+    // acessível no calendário.
+    banner.hidden = true;
+    if (btnCal) btnCal.hidden = false;
+    return;
+  }
+
+  // Ainda não foi fechado — mostra o aviso normalmente, esconde o botão do
+  // calendário (redundante enquanto o aviso já está visível).
   const txt = $("#alertaAtrasadosTexto");
   if (txt) {
     txt.textContent = atrasados.length === 1
@@ -385,8 +401,8 @@ function atualizarBannerAtrasados() {
       : `${atrasados.length} aparelhos estão atrasados.`;
   }
   banner.hidden = false;
+  if (btnCal) btnCal.hidden = true;
 }
-
 function jaVerificouAtrasadosHoje() {
   try {
     return localStorage.getItem(CHAVE_VERIFICACAO_ATRASADOS) === formatISO(new Date());
