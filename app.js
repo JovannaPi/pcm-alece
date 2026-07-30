@@ -1356,7 +1356,9 @@ function renderCalendar() {
       if (temAtrasado) classe = "atrasado";
       
       badge.className = "cal-day-badge " + classe;
-      badge.innerHTML = `<span class="badge-predio">${predio}</span><span class="badge-contagem">${itensPredio.length} ${ROTULOS_STATUS[classe]}</span>`;
+      badge.innerHTML = ESTADO.localFiltro === "Todos"
+        ? `<span class="badge-predio">${predio}</span><span class="badge-contagem">${itensPredio.length} ${ROTULOS_STATUS[classe]}</span>`
+        : `<span class="badge-maquinas">${itensPredio.map((i) => i.patrimonio || i.ambiente).join(", ")}</span>`;
       badge.addEventListener("mouseenter", (e) => mostrarTooltipCalendario(e.currentTarget, predio, itensPredio));
       badge.addEventListener("mouseleave", ocultarTooltipCalendario);
       badge.addEventListener("click", (e) => {
