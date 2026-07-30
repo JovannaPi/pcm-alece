@@ -1342,6 +1342,8 @@ function renderCalendar() {
     });
 
     // Cria uma etiqueta (badge) separada para cada prédio no mesmo dia
+    // Cria uma etiqueta (badge) separada para cada prédio no mesmo dia
+    const ROTULOS_STATUS = { pendente: "pendentes", andamento: "em andamento", concluido: "concluídos", atrasado: "atrasados" };
     Object.entries(porPredio).forEach(([predio, itensPredio]) => {
       const concluidas = itensPredio.filter((i) => i.statusPreventiva === "Concluída").length;
       const andamento = itensPredio.filter((i) => i.statusPreventiva === "Em andamento").length;
@@ -1354,8 +1356,14 @@ function renderCalendar() {
       if (temAtrasado) classe = "atrasado";
       
       badge.className = "cal-day-badge " + classe;
-      // Agora o texto mostra o nome do anexo antes da quantidade
-      badge.textContent = `${predio}: ${itensPredio.length} aparelho${itensPredio.length > 1 ? "s" : ""}`;
+      badge.innerHTML = `<span class="badge-predio">${predio}</span><span class="badge-contagem">${itensPredio.length} ${ROTULOS_STATUS[classe]}</span>`;
+      badge.addEventListener("mouseenter", (e) => mostrarTooltipCalendario(e.currentTarget, predio, itensPredio));
+      badge.addEventListener("mouseleave", ocultarTooltipCalendario);
+      badge.addEventListener("click", (e) => {
+        e.stopPropagation();
+        ocultarTooltipCalendario();
+        selecionarDiaBadge(iso, predio, itensPredio);
+      });
       el.appendChild(badge);
     });
     
@@ -1365,6 +1373,39 @@ function renderCalendar() {
   }
 }
 
+function mostrarTooltipCalendario(elemento, predio, itens) {
+  let tip = document.getElementById("calBadgeTooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "calBadgeTooltip";
+    tip.className = "cal-badge-tooltip";
+    document.body.appendChild(tip);
+  }
+  const preview = itens.slice(0, 3)
+    .map((i) => `<div>${i.patrimonio || i.ambiente}</div>`)
+    .join("");
+  const resto = itens.length > 3 ? `<div class="cal-badge-tooltip-mais">+${itens.length - 3} mais</div>` : "";
+  tip.innerHTML = `<strong>${predio}</strong>${preview}${resto}`;
+  const rect = elemento.getBoundingClientRect();
+  tip.style.left = `${rect.left}px`;
+  tip.style.top = `${rect.bottom + 6}px`;
+  tip.hidden = false;
+}
+
+function ocultarTooltipCalendario() {
+  const tip = document.getElementById("calBadgeTooltip");
+  if (tip) tip.hidden = true;
+}
+
+function selecionarDiaBadge(iso, predio, itensPredio) {
+  ESTADO.diaSelecionado = iso;
+  renderCalendar();
+  const [ano, mes, dia] = iso.split("-");
+  $("#dayDetailCard").hidden = false;
+  $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${predio} (${itensPredio.length} aparelho(s))`;
+  renderTabelaDetalheDia(itensPredio);
+}
+
 function selecionarDia(iso) {
   ESTADO.diaSelecionado = iso;
   renderCalendar();
@@ -1372,7 +1413,10 @@ function selecionarDia(iso) {
   const [ano, mes, dia] = iso.split("-");
   $("#dayDetailCard").hidden = false;
   $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${itensDoDia.length} aparelho(s)`;
+  renderTabelaDetalheDia(itensDoDia);
+}
 
+function renderTabelaDetalheDia(itensDoDia) {
   const table = $("#dayDetailTable");
   table.innerHTML = `<thead><tr><th>Patrimônio</th><th>Prédio</th><th>Setor</th><th>Ambiente</th><th>Equipe</th><th>Status</th></tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
@@ -1380,41 +1424,25 @@ function selecionarDia(iso) {
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.local || "SEDE"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
-    
     const tdStatus = document.createElement("td");
     const select = document.createElement("select");
-    const atrasado = estaAtrasado(item);
-
-    select.className = "status-select " + (atrasado ? "atrasado" : classeStatus(item.statusPreventiva));
-
-    // A mágica acontece aqui: usamos "hidden selected" para fazer o "Atrasado" funcionar como uma capa
-    if (atrasado) {
-      select.innerHTML = `
-        <option value="${item.statusPreventiva}" hidden selected>Atrasado</option>
-        <option value="Concluída">Concluída</option>
-        <option value="Em andamento">Em andamento</option>
-        <option value="Pendente">Pendente</option>
-      `;
-    } else {
-      select.innerHTML = `
-        <option value="Pendente" ${item.statusPreventiva === "Pendente" ? "selected" : ""}>Pendente</option>
-        <option value="Em andamento" ${item.statusPreventiva === "Em andamento" ? "selected" : ""}>Em andamento</option>
-        <option value="Concluída" ${item.statusPreventiva === "Concluída" ? "selected" : ""}>Concluída</option>
-      `;
-    }
+    select.className = "status-select " + classeStatus(item.statusPreventiva);
+    STATUS_VALIDOS.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      if (s === item.statusPreventiva) opt.selected = true;
+      select.appendChild(opt);
+    });
 
     select.addEventListener("change", async () => {
       const statusAnterior = item.statusPreventiva;
       const statusNovo = select.value;
-
       select.disabled = true;
-
       try {
         const camposStatus = {
           statusPreventiva: statusNovo,
           dataConclusao: statusNovo === "Concluída" ? formatISO(new Date()) : "",
         };
-        
         if (statusNovo === "Concluída") {
           const proxima = await calcularProximaData({ ...item, dataConclusao: camposStatus.dataConclusao });
           camposStatus.proximaPreventiva = proxima.data;
@@ -1423,22 +1451,18 @@ function selecionarDia(iso) {
           camposStatus.proximaPreventiva = "";
           camposStatus.proximaPreventivaDia = "";
         }
-        
         await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
         Object.assign(item, camposStatus);
-        
+
         const promessasLogs = [registrarHistorico(item, statusAnterior, statusNovo)];
-        
         if (statusNovo === "Concluída") {
           promessasLogs.push(registrarOrdemServico(item));
         } else if (statusAnterior === "Concluída" && statusNovo !== "Concluída") {
           promessasLogs.push(removerOrdemServico(item.id));
         }
-
         await Promise.all(promessasLogs);
 
-        // Recarrega o dia para limpar o visual de atrasado imediatamente
-        selecionarDia(iso);
+        select.className = "status-select " + classeStatus(statusNovo);
         toast(`Status atualizado com sucesso.`);
       } catch (err) {
         console.error(err);
@@ -1451,6 +1475,13 @@ function selecionarDia(iso) {
     });
 
     tdStatus.appendChild(select);
+    if (estaAtrasado(item)) {
+      const tagAtraso = document.createElement("span");
+      tagAtraso.className = "status-select atrasado";
+      tagAtraso.style.marginLeft = "6px";
+      tagAtraso.textContent = "Atrasado";
+      tdStatus.appendChild(tagAtraso);
+    }
     tr.appendChild(tdStatus);
     tbody.appendChild(tr);
   });
