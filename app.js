@@ -1399,15 +1399,6 @@ function ocultarTooltipCalendario() {
   if (tip) tip.hidden = true;
 }
 
-function selecionarDiaBadge(iso, predio, itensPredio) {
-  ESTADO.diaSelecionado = iso;
-  renderCalendar();
-  const [ano, mes, dia] = iso.split("-");
-  $("#dayDetailCard").hidden = false;
-  $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${predio} (${itensPredio.length} aparelho(s))`;
-  renderTabelaDetalheDia(itensPredio);
-}
-
 function selecionarDia(iso) {
   ESTADO.diaSelecionado = iso;
   renderCalendar();
@@ -1415,10 +1406,23 @@ function selecionarDia(iso) {
   const [ano, mes, dia] = iso.split("-");
   $("#dayDetailCard").hidden = false;
   $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${itensDoDia.length} aparelho(s)`;
-  renderTabelaDetalheDia(itensDoDia);
+  renderTabelaDetalheDia(itensDoDia, () => selecionarDia(iso));
 }
 
-function renderTabelaDetalheDia(itensDoDia) {
+function selecionarDiaBadge(iso, predio, itensPredio) {
+  ESTADO.diaSelecionado = iso;
+  renderCalendar();
+  const [ano, mes, dia] = iso.split("-");
+  $("#dayDetailCard").hidden = false;
+  $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${predio} (${itensPredio.length} aparelho(s))`;
+  renderTabelaDetalheDia(itensPredio, () => {
+    const itensAtualizados = aplicarFiltroLocal(ESTADO.equipamentos)
+      .filter((i) => i.dataAgendada === iso && (i.local || "SEDE") === predio);
+    selecionarDiaBadge(iso, predio, itensAtualizados);
+  });
+}
+
+function renderTabelaDetalheDia(itensDoDia, aoAtualizar) {
   const table = $("#dayDetailTable");
   table.innerHTML = `<thead><tr><th>Patrimônio</th><th>Prédio</th><th>Setor</th><th>Ambiente</th><th>Equipe</th><th>Status</th></tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
@@ -1426,15 +1430,25 @@ function renderTabelaDetalheDia(itensDoDia) {
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.local || "SEDE"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
+
     const tdStatus = document.createElement("td");
     const select = document.createElement("select");
-    select.className = "status-select " + classeStatus(item.statusPreventiva);
-    STATUS_VALIDOS.forEach((s) => {
-      const opt = document.createElement("option");
-      opt.value = s; opt.textContent = s;
-      if (s === item.statusPreventiva) opt.selected = true;
-      select.appendChild(opt);
-    });
+    const atrasado = estaAtrasado(item);
+    select.className = "status-select " + (atrasado ? "atrasado" : classeStatus(item.statusPreventiva));
+    if (atrasado) {
+      select.innerHTML = `
+        <option value="${item.statusPreventiva}" hidden selected>Atrasado</option>
+        <option value="Concluída">Concluída</option>
+        <option value="Em andamento">Em andamento</option>
+        <option value="Pendente">Pendente</option>
+      `;
+    } else {
+      select.innerHTML = `
+        <option value="Pendente" ${item.statusPreventiva === "Pendente" ? "selected" : ""}>Pendente</option>
+        <option value="Em andamento" ${item.statusPreventiva === "Em andamento" ? "selected" : ""}>Em andamento</option>
+        <option value="Concluída" ${item.statusPreventiva === "Concluída" ? "selected" : ""}>Concluída</option>
+      `;
+    }
 
     select.addEventListener("change", async () => {
       const statusAnterior = item.statusPreventiva;
@@ -1464,7 +1478,7 @@ function renderTabelaDetalheDia(itensDoDia) {
         }
         await Promise.all(promessasLogs);
 
-        select.className = "status-select " + classeStatus(statusNovo);
+        aoAtualizar();
         toast(`Status atualizado com sucesso.`);
       } catch (err) {
         console.error(err);
@@ -1477,13 +1491,6 @@ function renderTabelaDetalheDia(itensDoDia) {
     });
 
     tdStatus.appendChild(select);
-    if (estaAtrasado(item)) {
-      const tagAtraso = document.createElement("span");
-      tagAtraso.className = "status-select atrasado";
-      tagAtraso.style.marginLeft = "6px";
-      tagAtraso.textContent = "Atrasado";
-      tdStatus.appendChild(tagAtraso);
-    }
     tr.appendChild(tdStatus);
     tbody.appendChild(tr);
   });
