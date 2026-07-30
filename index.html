@@ -66,8 +66,11 @@
     <button class="sidenav-item sidenav-danger" id="btnApagarCronograma">
       <span class="sidenav-icon"></span> Apagar cronograma
     </button>
-    <button class="tab sidenav-item" data-view="usuarios" id="navUsuarios" hidden>
+     <button class="tab sidenav-item" data-view="usuarios" id="navUsuarios" hidden>
       <span class="sidenav-icon"></span> Usuários
+    </button>
+    <button class="tab sidenav-item" data-view="auditoria" id="navAuditoria" hidden>
+      <span class="sidenav-icon"></span> Auditoria
     </button>
     <button class="sidenav-item" id="btnSair" style="margin-top:8px">
       <span class="sidenav-icon"></span> Sair
@@ -354,6 +357,19 @@
 <div class="toast" id="toast"></div>
 <script type="module" src="firebase-config.js?v=4"></script>
 <script type="module" src="app.js?v=11"></script>
+<!-- VIEW 11: AUDITORIA (admin) -->
+    <section class="view" id="view-auditoria">
+      <div class="card">
+        <div class="card-head">
+          <h2>Log de auditoria</h2>
+          <span class="pill" id="auditoriaCount">0 registros</span>
+        </div>
+        <p class="muted">Registro de ações administrativas do sistema (login, criação/bloqueio de conta, cronogramas apagados, feriados, etc). Não se apaga junto com os ciclos.</p>
+        <div class="table-wrap">
+          <table id="auditoriaTable"></table>
+        </div>
+      </div>
+    </section>
 </body>
 </html>
 
