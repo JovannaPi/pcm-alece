@@ -125,6 +125,7 @@ const ESTADO = {
   equipamentos: [],
   feriados: [],
   ordens: [],
+  auditoria: [],
   historico: [],
   chamadosCorretivos: [],
   usuarioNome: null,
@@ -293,6 +294,7 @@ $all(".tab").forEach((btn) => {
     if (btn.dataset.view === "ordens") renderOrdens();
     if (btn.dataset.view === "historico") renderHistorico();
     if (btn.dataset.view === "config") renderCapacidadesPorPredio();
+    if (btn.dataset.view === "auditoria") renderAuditoria();
   });
 });
 
@@ -975,7 +977,7 @@ onAuthStateChanged(auth, async (user) => {
     if (!appJaInicializado) {
           appJaInicializado = true;
           inicializarApp();
-          if (ESTADO.permissao === "admin") iniciarSincronizacaoUsuarios();
+          if (ESTADO.permissao === "admin") { iniciarSincronizacaoUsuarios(); iniciarSincronizacaoAuditoria(); }
           const abaSalva = localStorage.getItem("ultimaAbaPMOC") || "dashboard";
           irParaAba(abaSalva);
         }
@@ -988,11 +990,12 @@ onAuthStateChanged(auth, async (user) => {
 function atualizarVisibilidadeAdmin() {
   const isAdmin = ESTADO.permissao === "admin";
   
-  // Esconde a aba de usuários da barra lateral
   const btn = $("#navUsuarios");
   if (btn) btn.hidden = !isAdmin;
 
-  // Ativa o "Escudo" de Somente Leitura se for usuário padrão
+  const btnAud = $("#navAuditoria");
+  if (btnAud) btnAud.hidden = !isAdmin;
+
   if (isAdmin) {
     document.body.classList.remove("modo-padrao");
   } else {
@@ -1081,6 +1084,34 @@ function iniciarSincronizacaoUsuarios() {
   }, (err) => console.error("Erro ao ler usuários:", err));
 }
 
+function iniciarSincronizacaoAuditoria() {
+  const q = query(collection(db, "auditoria"), orderBy("registradoEm", "desc"), limit(500));
+  onSnapshot(q, (snap) => {
+    ESTADO.auditoria = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAuditoria();
+  }, (err) => console.error("Erro ao ler auditoria:", err));
+}
+
+function renderAuditoria() {
+  const table = $("#auditoriaTable");
+  if (!table) return;
+  const registros = ESTADO.auditoria || [];
+  $("#auditoriaCount").textContent = `${registros.length} registros`;
+  table.innerHTML = `<thead><tr>
+      <th>Data/Hora</th><th>Usuário</th><th>Ação</th><th>Detalhes</th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+  registros.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${new Date(r.registradoEm).toLocaleString("pt-BR")}</td>
+      <td>${r.usuario || "-"}</td>
+      <td><strong>${r.acao}</strong></td>
+      <td>${r.detalhes || "-"}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 function renderUsuarios() {
   const table = $("#usuariosTable");
   if (!table) return;
@@ -1135,6 +1166,7 @@ function renderUsuarios() {
     tdMenu.querySelector('[data-acao="permissao"]').addEventListener("click", async () => {
       try {
         await updateDoc(doc(db, "usuarios", u.id), { permissao: novaPermissao });
+        await registrarAuditoria("Alterar permissão", `${u.usuario}: ${u.permissao} → ${novaPermissao}`);
         toast(`Permissão alterada com sucesso.`);
       } catch (err) {
         console.error(err);
@@ -1149,6 +1181,7 @@ function renderUsuarios() {
       
       try {
         await deleteDoc(doc(db, "usuarios", u.id));
+        await registrarAuditoria("Excluir conta", u.usuario);
         toast("Conta excluída.");
       } catch (err) {
         console.error(err);
@@ -1440,7 +1473,7 @@ function renderDashboard() {
   }
 }
 
-async function registrarHistorico(item, statusAnterior, statusNovo) {
+async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva") {
   const agora = new Date();
   await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
     equipamentoId: item.id,
@@ -1450,8 +1483,8 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
     local: item.local || "SEDE",
     equipe: item.equipeResponsavel || "",
     usuario: ESTADO.usuarioNome || "",
-    tipo: "Preventiva",
-    statusAnterior: statusAnterior || "Pendente",
+    tipo,
+    statusAnterior: statusAnterior || "-",
     statusNovo: statusNovo,
     registradoEm: agora.toISOString()
   });
@@ -1768,6 +1801,10 @@ async function adicionarEquipamentoManual() {
       await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", idEquipamentoEmEdicao), {
         patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM
       });
+      await registrarHistorico(
+        { id: idEquipamentoEmEdicao, patrimonio, setor, ambiente, local, equipeResponsavel: "" },
+        "-", "Editado", "Cadastro"
+      );
       toast("Equipamento atualizado com sucesso!");
       idEquipamentoEmEdicao = null;
       if (btnAdicionarEquipamento) btnAdicionarEquipamento.textContent = "Adicionar Equipamento";
@@ -1806,6 +1843,7 @@ async function adicionarEquipamentoManual() {
     try {
       await setDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), item);
       ESTADO.equipamentos.push(item);
+      await registrarHistorico(item, "-", "Cadastrado", "Cadastro");
       toast("Equipamento adicionado. Agendando automaticamente...");
       await reagendarTudo();
     } catch (err) {
@@ -1977,6 +2015,10 @@ $("#btnExcluirSelecionadosEquipamentos")?.addEventListener("click", async () => 
   const ok = window.confirm(`Excluir ${ids.length} equipamento(s) selecionado(s)? Essa ação não pode ser desfeita.`);
   if (!ok) return;
   try {
+    for (const id of ids) {
+      const item = ESTADO.equipamentos.find((e) => e.id === id);
+      if (item) await registrarHistorico(item, "-", "Excluído", "Cadastro");
+    }
     const TAMANHO_LOTE = 400;
     for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
       const batch = writeBatch(db);
@@ -1986,6 +2028,7 @@ $("#btnExcluirSelecionadosEquipamentos")?.addEventListener("click", async () => 
       await batch.commit();
     }
     ESTADO.selecaoEquipamentos.clear();
+    await registrarAuditoria("Excluir equipamentos (em massa)", `${ids.length} itens`);
     toast(`${ids.length} equipamento(s) excluído(s). Reorganizando cronograma...`);
     await reagendarTudo();
   } catch (err) {
@@ -2121,6 +2164,10 @@ async function abrirDrawerEquipamento(id) {
         prioridadeSetor: PRIORIDADE[setorPCM] || 7,
         pisoPCM: descobrirPiso(setor),
       });
+      await registrarHistorico(
+        { id, patrimonio, setor, ambiente, local, equipeResponsavel: item.equipeResponsavel },
+        "-", "Editado", "Cadastro"
+      );
       toast("Cadastro atualizado.");
       fecharDrawer();
     } catch (err) {
@@ -2185,6 +2232,7 @@ async function abrirDrawerEquipamento(id) {
     const ok = window.confirm(`Remover "${item.patrimonio || item.ambiente}"? Essa ação não pode ser desfeita.`);
     if (!ok) return;
     try {
+      await registrarHistorico(item, "-", "Excluído", "Cadastro");
       await deleteDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id));
       toast("Equipamento removido. Reorganizando cronograma...");
       fecharDrawer();
