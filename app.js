@@ -3077,36 +3077,32 @@ async function deletarRegistro(colecao, id) {
 
 // CONTROLE DO BOTÃO DE REAGENDAR ATRASADOS MANUALMENTE
 
-const btnReagendar = document.getElementById("btnReagendarAtrasados");
-
-if (btnReagendar) {
-  btnReagendar.addEventListener("click", async () => {
-    // Desabilita o botão para evitar múltiplos cliques
-    btnReagendar.disabled = true;
-    btnReagendar.textContent = "Reagendando...";
-    toast("Recalculando rotas e datas. Aguarde...");
-    
-    try {
-      await reagendarTudo();
-      toast("Aparelhos atrasados foram realocados com sucesso!");
-      
-      // Esconde a faixa amarela já que o problema foi resolvido
-      const banner = document.getElementById("alertaAtrasados");
-      if (banner) banner.hidden = true;
-      
-    } catch (err) {
-      console.error(err);
-      toast("Erro ao reagendar: " + err.message);
-    } finally {
-      // Volta o botão ao normal
-      btnReagendar.disabled = false;
-      btnReagendar.textContent = "Reagendar Agora";
-    }
-  });
+async function executarReagendamento(btn, textoNormal) {
+  btn.disabled = true;
+  btn.textContent = "Reagendando...";
+  toast("Recalculando rotas e datas. Aguarde...");
+  try {
+    await reagendarTudo();
+    toast("Aparelhos atrasados foram realocados com sucesso!");
+    atualizarBannerAtrasados();
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao reagendar: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoNormal;
+  }
 }
 
-console.log("Botão histórico:", $("#btnLimparHistorico"));
-console.log("Botão ordens:", $("#btnLimparOrdens"));
+const btnReagendar = document.getElementById("btnReagendarAtrasados");
+if (btnReagendar) {
+  btnReagendar.addEventListener("click", () => executarReagendamento(btnReagendar, "Reagendar Agora"));
+}
+
+const btnReagendarCalendario = document.getElementById("btnReagendarCalendario");
+if (btnReagendarCalendario) {
+  btnReagendarCalendario.addEventListener("click", () => executarReagendamento(btnReagendarCalendario, "↻ Reagendar atrasados"));
+}
 
 function numeroDoCiclo(id) {
   const ordenado = [...ESTADO.ciclos].sort((a, b) =>
