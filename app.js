@@ -1773,7 +1773,7 @@ function renderOrdens() {
     const tdBtn = document.createElement("td");
     tdBtn.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
       <div class="menu-linha-opcoes">
-        <button class="menu-linha-item" data-acao="pmoc">🖨️ Imprimir PMOC</button>
+        <button class="menu-linha-item" data-acao="pmoc">Imprimir PMOC</button>
         <button class="menu-linha-item menu-linha-excluir" data-acao="excluir">Excluir</button>
       </div>
     </details>`;
