@@ -2250,6 +2250,14 @@ async function abrirDrawerEquipamento(id) {
     const localItem = item.local || "SEDE";
     const cap = (ESTADO.config?.capacidades || {})[localItem] || { nEquipes: 1, aparelhosDia: 2 };
     const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
+    const feriadoNoDia = ESTADO.feriados.find((f) => novaData >= f.dataInicio && novaData <= f.dataFim);
+    if (feriadoNoDia) {
+      const ok = window.confirm(
+        `Esse dia é ${feriadoNoDia.tipo === "feriado" ? "feriado" : "período de férias"} (${feriadoNoDia.label}). Agendar mesmo assim?`
+      );
+      if (!ok) return;
+    }
+
     const jaNoDia = ESTADO.equipamentos.filter(
       (e) => e.id !== id && (e.local || "SEDE") === localItem && e.dataAgendada === novaData
     ).length;
@@ -2337,6 +2345,8 @@ async function adicionarFeriado() {
   try {
     const novoFeriado = { tipo, label: label || (tipo === "feriado" ? "Feriado" : "Férias"), dataInicio, dataFim };
     const refDoc = await addDoc(collection(db, "feriados"), novoFeriado);
+    const snapFeriadosAtual = await getDocs(query(collection(db, "feriados"), orderBy("dataInicio")));
+    ESTADO.feriados = snapFeriadosAtual.docs.map((d) => ({ id: d.id, ...d.data() }));
     await registrarAuditoria("Adicionar feriado/férias", `${novoFeriado.label} (${novoFeriado.dataInicio} a ${novoFeriado.dataFim})`);
     $("#feriadoLabel").value = "";
     $("#feriadoInicio").value = "";
