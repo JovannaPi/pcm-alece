@@ -921,7 +921,7 @@ $("#btnAuthEntrar")?.addEventListener("click", async () => {
 });
 
 $("#btnSair")?.addEventListener("click", () => {
-  registrarAuditoria("Logout", "");
+  
   // Desliga todos os "escutadores" do Firestore antes de sair — senão eles
   // continuam tentando sincronizar sem permissão e enchem o console de erro.
   if (ESTADO.unsubscribe) ESTADO.unsubscribe();
@@ -967,7 +967,6 @@ onAuthStateChanged(auth, async (user) => {
         return;
       }
       ESTADO.permissao = (dadosUsuario && dadosUsuario.permissao) || "padrao";
-      registrarAuditoria("Login", "");
     } catch (err) {
       console.error("Erro ao verificar usuário:", err);
     }
