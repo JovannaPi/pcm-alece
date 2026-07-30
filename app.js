@@ -584,6 +584,7 @@ async function gerarCronograma() {
     });
 
     toast("Apagando ciclos anteriores...");
+    await registrarAuditoria("Gerar cronograma", `Novo levantamento com ${ESTADO.itensCarregados.length} itens (apagou ciclos anteriores)`);
     await apagarTodosOsCiclos();
 
     const cicloRef = doc(collection(db, "ciclos"));
@@ -918,6 +919,7 @@ $("#btnAuthEntrar")?.addEventListener("click", async () => {
 });
 
 $("#btnSair")?.addEventListener("click", () => {
+  registrarAuditoria("Logout", "");
   // Desliga todos os "escutadores" do Firestore antes de sair — senão eles
   // continuam tentando sincronizar sem permissão e enchem o console de erro.
   if (ESTADO.unsubscribe) ESTADO.unsubscribe();
@@ -963,6 +965,7 @@ onAuthStateChanged(auth, async (user) => {
         return;
       }
       ESTADO.permissao = (dadosUsuario && dadosUsuario.permissao) || "padrao";
+      registrarAuditoria("Login", "");
     } catch (err) {
       console.error("Erro ao verificar usuário:", err);
     }
@@ -1024,6 +1027,7 @@ async function criarContaAdmin(usuario, senha, permissao) {
       ultimoLogin: "",
       criadoPor: ESTADO.usuarioNome || "",
     });
+    await registrarAuditoria("Criar usuário", `${usuario} (${permissao})`);
   } finally {
     await deleteApp(appTemp);
   }
@@ -1119,6 +1123,7 @@ function renderUsuarios() {
     tdMenu.querySelector('[data-acao="bloqueio"]').addEventListener("click", async () => {
       try {
         await updateDoc(doc(db, "usuarios", u.id), { bloqueado: !u.bloqueado });
+        await registrarAuditoria(u.bloqueado ? "Desbloquear usuário" : "Bloquear usuário", u.usuario);
         toast(u.bloqueado ? "Usuário desbloqueado." : "Usuário bloqueado.");
       } catch (err) {
         console.error(err);
@@ -1450,6 +1455,19 @@ async function registrarHistorico(item, statusAnterior, statusNovo) {
     statusNovo: statusNovo,
     registradoEm: agora.toISOString()
   });
+}
+
+async function registrarAuditoria(acao, detalhes) {
+  try {
+    await addDoc(collection(db, "auditoria"), {
+      acao,
+      detalhes: detalhes || "",
+      usuario: ESTADO.usuarioNome || "",
+      registradoEm: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Erro ao registrar auditoria:", err);
+  }
 }
 
 async function registrarOrdemServico(item) {
@@ -2212,6 +2230,7 @@ async function adicionarFeriado() {
     const novoFeriado = { tipo, label: label || (tipo === "feriado" ? "Feriado" : "Férias"), dataInicio, dataFim };
     const refDoc = await addDoc(collection(db, "feriados"), novoFeriado);
     ESTADO.feriados.push({ id: refDoc.id, ...novoFeriado });
+    await registrarAuditoria("Adicionar feriado/férias", `${novoFeriado.label} (${novoFeriado.dataInicio} a ${novoFeriado.dataFim})`);
     $("#feriadoLabel").value = "";
     $("#feriadoInicio").value = "";
     $("#feriadoFim").value = "";
@@ -2229,6 +2248,7 @@ async function removerFeriado(id, label) {
   try {
     await deleteDoc(doc(db, "feriados", id));
     ESTADO.feriados = ESTADO.feriados.filter((f) => f.id !== id);
+    await registrarAuditoria("Remover feriado/férias", label);
     toast("Removido. Reorganizando cronograma...");
     await reagendarTudo();
   } catch (err) {
@@ -2640,6 +2660,7 @@ async function apagarCronograma() {
   btnApagarCronograma.disabled = true;
   toast("Apagando cronograma...");
   try {
+    await registrarAuditoria("Apagar cronograma", `${ESTADO.equipamentos.length} equipamentos removidos`);
     const ids = ESTADO.equipamentos.map(eq => eq.id);
 
     const TAMANHO_LOTE = 400;
@@ -2764,13 +2785,13 @@ async function apagarTodoHistoricoTodosOsCiclos() {
       refs.slice(inicio, inicio + TAMANHO_LOTE).forEach((ref) => batch.delete(ref));
       await batch.commit();
     }
+    await registrarAuditoria("Apagar histórico completo", `${refs.length} registros`);
     toast(`${refs.length} registro(s) apagado(s).`);
   } catch (err) {
     console.error(err);
     toast("Erro ao apagar: " + err.message);
   }
 }
-
 const btnLimparOrdens = $("#btnLimparOrdens");
 if (btnLimparOrdens) {
   btnLimparOrdens.addEventListener("click", apagarTodasOrdensTodosOsCiclos);
@@ -2794,13 +2815,13 @@ async function apagarTodasOrdensTodosOsCiclos() {
       refs.slice(inicio, inicio + TAMANHO_LOTE).forEach((ref) => batch.delete(ref));
       await batch.commit();
     }
+    await registrarAuditoria("Apagar todas as ordens", `${refs.length} registros`);
     toast(`${refs.length} registro(s) apagado(s).`);
   } catch (err) {
     console.error(err);
     toast("Erro ao apagar: " + err.message);
   }
 }
-
 function gerarPDFPMOC(ordem) {
   const eqFull = ESTADO.equipamentos.find(e => e.id === ordem.equipamentoId) || {};
 
@@ -2916,7 +2937,7 @@ async function deletarCiclo(id) {
     "Excluir este ciclo permanentemente? Isso também apaga os equipamentos, o histórico e as ordens de serviço salvos dentro dele."
   );
   if (!ok) return;
-
+  await registrarAuditoria("Apagar ciclo", `Ciclo ${numeroDoCiclo(id)}`);
   try {
     // Apaga as subcoleções primeiro — apagar o documento do ciclo NÃO apaga
     // o que está dentro dele sozinho, ficaria órfão no Firestore pra sempre.
