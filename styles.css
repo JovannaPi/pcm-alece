@@ -760,6 +760,12 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.cal-day-badge .badge-maquinas {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cal-day-badge.pendente { background: var(--vermelho-fundo); color: var(--vermelho-texto); }
 .cal-day-badge.andamento { background: var(--amarelo-fundo); color: var(--amarelo-texto); }
 .cal-day-badge.concluido { background: var(--verde-fundo); color: var(--verde-texto); }
