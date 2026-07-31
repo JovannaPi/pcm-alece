@@ -867,11 +867,32 @@ async function carregarConfigSite() {
 }
 
 function preencherFormularioConfigSite() {
+  // Preenche os inputs do formulário (Modo Edição)
   if ($("#cfgMesesCiclo")) $("#cfgMesesCiclo").value = ESTADO.configSite.mesesCiclo;
   if ($("#cfgUrlCorretivas")) $("#cfgUrlCorretivas").value = ESTADO.configSite.urlCorretivas;
   if ($("#cfgPredios")) $("#cfgPredios").value = ESTADO.configSite.predios.join("\n");
+
+  // Preenche os textos visuais (Modo Leitura)
+  if ($("#txtCfgMeses")) $("#txtCfgMeses").textContent = ESTADO.configSite.mesesCiclo + " meses";
+  if ($("#txtCfgUrl")) $("#txtCfgUrl").textContent = ESTADO.configSite.urlCorretivas || "Nenhum link configurado";
+  if ($("#txtCfgPredios")) $("#txtCfgPredios").textContent = ESTADO.configSite.predios.join(" · ");
 }
 
+// --- CONTROLES DE MODO LEITURA/EDIÇÃO ---
+$("#btnHabilitarEdicaoCfg")?.addEventListener("click", () => {
+  $("#cfgModoLeitura").hidden = true;
+  $("#btnHabilitarEdicaoCfg").hidden = true;
+  $("#cfgModoEdicao").hidden = false;
+});
+
+$("#btnCancelarEdicaoCfg")?.addEventListener("click", () => {
+  $("#cfgModoEdicao").hidden = true;
+  $("#cfgModoLeitura").hidden = false;
+  $("#btnHabilitarEdicaoCfg").hidden = false;
+  preencherFormularioConfigSite(); // Volta os inputs pro valor original se a pessoa desistir
+});
+
+// --- SALVAR CONFIGURAÇÕES ---
 $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
   const mesesCiclo = Math.max(1, parseInt($("#cfgMesesCiclo").value, 10) || 4);
   const urlCorretivas = $("#cfgUrlCorretivas").value.trim();
@@ -886,13 +907,18 @@ $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
   try {
     await setDoc(doc(db, "config", "site"), novaConfig);
     ESTADO.configSite = novaConfig;
-    await registrarAuditoria("Alterar configurações do site", `Ciclo: ${mesesCiclo} meses`);
-    toast("Configurações salvas!");
+    await registrarAuditoria("Alterar parâmetros do sistema", `Ciclo: ${mesesCiclo} meses`);
+    toast("Configurações salvas com sucesso!");
     carregarChamadosCorretivos(true);
+    
+    // Sucesso! Volta para o Modo Leitura automaticamente
+    $("#btnCancelarEdicaoCfg").click();
+
   } catch (err) {
     console.error(err);
     toast("Erro ao salvar: " + err.message);
   }
+  
   const selectEqLocal = $("#eqLocal");
   if (selectEqLocal) {
     selectEqLocal.innerHTML = ESTADO.configSite.predios.map((p) => `<option value="${p}">${p}</option>`).join("");
