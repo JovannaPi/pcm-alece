@@ -133,6 +133,7 @@ const ESTADO = {
 configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: "", predios: ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"] },
   selecaoEquipamentos: new Set(),
   selecaoHistorico: new Set(),
+  equipes: [],
   selecaoOrdens: new Set(),
   usuarios: [],
   ordenacaoEquipamentos: null,
@@ -287,6 +288,7 @@ $all(".subtab").forEach((btn) => {
     if (btn.dataset.subview === "cfg-usuarios") renderUsuarios();
     if (btn.dataset.subview === "cfg-auditoria") renderAuditoria();
     if (btn.dataset.subview === "cfg-geral") preencherFormularioConfigSite();
+    if (btn.dataset.subview === "cfg-equipes") renderEquipesPorPredio();
   });
 });
 
@@ -664,7 +666,7 @@ async function gerarCronograma() {
           grupoAmbienteAtual = chaveAmbiente;
           indiceGrupo++;
         }
-        item.equipeResponsavel = `Equipe ${(indiceGrupo % cap.nEquipes) + 1}`;
+        item.equipeResponsavel = nomeEquipePorVaga(local, indiceGrupo, cap.nEquipes);
 
         ordem++;
         item.ordemExecucao = ordem;
@@ -1065,7 +1067,7 @@ onAuthStateChanged(auth, async (user) => {
     if (!appJaInicializado) {
           appJaInicializado = true;
           inicializarApp();
-          if (ESTADO.permissao === "admin") { iniciarSincronizacaoUsuarios(); iniciarSincronizacaoAuditoria(); }
+          if (ESTADO.permissao === "admin") { iniciarSincronizacaoUsuarios(); iniciarSincronizacaoAuditoria(); iniciarSincronizacaoEquipes(); }
           await carregarConfigSite();
           const abaSalva = localStorage.getItem("ultimaAbaPMOC") || "dashboard";
           irParaAba(abaSalva);
@@ -1288,6 +1290,132 @@ function locaisParaConfigurar() {
   const origem = ESTADO.equipamentos.length ? ESTADO.equipamentos : ESTADO.itensCarregados;
   const set = new Set(origem.map((e) => e.local || "SEDE"));
   return set.size ? [...set].sort() : ["SEDE"];
+}
+
+function iniciarSincronizacaoEquipes() {
+  const q = query(collection(db, "equipes"), orderBy("predio"), orderBy("ordem"));
+  onSnapshot(q, (snap) => {
+    ESTADO.equipes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderEquipesPorPredio();
+  }, (err) => console.error("Erro ao ler equipes:", err));
+}
+
+function nomeEquipePorVaga(predio, vaga, nEquipes) {
+  const ordem = (vaga % nEquipes) + 1;
+  const encontrada = ESTADO.equipes.find((e) => e.predio === predio && e.ordem === ordem);
+  return encontrada ? encontrada.nome : `Equipe ${ordem}`;
+}
+
+function renderEquipesPorPredio() {
+  const container = $("#equipesPorPredio");
+  if (!container) return;
+
+  const predios = ESTADO.configSite.predios;
+  const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
+
+  container.innerHTML = predios.map((predio) => {
+    const nEquipes = (capacidades[predio] && capacidades[predio].nEquipes) || 2;
+    const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === predio).sort((a, b) => a.ordem - b.ordem);
+    const maiorOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0);
+    const totalVagas = Math.max(nEquipes, maiorOrdem);
+
+    let linhas = "";
+    for (let ordem = 1; ordem <= totalVagas; ordem++) {
+      const existente = equipesDoPredio.find((e) => e.ordem === ordem);
+      const ehExtra = ordem > nEquipes;
+      linhas += `
+        <div class="eq-linha${ehExtra ? " eq-extra" : ""}">
+          <span class="eq-vaga">${ehExtra ? "extra" : "vaga " + ordem}</span>
+          <input type="text" data-predio="${predio}" data-ordem="${ordem}" class="eq-nome-input"
+            value="${existente ? existente.nome : ""}" placeholder="Equipe ${ordem}">
+          <select data-predio-atual="${predio}" data-ordem-mover="${ordem}" class="eq-mover-select" style="width:auto">
+            ${predios.map((p) => `<option value="${p}" ${p === predio ? "selected" : ""}>${p}</option>`).join("")}
+          </select>
+          ${existente ? `<button class="btn-icon eq-excluir" data-id="${existente.id}" title="Excluir">✕</button>` : ""}
+        </div>`;
+    }
+
+    return `
+      <div class="card eq-predio-card">
+        <p class="eq-predio-titulo">${predio} <span class="muted" style="text-transform:none;font-weight:400">(${nEquipes} vaga(s) usada(s) nas preventivas)</span></p>
+        ${linhas}
+        <button class="btn ghost btn-adicionar-vaga" data-predio="${predio}" style="margin-top:8px">+ Adicionar vaga extra</button>
+      </div>`;
+  }).join("");
+
+  container.querySelectorAll(".btn-adicionar-vaga").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const predio = btn.dataset.predio;
+      const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === predio);
+      const proximaOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0) + 1;
+      const nomeTemp = window.prompt(`Nome da nova equipe extra (vaga ${proximaOrdem}) em ${predio}:`);
+      if (!nomeTemp || !nomeTemp.trim()) return;
+      addDoc(collection(db, "equipes"), { predio, ordem: proximaOrdem, nome: nomeTemp.trim() })
+        .then(() => registrarAuditoria("Adicionar equipe", `${nomeTemp.trim()} — ${predio}, vaga ${proximaOrdem}`))
+        .catch((err) => { console.error(err); toast("Erro ao adicionar: " + err.message); });
+    });
+  });
+
+  container.querySelectorAll(".eq-nome-input").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const predio = input.dataset.predio;
+      const ordem = Number(input.dataset.ordem);
+      const nome = input.value.trim();
+      const existente = ESTADO.equipes.find((e) => e.predio === predio && e.ordem === ordem);
+      try {
+        if (!nome) {
+          if (existente) await deleteDoc(doc(db, "equipes", existente.id));
+          return;
+        }
+        if (existente) {
+          await updateDoc(doc(db, "equipes", existente.id), { nome });
+        } else {
+          await addDoc(collection(db, "equipes"), { predio, ordem, nome });
+        }
+        await registrarAuditoria("Renomear/definir equipe", `${nome} — ${predio}, vaga ${ordem}`);
+        toast("Equipe salva.");
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao salvar: " + err.message);
+      }
+    });
+  });
+
+  container.querySelectorAll(".eq-mover-select").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const predioAtual = select.dataset.predioAtual;
+      const ordemMover = Number(select.dataset.ordemMover);
+      const novoPredio = select.value;
+      if (novoPredio === predioAtual) return;
+      const existente = ESTADO.equipes.find((e) => e.predio === predioAtual && e.ordem === ordemMover);
+      if (!existente) { renderEquipesPorPredio(); return; }
+      const equipesDoDestino = ESTADO.equipes.filter((e) => e.predio === novoPredio);
+      const novaOrdem = equipesDoDestino.reduce((max, e) => Math.max(max, e.ordem), 0) + 1;
+      try {
+        await updateDoc(doc(db, "equipes", existente.id), { predio: novoPredio, ordem: novaOrdem });
+        await registrarAuditoria("Mover equipe de prédio", `${existente.nome}: ${predioAtual} → ${novoPredio}`);
+        toast(`Equipe movida pra ${novoPredio}.`);
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao mover: " + err.message);
+      }
+    });
+  });
+
+  container.querySelectorAll(".eq-excluir").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const ok = window.confirm("Excluir essa equipe?");
+      if (!ok) return;
+      try {
+        await deleteDoc(doc(db, "equipes", btn.dataset.id));
+        await registrarAuditoria("Excluir equipe", btn.dataset.id);
+        toast("Equipe excluída.");
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao excluir: " + err.message);
+      }
+    });
+  });
 }
 
 function renderCapacidadesPorPredio() {
@@ -2085,7 +2213,7 @@ async function adicionarEquipamentoManual() {
     const maiorOrdem = itensDoMesmoLocal.reduce((max, e) => Math.max(max, e.ordemExecucao || 0), 0);
     const ordemExecucao = maiorOrdem + 1;
     const capLocal = (ESTADO.config && ESTADO.config.capacidades && ESTADO.config.capacidades[local]) || { nEquipes: 2 };
-    const equipeResponsavel = `Equipe ${((ordemExecucao - 1) % capLocal.nEquipes) + 1}`;
+    const equipeResponsavel = nomeEquipePorVaga(local, ordemExecucao - 1, capLocal.nEquipes);
 
     const item = {
       id, patrimonio, setor, ambiente,
