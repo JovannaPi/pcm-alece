@@ -165,6 +165,19 @@
         <button class="btn secondary" id="btnExport">Baixar planilha (.xlsx)</button>
       </div>
       <details class="ciclos-discreto">
+        <summary>Ver visão gerencial</summary>
+        <div class="card" style="margin-top:10px">
+          <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">Por prédio</h3>
+          <div id="visaoPorPredio" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px"></div>
+
+          <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">Próximos 7 dias</h3>
+          <div id="visaoProximosDias" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:20px"></div>
+
+          <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">Por equipe</h3>
+          <div id="visaoPorEquipe"></div>
+        </div>
+      </details>
+      <details class="ciclos-discreto">
         <summary>Ver ciclos anteriores</summary>
         <div class="card" style="margin-top:10px">
           <div class="card-head">
