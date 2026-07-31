@@ -2226,6 +2226,11 @@ function prepararEdicao(item) {
   toast("Modo de edição ativado para o item selecionado.");
 }
 
+const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
+if (btnAdicionarEquipamento) {
+  btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
+}
+
 async function adicionarEquipamentoManual() {
   const patrimonio = $("#eqPatrimonio").value.trim();
   const setor = $("#eqSetor").value.trim();
