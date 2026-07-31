@@ -100,16 +100,32 @@
     <!-- VIEW 2: CONFIG / CRONOGRAMA -->
     <section class="view" id="view-config">
       <div class="card">
-        <h2>Capacidade da equipe</h2>
-        <div class="grid-form">
+        <h2>Parâmetros Iniciais</h2>
+        <p class="muted">Defina a base do calendário para o início do ciclo de manutenção.</p>
+        <div class="grid-form" style="margin-top: 16px;">
           <label>Dias úteis por semana<input type="number" id="diasSemana" value="5" min="1" max="7"></label>
           <label>Data de início<input type="date" id="dataInicio"></label>
         </div>
-        <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 4px">Capacidade por prédio</h3>
-        <p class="muted">Cada prédio tem sua própria equipe e avança no calendário no próprio ritmo.</p>
-        <div id="capacidadesPorPredio"></div>
-        <button class="btn primary" id="btnGerar" style="margin-top:18px">Gerar cronograma</button>
-        <p class="muted" id="resumoCapacidade"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Capacidade por Prédio</h2>
+        </div>
+        <p class="muted">Cada local avança no calendário no próprio ritmo. Ajuste quantas equipes atuam e quantos aparelhos fazem por dia.</p>
+        <div id="capacidadesPorPredio" style="margin-top: 16px;"></div>
+      </div>
+
+      <!-- Bloco de Ação (Launchpad) -->
+      <div class="launchpad-card">
+        <div class="launchpad-texto">
+          <h3>Pronto para processar?</h3>
+          <p>Ao clicar em gerar, o sistema calculará as rotas e datas de todos os equipamentos com base nas regras acima. <strong>Isso reescreverá o cronograma atual.</strong></p>
+          <div id="resumoCapacidade" class="launchpad-resumo"></div>
+        </div>
+        <button class="btn primary" id="btnGerar" style="background: var(--dourado); color: var(--azul-900); padding: 12px 24px; font-size: 15px; flex-shrink: 0;">
+          Gerar Cronograma
+        </button>
       </div>
     </section>
 
