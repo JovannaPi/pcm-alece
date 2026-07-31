@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 </head>
 <body>
-<div class="auth-overlay" id="authOverlay">
+<div class="auth-overlay" id="authOverlay" hidden>
   <div class="auth-card">
     <h2 id="authTitulo">Entrar</h2>
     <label>Usuário<input type="text" id="authEmail" placeholder="ex: joana.feira"></label>
@@ -17,6 +17,9 @@
     <button class="btn primary" id="btnAuthEntrar" style="width:100%;margin-top:6px">Entrar</button>
     <p class="muted" id="authErro" style="color:var(--vermelho);min-height:18px"></p>
   </div>
+</div>
+<div id="telaCarregando" style="position:fixed;inset:0;background:var(--fundo);display:flex;align-items:center;justify-content:center;z-index:150">
+  <p style="color:var(--texto-suave);font-size:14px">Carregando...</p>
 </div>
 <div id="appRoot" hidden>
 
