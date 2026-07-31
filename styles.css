@@ -1208,12 +1208,88 @@ body.modo-padrao .badge-somente-leitura {
 .subtab:hover { color: var(--azul-700); }
 .subtab.active { color: var(--azul-800); border-bottom-color: var(--dourado); }
 
-.eq-predio-card { margin-bottom: 20px; }
+/* --- TELA DE GESTÃO DE EQUIPES (MODERNO) --- */
+#equipesPorPredio {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--sp-5);
+  margin-top: var(--sp-4);
+}
+
+.eq-predio-card {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: var(--sp-5);
+  box-shadow: var(--sombra);
+  display: flex;
+  flex-direction: column;
+}
+
 .eq-predio-titulo {
-  font-size: 13px; font-weight: 700; color: var(--azul-800);
-  text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 10px;
+  font-family: var(--fonte-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--azul-900);
+  border-bottom: 2px solid var(--fundo);
+  padding-bottom: 12px;
+  margin: 0 0 16px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+
+.eq-predio-titulo .badge-capacidade {
+  font-family: var(--fonte-corpo);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--azul-50);
+  color: var(--azul-900);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
 .eq-linha {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: var(--fundo);
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  transition: all 0.2s ease;
 }
-.eq-linha input[type="text"] { flex: 1; margin: 0; }
+
+/* A mágica acontece aqui: A linha "acende" quando você clica para digitar */
+.eq-linha:focus-within {
+  background: #fff;
+  border-color: var(--dourado);
+  box-shadow: 0 0 0 3px rgba(201, 163, 78, 0.15);
+}
+
+.eq-nome-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--texto) !important;
+  outline: none !important;
+  padding: 4px 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+.eq-nome-input::placeholder {
+  color: var(--texto-suave);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.btn-adicionar-vaga {
+  margin-top: auto;
+  align-self: flex-start;
+  font-size: 13px;
+  padding: 6px 12px;
+}
