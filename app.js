@@ -1031,6 +1031,8 @@ async function registrarUsuarioLogado(user) {
 onAuthStateChanged(auth, async (user) => {
   const overlay = $("#authOverlay");
   const appRoot = $("#appRoot");
+  const telaCarregando = $("#telaCarregando");
+  if (telaCarregando) telaCarregando.remove();
   if (user) {
     ESTADO.usuarioEmail = user.email;
     ESTADO.usuarioNome = extrairUsuario(user.email);
