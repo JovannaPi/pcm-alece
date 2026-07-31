@@ -876,6 +876,12 @@ function preencherFormularioConfigSite() {
   if ($("#txtCfgMeses")) $("#txtCfgMeses").textContent = ESTADO.configSite.mesesCiclo + " meses";
   if ($("#txtCfgUrl")) $("#txtCfgUrl").textContent = ESTADO.configSite.urlCorretivas || "Nenhum link configurado";
   if ($("#txtCfgPredios")) $("#txtCfgPredios").textContent = ESTADO.configSite.predios.join(" · ");
+
+  // CORREÇÃO: Preenche automaticamente as opções de Prédio no cadastro de equipamentos
+  const selectEqLocal = $("#eqLocal");
+  if (selectEqLocal && ESTADO.configSite && ESTADO.configSite.predios) {
+    selectEqLocal.innerHTML = ESTADO.configSite.predios.map(p => `<option value="${p}">${p}</option>`).join("");
+  }
 }
 
 // --- CONTROLES DE MODO LEITURA/EDIÇÃO ---
