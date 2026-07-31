@@ -1502,6 +1502,90 @@ function classeStatus(status) {
   return "pendente";
 }
 
+function renderVisaoGerencial() {
+  const elPredio = $("#visaoPorPredio");
+  const elDias = $("#visaoProximosDias");
+  const elEquipe = $("#visaoPorEquipe");
+  if (!elPredio || !elDias || !elEquipe) return;
+
+  const itens = ESTADO.equipamentos;
+
+  // --- Por prédio ---
+  const gruposPredio = new Map();
+  itens.forEach((i) => {
+    const l = i.local || "SEDE";
+    if (!gruposPredio.has(l)) gruposPredio.set(l, []);
+    gruposPredio.get(l).push(i);
+  });
+  const porPredio = [...gruposPredio.entries()]
+    .map(([local, lista]) => {
+      const concluidas = lista.filter((i) => i.statusPreventiva === "Concluída").length;
+      const pct = lista.length ? Math.round((concluidas / lista.length) * 100) : 0;
+      return { local, total: lista.length, concluidas, pct };
+    })
+    .sort((a, b) => a.local.localeCompare(b.local));
+
+  elPredio.innerHTML = porPredio.map((p) => `
+    <div class="vg-card">
+      <p class="vg-titulo">${p.local}</p>
+      <p class="vg-pct">${p.pct}%</p>
+      <p class="vg-detalhe">${p.concluidas} de ${p.total} concluídos</p>
+    </div>`).join("") || `<p class="muted">Nenhum aparelho carregado ainda.</p>`;
+
+  // --- Próximos 7 dias ---
+  const porData = {};
+  itens.forEach((i) => { if (i.dataAgendada) porData[i.dataAgendada] = (porData[i.dataAgendada] || 0) + 1; });
+  const hoje = new Date();
+  const nomesCurtos = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  let htmlDias = "";
+  for (let n = 0; n < 7; n++) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() + n);
+    const iso = formatISO(d);
+    const diaSemanaIdx = (d.getDay() + 6) % 7;
+    const fimDeSemana = diaSemanaIdx >= 5;
+    htmlDias += `
+      <div class="vg-dia${fimDeSemana ? " vg-fimdesemana" : ""}">
+        <p class="vg-dia-nome">${nomesCurtos[diaSemanaIdx]}</p>
+        <p class="vg-dia-num">${porData[iso] || 0}</p>
+      </div>`;
+  }
+  elDias.innerHTML = htmlDias;
+
+  // --- Por equipe, agrupado por prédio ---
+  const gruposEquipe = new Map();
+  itens.forEach((i) => {
+    const l = i.local || "SEDE";
+    if (!gruposEquipe.has(l)) gruposEquipe.set(l, new Map());
+    const eq = i.equipeResponsavel || "Sem equipe";
+    const porEq = gruposEquipe.get(l);
+    if (!porEq.has(eq)) porEq.set(eq, []);
+    porEq.get(eq).push(i);
+  });
+
+  const predios = [...gruposEquipe.keys()].sort();
+  elEquipe.innerHTML = predios.map((local) => {
+    const equipes = gruposEquipe.get(local);
+    const linhas = [...equipes.entries()]
+      .map(([equipe, lista]) => {
+        const concluidas = lista.filter((i) => i.statusPreventiva === "Concluída").length;
+        const pct = lista.length ? Math.round((concluidas / lista.length) * 100) : 0;
+        return { equipe, total: lista.length, concluidas, pct };
+      })
+      .sort((a, b) => a.equipe.localeCompare(b.equipe));
+
+    return `
+      <div class="vg-equipe-grupo">
+        <p class="vg-equipe-predio-nome">${local}</p>
+        ${linhas.map((l) => `
+          <div class="vg-equipe-linha">
+            <span>${l.equipe}</span>
+            <span style="color:var(--texto-suave)">${l.concluidas} de ${l.total} · ${l.pct}%</span>
+          </div>`).join("")}
+      </div>`;
+  }).join("") || `<p class="muted">Nenhum aparelho carregado ainda.</p>`;
+}
+
 function renderResumoAtrasos() {
   const resumoEl = $("#resumoAtrasosResumo");
   const table = $("#atrasosTable");
@@ -1579,6 +1663,7 @@ function renderDashboard() {
       <div class="ciclo-barra"><span style="width:${pct}%"></span></div>`;
   }
   renderResumoAtrasos();
+  renderVisaoGerencial();
 }
 
 async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva") {
