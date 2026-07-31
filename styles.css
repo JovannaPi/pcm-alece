@@ -1162,31 +1162,86 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 /* ------------------------------------------------------------
    Responsivo
    ------------------------------------------------------------ */
+/* ============================================================
+   RESPONSIVIDADE (MOBILE / CELULAR)
+   ============================================================ */
+
 @media (max-width: 960px) {
-  .topbar-inner { flex-wrap: wrap; min-height: auto; padding: var(--sp-3) var(--sp-4); }
-  .tabs { width: 100%; overflow-x: auto; }
   .body-layout { flex-direction: column; }
-  .sidenav {
-    width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-    border-right: none;
-    border-bottom: 1px solid var(--borda);
-    padding: var(--sp-3);
-  }
-  .sidenav-label { display: none !important; }
-  .sidenav-spacer { display: none; }
-  .sidenav-item { width: auto; }
-  .page { padding: var(--sp-3); }
-  .kpi-row { grid-template-columns: repeat(2, 1fr); }
-  .cal-day { min-height: 68px; }
+  .page { padding: var(--sp-4); }
   .drawer { width: 100%; max-width: 100%; }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 768px) {
+  /* 1. LAYOUT GERAL E ESPAÇO PRO MENU INFERIOR */
+  .body-layout { padding-bottom: 70px; }
+  .page { padding: 12px; gap: 16px; }
+
+  /* 2. TOPBAR COMPACTA E ABAS DESLIZANTES */
+  .topbar-inner { flex-wrap: wrap; padding: 10px; min-height: auto; gap: 8px; }
   .brand-org { display: none; }
+  .brand img { height: 32px; }
+  .brand-name { font-size: 18px; }
+  
+  .tabs { 
+    width: 100%; 
+    overflow-x: auto; 
+    padding-bottom: 4px; 
+    -webkit-overflow-scrolling: touch; /* Rolar suave no iPhone */
+  }
+  .tab { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+
+  /* 3. MENU LATERAL VIRA MENU INFERIOR (APP) */
+  .sidenav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    top: auto; height: auto;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    border-top: 1px solid var(--borda);
+    padding: 8px;
+    z-index: 1000;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidenav-label, .sidenav-spacer { display: none !important; }
+  .sidenav-item {
+    flex: 1;
+    min-width: 80px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 6px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .sidenav-icon { margin: 0 auto; } /* Centraliza a bolinha */
+  #btnSair, #btnApagarCronograma { margin-top: 0 !important; }
+
+  /* 4. FORMULÁRIOS, KPI E TOOLBARS EM 1 COLUNA */
+  .grid-form { grid-template-columns: 1fr; }
+  .filtros-equipamentos { grid-template-columns: 1fr; }
+  .capacidade-linha { grid-template-columns: 1fr; gap: 8px; }
   .kpi-row { grid-template-columns: 1fr 1fr; }
-  .capacidade-linha { grid-template-columns: 1fr; gap: var(--sp-2); }
+  .toolbar-pesquisa { flex-direction: column; align-items: stretch; }
+  .toolbar-pesquisa .search-input { min-width: 100%; }
+
+  /* 5. CALENDÁRIO ULTRA-COMPACTO */
+  .cal-dow { font-size: 9px; padding: 4px 0; }
+  .cal-day { min-height: 50px; padding: 2px; }
+  .cal-day-num { font-size: 11px; }
+  .cal-day-badge { padding: 2px; justify-content: center; }
+  .badge-predio { display: none; } /* Esconde o nome do prédio no celular */
+  .badge-contagem { font-size: 9px; margin: 0 auto; text-align: center; }
+  .cal-badge-tooltip { display: none !important; } /* Desativa o balão no touch */
+
+  /* 6. AJUSTES EM TABELAS E MENUS */
+  table tbody td, table thead th { padding: 8px; font-size: 12px; }
+  .menu-linha-opcoes { right: auto; left: -50px; } /* Evita que o menu corte a tela pra direita */
+  .toast { width: 90vw; bottom: 80px; } /* Fica acima do menu inferior */
 }
 
 .drawer-overlay {
