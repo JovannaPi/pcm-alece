@@ -1207,3 +1207,18 @@ body.modo-padrao .badge-somente-leitura {
 }
 .subtab:hover { color: var(--azul-700); }
 .subtab.active { color: var(--azul-800); border-bottom-color: var(--dourado); }
+
+.eq-predio-card { margin-bottom: 20px; }
+.eq-predio-titulo {
+  font-size: 13px; font-weight: 700; color: var(--azul-800);
+  text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 10px;
+}
+.eq-linha {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.eq-linha .eq-vaga {
+  font-family: var(--fonte-dado); font-size: 12px; color: var(--texto-fraco);
+  width: 46px; flex-shrink: 0;
+}
+.eq-linha input[type="text"] { flex: 1; margin: 0; }
+.eq-linha.eq-extra .eq-vaga { color: var(--dourado-escuro); }
