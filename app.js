@@ -130,7 +130,7 @@ const ESTADO = {
   chamadosCorretivos: [],
   usuarioNome: null,
   permissao: "padrao",
-  configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: URL_CHAMADOS_CORRETIVOS, predios: ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"] },
+configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: "", predios: ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"] },
   selecaoEquipamentos: new Set(),
   selecaoHistorico: new Set(),
   selecaoOrdens: new Set(),
@@ -154,7 +154,7 @@ const ESTADO = {
   localFiltro: "Todos",
 };
 
-const URL_CHAMADOS_CORRETIVOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR2Ysf9JofZL_2Xn_JPJFaPrMX6IGiwMQWFyhgJcqu8BK_4imC_lmrMgfpDWLnI6MIdcC0OYSDUQFPw/pub?gid=1978174237&single=true&output=csv";
+ESTADO.configSite.urlCorretivas = URL_CHAMADOS_CORRETIVOS;
 const INTERVALO_ATUALIZACAO_CORRETIVOS_MS = 5 * 60 * 1000; 
 
 const COL_CORRETIVA = {
