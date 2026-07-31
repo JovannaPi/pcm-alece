@@ -1626,7 +1626,7 @@ iniciarSincronizacaoOrdens();
 
 function iniciarSincronizacaoHistorico(){
   if (ESTADO.unsubscribeHistorico) ESTADO.unsubscribeHistorico();
-  const q = query(collectionGroup(db, "historico"), orderBy("registradoEm", "desc"));
+  const q = query(collectionGroup(db, "historico"), orderBy("registradoEm", "desc"), limit(300));
 
   ESTADO.unsubscribeHistorico = onSnapshot(q, (snap) => {
     ESTADO.historico = snap.docs
@@ -2281,6 +2281,7 @@ async function abrirDrawerEquipamento(id) {
         setor: item.setor || "",
         ambiente: item.ambiente || "",
         local: item.local || "SEDE",
+        usuario: ESTADO.usuarioNome || "",
         equipe: item.equipeResponsavel || "",
         tipo: "Reagendamento manual",
         dataAnterior: item.dataAgendada || "",
