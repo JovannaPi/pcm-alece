@@ -1643,6 +1643,11 @@ function selecionarDia(iso) {
   $("#dayDetailCard").hidden = false;
   $("#dayDetailTitle").textContent = `${dia}/${mes}/${ano} — ${itensDoDia.length} aparelho(s)`;
   renderTabelaDetalheDia(itensDoDia, () => selecionarDia(iso));
+  
+  // CORREÇÃO MOBILE: Desliza a tela suavemente para baixo até a tabela
+  if (window.innerWidth <= 768) {
+    setTimeout(() => $("#dayDetailCard").scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
 }
 
 function selecionarDiaBadge(iso, predio, itensPredio) {
@@ -1656,6 +1661,11 @@ function selecionarDiaBadge(iso, predio, itensPredio) {
       .filter((i) => i.dataAgendada === iso && (i.local || "SEDE") === predio);
     selecionarDiaBadge(iso, predio, itensAtualizados);
   });
+  
+  // CORREÇÃO MOBILE: Desliza a tela suavemente para baixo até a tabela
+  if (window.innerWidth <= 768) {
+    setTimeout(() => $("#dayDetailCard").scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
 }
 
 function renderTabelaDetalheDia(itensDoDia, aoAtualizar) {
