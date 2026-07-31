@@ -304,7 +304,9 @@ function irParaAba(nome) {
   $(`.tab[data-view="${nome}"]`)?.click();
 }
 $("#navConfigSite")?.addEventListener("click", () => {
-  irParaAba("config-site");
+  $all(".tab").forEach((b) => b.classList.remove("active"));
+  $all(".view").forEach((v) => v.classList.remove("active"));
+  $("#view-config-site").classList.add("active");
   preencherFormularioConfigSite();
 });
 
