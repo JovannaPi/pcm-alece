@@ -303,6 +303,10 @@ $all(".tab").forEach((btn) => {
 function irParaAba(nome) {
   $(`.tab[data-view="${nome}"]`)?.click();
 }
+$("#navConfigSite")?.addEventListener("click", () => {
+  irParaAba("config-site");
+  preencherFormularioConfigSite();
+});
 
 // ------------------------------------------------------------------
 // Filtro por prédio (SEDE / Anexo 1 / Anexo 2 / ...) — usado nas telas
