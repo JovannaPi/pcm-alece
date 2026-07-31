@@ -1502,6 +1502,53 @@ function classeStatus(status) {
   return "pendente";
 }
 
+function renderResumoAtrasos() {
+  const resumoEl = $("#resumoAtrasosResumo");
+  const table = $("#atrasosTable");
+  if (!resumoEl || !table) return;
+
+  const atrasadosAgora = aplicarFiltroLocal(ESTADO.equipamentos).filter(estaAtrasado).length;
+
+  const reagendamentos = aplicarFiltroLocal(
+    ESTADO.historico.filter((h) => h.tipo === "Atraso Reagendado" && h.cicloId === ESTADO.cicloAtual)
+  );
+
+  const porPredio = {};
+  reagendamentos.forEach((h) => {
+    const local = h.local || "SEDE";
+    porPredio[local] = (porPredio[local] || 0) + 1;
+  });
+  const resumoPredio = Object.entries(porPredio).map(([l, q]) => `${l}: ${q}`).join(" · ") || "nenhum";
+
+  resumoEl.textContent = `Atrasos — ${atrasadosAgora} agora · ${reagendamentos.length} reagendado(s) neste ciclo (${resumoPredio})`;
+  $("#atrasosCount").textContent = `${reagendamentos.length} registros`;
+
+  table.innerHTML = `<thead><tr>
+      <th>Patrimônio</th><th>Prédio</th><th>Setor</th><th>Equipe</th><th>De</th><th>Para</th><th>Quando</th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+
+  if (!reagendamentos.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--texto-suave)">Nenhum atraso reagendado neste ciclo ainda.</td></tr>`;
+    return;
+  }
+
+  [...reagendamentos]
+    .sort((a, b) => String(b.registradoEm).localeCompare(String(a.registradoEm)))
+    .forEach((h) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${h.patrimonio || "-"}</td>
+        <td>${h.local || "SEDE"}</td>
+        <td>${h.setor || "-"}</td>
+        <td>${h.equipe || "-"}</td>
+        <td>${formatarDataBR(h.dataAnterior)}</td>
+        <td>${formatarDataBR(h.dataNova)}</td>
+        <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>`;
+      tbody.appendChild(tr);
+    });
+}
+
 function renderDashboard() {
   // O aplicarFiltroLocal já garante que os números mudem quando você clica no filtro lá em cima
   const itens = aplicarFiltroLocal(ESTADO.equipamentos);
@@ -1531,6 +1578,7 @@ function renderDashboard() {
       <strong>Ciclo ${cicloAtual}</strong> — ${concluidas} de ${total} aparelhos concluídos (${pct}%)
       <div class="ciclo-barra"><span style="width:${pct}%"></span></div>`;
   }
+  renderResumoAtrasos();
 }
 
 async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva") {
