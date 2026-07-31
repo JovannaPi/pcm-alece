@@ -1161,3 +1161,34 @@ body.modo-padrao .badge-somente-leitura {
   border-radius: 999px;
   margin-left: 12px;
 }
+
+.vg-card {
+  background: var(--azul-50);
+  border-radius: var(--raio-pequeno);
+  padding: 12px;
+}
+.vg-card .vg-titulo { font-size: 12.5px; color: var(--texto-suave); margin: 0 0 4px; }
+.vg-card .vg-pct { font-family: var(--fonte-display); font-size: 22px; font-weight: 700; margin: 0 0 2px; color: var(--azul-900); }
+.vg-card .vg-detalhe { font-size: 11.5px; color: var(--texto-fraco); margin: 0; }
+.vg-dia {
+  background: var(--azul-50);
+  border-radius: var(--raio-pequeno);
+  padding: 8px 4px;
+  text-align: center;
+}
+.vg-dia .vg-dia-nome { font-size: 10.5px; color: var(--texto-fraco); margin: 0 0 4px; text-transform: uppercase; }
+.vg-dia .vg-dia-num { font-size: 16px; font-weight: 700; margin: 0; color: var(--azul-900); }
+.vg-dia.vg-fimdesemana { background: var(--dourado-tint); }
+.vg-dia.vg-fimdesemana .vg-dia-num { color: var(--dourado-escuro); }
+.vg-equipe-grupo { margin-bottom: 14px; }
+.vg-equipe-grupo:last-child { margin-bottom: 0; }
+.vg-equipe-predio-nome {
+  font-size: 11px; color: var(--texto-fraco); text-transform: uppercase;
+  letter-spacing: 0.04em; margin: 0 0 6px;
+}
+.vg-equipe-linha {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--azul-50); border-radius: var(--raio-pequeno);
+  padding: 8px 12px; font-size: 13px; margin-bottom: 4px;
+}
+.vg-equipe-linha:last-child { margin-bottom: 0; }
