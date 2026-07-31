@@ -278,6 +278,18 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.remove("show"), 2600);
 }
 
+$all(".subtab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    $all(".subtab").forEach((b) => b.classList.remove("active"));
+    $all(".subview").forEach((v) => v.classList.remove("active"));
+    btn.classList.add("active");
+    $(`#subview-${btn.dataset.subview}`).classList.add("active");
+    if (btn.dataset.subview === "cfg-usuarios") renderUsuarios();
+    if (btn.dataset.subview === "cfg-auditoria") renderAuditoria();
+    if (btn.dataset.subview === "cfg-geral") preencherFormularioConfigSite();
+  });
+});
+
 $all(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     $all(".tab").forEach((b) => b.classList.remove("active"));
@@ -1066,12 +1078,6 @@ onAuthStateChanged(auth, async (user) => {
 
 function atualizarVisibilidadeAdmin() {
   const isAdmin = ESTADO.permissao === "admin";
-  
-  const btn = $("#navUsuarios");
-  if (btn) btn.hidden = !isAdmin;
-
-  const btnAud = $("#navAuditoria");
-  if (btnAud) btnAud.hidden = !isAdmin;
 
   const btnCfg = $("#navConfigSite");
   if (btnCfg) btnCfg.hidden = !isAdmin;
