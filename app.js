@@ -1323,23 +1323,30 @@ function renderEquipesPorPredio() {
     for (let ordem = 1; ordem <= totalVagas; ordem++) {
       const existente = equipesDoPredio.find((e) => e.ordem === ordem);
       const ehExtra = ordem > nEquipes;
+      const outrosPredios = predios.filter((p) => p !== predio);
+
       linhas += `
-        <div class="eq-linha${ehExtra ? " eq-extra" : ""}">
-          <span class="eq-vaga">${ehExtra ? "extra" : "vaga " + ordem}</span>
+        <div class="eq-linha">
           <input type="text" data-predio="${predio}" data-ordem="${ordem}" class="eq-nome-input"
-            value="${existente ? existente.nome : ""}" placeholder="Equipe ${ordem}">
-          <select data-predio-atual="${predio}" data-ordem-mover="${ordem}" class="eq-mover-select" style="width:auto">
-            ${predios.map((p) => `<option value="${p}" ${p === predio ? "selected" : ""}>${p}</option>`).join("")}
-          </select>
-          ${existente ? `<button class="btn-icon eq-excluir" data-id="${existente.id}" title="Excluir">✕</button>` : ""}
+            value="${existente ? existente.nome : ""}" placeholder="Nome da equipe">
+          ${ehExtra ? '<span class="pill" style="background:var(--dourado-tint);color:var(--dourado-escuro)">extra</span>' : ""}
+          <details class="menu-linha">
+            <summary>⋯</summary>
+            <div class="menu-linha-opcoes">
+              ${existente ? outrosPredios.map((p) =>
+                `<button class="menu-linha-item eq-mover-btn" data-id="${existente.id}" data-destino="${p}">Mover para ${p}</button>`
+              ).join("") : ""}
+              ${existente ? `<button class="menu-linha-item menu-linha-excluir eq-excluir" data-id="${existente.id}">Excluir</button>` : ""}
+            </div>
+          </details>
         </div>`;
     }
 
     return `
       <div class="card eq-predio-card">
-        <p class="eq-predio-titulo">${predio} <span class="muted" style="text-transform:none;font-weight:400">(${nEquipes} vaga(s) usada(s) nas preventivas)</span></p>
+        <p class="eq-predio-titulo">${predio} <span class="muted" style="text-transform:none;font-weight:400">(${nEquipes} usada(s) nas preventivas)</span></p>
         ${linhas}
-        <button class="btn ghost btn-adicionar-vaga" data-predio="${predio}" style="margin-top:8px">+ Adicionar vaga extra</button>
+        <button class="btn ghost btn-adicionar-vaga" data-predio="${predio}" style="margin-top:8px">+ Adicionar equipe</button>
       </div>`;
   }).join("");
 
@@ -1348,10 +1355,10 @@ function renderEquipesPorPredio() {
       const predio = btn.dataset.predio;
       const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === predio);
       const proximaOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0) + 1;
-      const nomeTemp = window.prompt(`Nome da nova equipe extra (vaga ${proximaOrdem}) em ${predio}:`);
+      const nomeTemp = window.prompt(`Nome da nova equipe em ${predio}:`);
       if (!nomeTemp || !nomeTemp.trim()) return;
       addDoc(collection(db, "equipes"), { predio, ordem: proximaOrdem, nome: nomeTemp.trim() })
-        .then(() => registrarAuditoria("Adicionar equipe", `${nomeTemp.trim()} — ${predio}, vaga ${proximaOrdem}`))
+        .then(() => registrarAuditoria("Adicionar equipe", `${nomeTemp.trim()} — ${predio}`))
         .catch((err) => { console.error(err); toast("Erro ao adicionar: " + err.message); });
     });
   });
@@ -1372,7 +1379,7 @@ function renderEquipesPorPredio() {
         } else {
           await addDoc(collection(db, "equipes"), { predio, ordem, nome });
         }
-        await registrarAuditoria("Renomear/definir equipe", `${nome} — ${predio}, vaga ${ordem}`);
+        await registrarAuditoria("Renomear/definir equipe", `${nome} — ${predio}`);
         toast("Equipe salva.");
       } catch (err) {
         console.error(err);
@@ -1381,20 +1388,17 @@ function renderEquipesPorPredio() {
     });
   });
 
-  container.querySelectorAll(".eq-mover-select").forEach((select) => {
-    select.addEventListener("change", async () => {
-      const predioAtual = select.dataset.predioAtual;
-      const ordemMover = Number(select.dataset.ordemMover);
-      const novoPredio = select.value;
-      if (novoPredio === predioAtual) return;
-      const existente = ESTADO.equipes.find((e) => e.predio === predioAtual && e.ordem === ordemMover);
-      if (!existente) { renderEquipesPorPredio(); return; }
-      const equipesDoDestino = ESTADO.equipes.filter((e) => e.predio === novoPredio);
+  container.querySelectorAll(".eq-mover-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const existente = ESTADO.equipes.find((e) => e.id === btn.dataset.id);
+      if (!existente) return;
+      const destino = btn.dataset.destino;
+      const equipesDoDestino = ESTADO.equipes.filter((e) => e.predio === destino);
       const novaOrdem = equipesDoDestino.reduce((max, e) => Math.max(max, e.ordem), 0) + 1;
       try {
-        await updateDoc(doc(db, "equipes", existente.id), { predio: novoPredio, ordem: novaOrdem });
-        await registrarAuditoria("Mover equipe de prédio", `${existente.nome}: ${predioAtual} → ${novoPredio}`);
-        toast(`Equipe movida pra ${novoPredio}.`);
+        await updateDoc(doc(db, "equipes", existente.id), { predio: destino, ordem: novaOrdem });
+        await registrarAuditoria("Mover equipe de prédio", `${existente.nome}: ${existente.predio} → ${destino}`);
+        toast(`Equipe movida pra ${destino}.`);
       } catch (err) {
         console.error(err);
         toast("Erro ao mover: " + err.message);
@@ -1417,7 +1421,6 @@ function renderEquipesPorPredio() {
     });
   });
 }
-
 function renderCapacidadesPorPredio() {
   const container = $("#capacidadesPorPredio");
   if (!container) return;
