@@ -70,12 +70,6 @@
     <button class="sidenav-item sidenav-danger" id="btnApagarCronograma">
       <span class="sidenav-icon"></span> Apagar cronograma
     </button>
-     <button class="tab sidenav-item" data-view="usuarios" id="navUsuarios" hidden>
-      <span class="sidenav-icon"></span> Usuários
-    </button>
-    <button class="tab sidenav-item" data-view="auditoria" id="navAuditoria" hidden>
-      <span class="sidenav-icon"></span> Auditoria
-    </button>
     <button class="sidenav-item" id="btnSair" style="margin-top:8px">
       <span class="sidenav-icon"></span> Sair
     </button>
@@ -344,72 +338,79 @@
       </div>
     </section>
 
-    <!-- VIEW 10: USUÁRIOS (admin) -->
-    <section class="view" id="view-usuarios">
-      <div class="card">
-        <h2>Criar nova conta</h2>
-        <div class="grid-form">
-          <label>Usuário<input type="text" id="novoUsuarioNome" placeholder="ex: joana.ferreira"></label>
-          <label>Senha temporária<input type="password" id="novoUsuarioSenha" placeholder="Mínimo 6 caracteres"></label>
-          <label>Permissão
-            <select id="novoUsuarioPermissao">
-              <option value="padrao">Padrão</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </label>
-        </div>
-        <button class="btn primary" id="btnCriarUsuario">+ Criar conta</button>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <h2>Contas cadastradas</h2>
-          <span class="pill" id="usuariosCount">0 contas</span>
-        </div>
-        <div class="table-wrap">
-          <table id="usuariosTable"></table>
-        </div>
-      </div>
-    </section>
-
-    <!-- VIEW 11: AUDITORIA (admin) -->
-    <section class="view" id="view-auditoria">
-      <div class="card">
-        <div class="card-head">
-          <h2>Log de auditoria</h2>
-          <span class="pill" id="auditoriaCount">0 registros</span>
-        </div>
-        <p class="muted">Registro de ações administrativas do sistema (login, criação/bloqueio de conta, cronogramas apagados, feriados, etc). Não se apaga junto com os ciclos.</p>
-        <div class="table-wrap">
-          <table id="auditoriaTable"></table>
-        </div>
-      </div>
-    </section>
-    <!-- VIEW 12: CONFIGURAÇÕES (admin) -->
+    <!-- VIEW 10: CONFIGURAÇÕES (admin) -->
     <section class="view" id="view-config-site">
-      <div class="card">
-        <h2>Ciclo de manutenção</h2>
-        <div class="grid-form">
-          <label>Duração do ciclo (meses)<input type="number" id="cfgMesesCiclo" min="1" max="24" value="4"></label>
-        </div>
+      <div class="subtabs" style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--borda)">
+        <button class="subtab active" data-subview="cfg-geral">Site</button>
+        <button class="subtab" data-subview="cfg-usuarios">Usuários</button>
+        <button class="subtab" data-subview="cfg-auditoria">Auditoria</button>
       </div>
-      <div class="card">
-        <h2>Planilha de chamados corretivos</h2>
-        <div class="grid-form">
-          <label>Link publicado em CSV<input type="text" id="cfgUrlCorretivas" placeholder="https://docs.google.com/.../pub?output=csv"></label>
+
+      <div class="subview active" id="subview-cfg-geral">
+        <div class="card">
+          <h2>Ciclo de manutenção</h2>
+          <div class="grid-form">
+            <label>Duração do ciclo (meses)<input type="number" id="cfgMesesCiclo" min="1" max="24" value="4"></label>
+          </div>
         </div>
-      </div>
-      <div class="card">
-        <h2>Prédios</h2>
-        <p class="muted">Um por linha. O primeiro da lista é o padrão pra quem não tiver prédio definido.</p>
-        <div class="grid-form">
-          <label>Lista de prédios<textarea id="cfgPredios" rows="6" style="width:100%;padding:9px 11px;border:1px solid var(--borda-forte);border-radius:var(--raio-pequeno);font-family:var(--fonte-dado);font-size:13px">SEDE
+        <div class="card">
+          <h2>Planilha de chamados corretivos</h2>
+          <div class="grid-form">
+            <label>Link publicado em CSV<input type="text" id="cfgUrlCorretivas" placeholder="https://docs.google.com/.../pub?output=csv"></label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Prédios</h2>
+          <p class="muted">Um por linha. O primeiro da lista é o padrão pra quem não tiver prédio definido.</p>
+          <div class="grid-form">
+            <label>Lista de prédios<textarea id="cfgPredios" rows="6" style="width:100%;padding:9px 11px;border:1px solid var(--borda-forte);border-radius:var(--raio-pequeno);font-family:var(--fonte-dado);font-size:13px">SEDE
 ANEXO 1
 ANEXO 2
 ANEXO 3
 ANEXO 4</textarea></label>
+          </div>
+        </div>
+        <button class="btn primary" id="btnSalvarConfigSite">Salvar configurações</button>
+      </div>
+
+      <div class="subview" id="subview-cfg-usuarios">
+        <div class="card">
+          <h2>Criar nova conta</h2>
+          <div class="grid-form">
+            <label>Usuário<input type="text" id="novoUsuarioNome" placeholder="ex: joana.ferreira"></label>
+            <label>Senha temporária<input type="password" id="novoUsuarioSenha" placeholder="Mínimo 6 caracteres"></label>
+            <label>Permissão
+              <select id="novoUsuarioPermissao">
+                <option value="padrao">Padrão</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn primary" id="btnCriarUsuario">+ Criar conta</button>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>Contas cadastradas</h2>
+            <span class="pill" id="usuariosCount">0 contas</span>
+          </div>
+          <div class="table-wrap">
+            <table id="usuariosTable"></table>
+          </div>
         </div>
       </div>
-      <button class="btn primary" id="btnSalvarConfigSite">Salvar configurações</button>
+
+      <div class="subview" id="subview-cfg-auditoria">
+        <div class="card">
+          <div class="card-head">
+            <h2>Log de auditoria</h2>
+            <span class="pill" id="auditoriaCount">0 registros</span>
+          </div>
+          <p class="muted">Registro de ações administrativas do sistema (login, criação/bloqueio de conta, cronogramas apagados, feriados, etc). Não se apaga junto com os ciclos.</p>
+          <div class="table-wrap">
+            <table id="auditoriaTable"></table>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </div>
