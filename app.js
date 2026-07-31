@@ -2580,7 +2580,7 @@ async function abrirDrawerEquipamento(id) {
     </details>
 
     <details class="drawer-secao drawer-form">
-      <summary style="color:var(--vermelho)">Zona de risco</summary>
+      <summary style="color:var(--vermelho)">Excluir</summary>
       <div class="drawer-acoes">
         <button class="btn ghost" id="drawerExcluir" style="color:var(--vermelho);border-color:var(--vermelho)">Excluir equipamento</button>
       </div>
