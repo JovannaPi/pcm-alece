@@ -1159,9 +1159,6 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ------------------------------------------------------------
-   Responsivo
-   ------------------------------------------------------------ */
 /* ============================================================
    RESPONSIVIDADE (MOBILE / CELULAR)
    ============================================================ */
@@ -1174,8 +1171,8 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 
 @media (max-width: 768px) {
   /* 1. LAYOUT GERAL E ESPAÇO PRO MENU INFERIOR */
-  .body-layout { padding-bottom: 70px; }
-  .page { padding: 12px; gap: 16px; }
+  .body-layout { padding-bottom: 80px; } /* Aumentei pra garantir que nada fique escondido */
+  .page { padding: 12px; gap: 16px; width: 100%; overflow-x: hidden; }
 
   /* 2. TOPBAR COMPACTA E ABAS DESLIZANTES */
   .topbar-inner { flex-wrap: wrap; padding: 10px; min-height: auto; gap: 8px; }
@@ -1185,11 +1182,15 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   
   .tabs { 
     width: 100%; 
+    display: flex;
+    flex-wrap: nowrap;
     overflow-x: auto; 
     padding-bottom: 4px; 
     -webkit-overflow-scrolling: touch; /* Rolar suave no iPhone */
+    scrollbar-width: none; /* Esconde a barrinha de rolagem feia */
   }
-  .tab { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 8px 12px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
 
   /* 3. MENU LATERAL VIRA MENU INFERIOR (APP) */
   .sidenav {
@@ -1197,6 +1198,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
     bottom: 0; left: 0; right: 0;
     top: auto; height: auto;
     width: 100%;
+    background: var(--superficie); /* <--- AQUI ESTÁ A CORREÇÃO DO ENCAVALAMENTO */
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -1205,43 +1207,48 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
     z-index: 1000;
     box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .sidenav::-webkit-scrollbar { display: none; }
   .sidenav-label, .sidenav-spacer { display: none !important; }
   .sidenav-item {
     flex: 1;
     min-width: 80px;
     flex-direction: column;
     justify-content: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 4px;
+    font-size: 10.5px;
     padding: 6px;
     text-align: center;
     white-space: nowrap;
   }
-  .sidenav-icon { margin: 0 auto; } /* Centraliza a bolinha */
+  .sidenav-icon { margin: 0 auto; width: 16px; height: 4px; border-radius: 2px; } /* Deixei as bolinhas parecendo "tracinhos" de app */
   #btnSair, #btnApagarCronograma { margin-top: 0 !important; }
 
-  /* 4. FORMULÁRIOS, KPI E TOOLBARS EM 1 COLUNA */
+  /* 4. FORMULÁRIOS E TOOLBARS EM 1 COLUNA */
   .grid-form { grid-template-columns: 1fr; }
-  .filtros-equipamentos { grid-template-columns: 1fr; }
+  .filtros-equipamentos { display: flex; flex-direction: column; gap: 8px; }
+  .filtros-equipamentos select { width: 100%; min-width: 100%; }
   .capacidade-linha { grid-template-columns: 1fr; gap: 8px; }
   .kpi-row { grid-template-columns: 1fr 1fr; }
   .toolbar-pesquisa { flex-direction: column; align-items: stretch; }
-  .toolbar-pesquisa .search-input { min-width: 100%; }
+  .toolbar-pesquisa .search-input { min-width: 100%; width: 100%; }
 
   /* 5. CALENDÁRIO ULTRA-COMPACTO */
   .cal-dow { font-size: 9px; padding: 4px 0; }
   .cal-day { min-height: 50px; padding: 2px; }
   .cal-day-num { font-size: 11px; }
-  .cal-day-badge { padding: 2px; justify-content: center; }
-  .badge-predio { display: none; } /* Esconde o nome do prédio no celular */
-  .badge-contagem { font-size: 9px; margin: 0 auto; text-align: center; }
-  .cal-badge-tooltip { display: none !important; } /* Desativa o balão no touch */
+  .cal-day-badge { padding: 4px 2px; justify-content: center; flex-wrap: wrap; }
+  .badge-predio { display: none; } /* Esconde o nome do prédio no celular pra não explodir a tela */
+  .badge-contagem { font-size: 9.5px; margin: 0 auto; text-align: center; white-space: normal; line-height: 1.1; }
+  .cal-badge-tooltip { display: none !important; }
 
-  /* 6. AJUSTES EM TABELAS E MENUS */
+  /* 6. AJUSTES EM TABELAS PARA NÃO QUEBRAREM A TELA */
+  .table-wrap { width: 100%; overflow-x: auto; }
+  table { min-width: 600px; /* Garante que a tabela role para o lado ao invés de esmagar o conteúdo */ }
   table tbody td, table thead th { padding: 8px; font-size: 12px; }
-  .menu-linha-opcoes { right: auto; left: -50px; } /* Evita que o menu corte a tela pra direita */
-  .toast { width: 90vw; bottom: 80px; } /* Fica acima do menu inferior */
+  .menu-linha-opcoes { right: auto; left: -50px; } 
+  .toast { width: 90vw; bottom: 80px; } 
 }
 
 .drawer-overlay {
