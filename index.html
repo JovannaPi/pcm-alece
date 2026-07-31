@@ -146,9 +146,22 @@
       <div class="local-filtro" id="localFiltroDashboard"></div>
       <div class="ciclo-resumo" id="cicloResumo"></div>
       <div class="kpi-row" id="kpiRow"></div>
+      <details class="ciclos-discreto">
+        <summary id="resumoAtrasosResumo">Atrasos: carregando...</summary>
+        <div class="card" style="margin-top:10px">
+          <div class="card-head">
+            <h2>Atrasos deste ciclo</h2>
+            <span class="pill" id="atrasosCount">0 registros</span>
+          </div>
+          <p class="muted">Toda vez que um aparelho atrasado é reagendado automaticamente, fica registrado aqui — mesmo depois que ele já não aparece mais como atrasado no calendário.</p>
+          <div class="table-wrap">
+            <table id="atrasosTable"></table>
+          </div>
+        </div>
+      </details>
       <div class="card">
         <h2>Exportar</h2>
-        <p class="muted">Baixa uma planilha .xlsx com os dados atuais (status incluído).</p>
+        <p class="muted">Baixa uma planilha .xlsx com os dados atuais.</p>
         <button class="btn secondary" id="btnExport">Baixar planilha (.xlsx)</button>
       </div>
       <details class="ciclos-discreto">
