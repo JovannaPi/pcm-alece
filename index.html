@@ -360,31 +360,27 @@
       </div>
     </section>
 
-    <!-- VIEW 10: CONFIGURAÇÕES (admin) -->
+    <!-- VIEW 10: CONFIGURAÇÕES -->
     <section class="view" id="view-config-site">
       <div class="subtabs" style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--borda)">
         <button class="subtab active" data-subview="cfg-geral">Sistema</button>
         <button class="subtab" data-subview="cfg-usuarios">Usuários</button>
         <button class="subtab" data-subview="cfg-auditoria">Auditoria</button>
         <button class="subtab" data-subview="cfg-equipes">Equipes</button>
+        <button class="subtab" data-subview="cfg-avancado" style="color: var(--vermelho);">Avançado</button>
       </div>
 
- <!-- ABA: SISTEMA (Antiga aba Site) -->
       <div class="subview active" id="subview-cfg-geral">
         <div class="card">
           <div class="card-head">
             <h2>Parâmetros Globais do Sistema</h2>
             <button class="btn ghost" id="btnHabilitarEdicaoCfg" style="font-size: 12px; padding: 6px 12px;">Editar Parâmetros</button>
           </div>
-          
-          <!-- MODO LEITURA (Apenas exibe os dados) -->
           <div id="cfgModoLeitura" style="margin-top: 10px;">
             <div class="drawer-campo" style="padding: 12px 0;"><span class="rotulo">Duração do Ciclo</span><span class="valor" id="txtCfgMeses">...</span></div>
             <div class="drawer-campo" style="padding: 12px 0;"><span class="rotulo">Prédios Ativos</span><span class="valor" id="txtCfgPredios">...</span></div>
             <div class="drawer-campo" style="padding: 12px 0; border-bottom: none;"><span class="rotulo">Planilha Corretivas (CSV)</span><span class="valor" id="txtCfgUrl" style="word-break: break-all; max-width: 60%; color: var(--azul-700);">...</span></div>
           </div>
-
-          <!-- MODO EDIÇÃO (Formulário escondido) -->
           <div id="cfgModoEdicao" hidden style="margin-top: 16px; padding-top: 20px; border-top: 1px dashed var(--borda);">
             <div class="grid-form">
               <label>Duração do ciclo (meses)<input type="number" id="cfgMesesCiclo" min="1" max="24"></label>
@@ -392,25 +388,13 @@
             </div>
             <label style="display:block; font-size:12px; font-weight:600; color:var(--texto-suave); text-transform:uppercase; margin-top:16px;">Prédios Gerenciados (Um por linha)</label>
             <textarea id="cfgPredios" rows="5" style="width:100%; padding:9px 11px; border:1px solid var(--borda-forte); border-radius:var(--raio-pequeno); font-family:var(--fonte-dado); font-size:13px; margin-top:4px;"></textarea>
-
             <div style="display: flex; gap: 12px; margin-top: 20px;">
               <button class="btn primary" id="btnSalvarConfigSite">Salvar alterações</button>
               <button class="btn ghost" id="btnCancelarEdicaoCfg">Cancelar</button>
             </div>
           </div>
         </div>
-
-        <!-- ZONA DE PERIGO: Apagar Cronograma -->
-        <div class="card" style="margin-top: 24px; border-color: #FECACA; background-color: #FEF2F2;">
-          <h2 style="color: #991B1B;">Zona de Perigo</h2>
-          <p style="font-size: 13px; color: #7F1D1D; margin-bottom: 16px;">
-            Ações irreversíveis que afetam o funcionamento do sistema atual. Tenha certeza absoluta antes de prosseguir.
-          </p>
-          <button class="btn danger-inverted" id="btnApagarCronograma" style="background: #DC2626; color: #FFFFFF; border-color: #DC2626; width: 100%;">
-            ⚠️ Apagar Cronograma Atual
-          </button>
-        </div>
-      </div> <!-- FIM DA ABA SISTEMA -->
+      </div>
 
       <div class="subview" id="subview-cfg-usuarios">
         <div class="card">
@@ -437,20 +421,33 @@
           </div>
         </div>
       </div>
+
       <div class="subview" id="subview-cfg-auditoria">
         <div class="card">
           <div class="card-head">
             <h2>Log de auditoria</h2>
             <span class="pill" id="auditoriaCount">0 registros</span>
           </div>
-          <p class="muted">Registro de ações administrativas do sistema (login, criação/bloqueio de conta, cronogramas apagados, feriados, etc). Não se apaga junto com os ciclos.</p>
           <div class="table-wrap">
             <table id="auditoriaTable"></table>
           </div>
         </div>
       </div>
+
       <div class="subview" id="subview-cfg-equipes">
         <div id="equipesPorPredio"></div>
+      </div>
+
+      <div class="subview" id="subview-cfg-avancado">
+        <div class="card" style="border-color: #FECACA; background-color: #FEF2F2;">
+          <h2 style="color: #991B1B;">Apagar o Cronograma</h2>
+          <p style="font-size: 13px; color: #7F1D1D; margin-bottom: 16px;">
+            Ações irreversíveis que afetam o funcionamento do sistema atual. Tenha certeza absoluta antes de prosseguir.
+          </p>
+          <button class="btn danger-inverted" id="btnApagarCronograma" style="background: #DC2626; color: #FFFFFF; border-color: #DC2626; width: 100%;">
+             Apagar Cronograma Atual
+          </button>
+        </div>
       </div>
     </section>
   </main>
