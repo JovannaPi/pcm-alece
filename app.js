@@ -38,7 +38,7 @@ async function calcularProximaData(item) {
   const ehDiaUtilLocal = (dt) => DIAS_UTEIS.includes(NOMES_DIAS[(dt.getDay() + 6) % 7]) && !estaEmFeriado(dt);
 
   const [a, m, d] = item.dataAgendada.split("-");
-  let cursor = adicionarMeses(new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0), MESES_CICLO);
+  let cursor = adicionarMeses(new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0), ESTADO.configSite.mesesCiclo);
   while (!ehDiaUtilLocal(cursor)) cursor.setDate(cursor.getDate() + 1);
 
   // Conta quantos outros aparelhos do mesmo prédio já têm a próxima
@@ -130,6 +130,7 @@ const ESTADO = {
   chamadosCorretivos: [],
   usuarioNome: null,
   permissao: "padrao",
+  configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: URL_CHAMADOS_CORRETIVOS, predios: ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"] },
   selecaoEquipamentos: new Set(),
   selecaoHistorico: new Set(),
   selecaoOrdens: new Set(),
@@ -196,7 +197,7 @@ async function carregarChamadosCorretivos(forcar) {
     return;
   }
   try {
-    const resp = await fetch(URL_CHAMADOS_CORRETIVOS, { cache: "no-store" });
+    const resp = await fetch(ESTADO.configSite.urlCorretivas || URL_CHAMADOS_CORRETIVOS, { cache: "no-store" });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const texto = await resp.text();
     const wb = XLSX.read(texto, { type: "string" });
@@ -295,6 +296,7 @@ $all(".tab").forEach((btn) => {
     if (btn.dataset.view === "historico") renderHistorico();
     if (btn.dataset.view === "config") renderCapacidadesPorPredio();
     if (btn.dataset.view === "auditoria") renderAuditoria();
+    if (btn.dataset.view === "config-site") preencherFormularioConfigSite();
   });
 });
 
@@ -826,6 +828,57 @@ async function reagendarTudo(permitirRecuo = false) {
 
   await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
 }
+
+async function carregarConfigSite() {
+  try {
+    const snap = await getDoc(doc(db, "config", "site"));
+    if (snap.exists()) {
+      const dados = snap.data();
+      ESTADO.configSite = {
+        mesesCiclo: dados.mesesCiclo || MESES_CICLO,
+        urlCorretivas: dados.urlCorretivas || URL_CHAMADOS_CORRETIVOS,
+        predios: (dados.predios && dados.predios.length) ? dados.predios : ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"],
+      };
+    }
+    preencherFormularioConfigSite();
+  } catch (err) {
+    console.error("Erro ao carregar configurações:", err);
+  }
+}
+
+function preencherFormularioConfigSite() {
+  if ($("#cfgMesesCiclo")) $("#cfgMesesCiclo").value = ESTADO.configSite.mesesCiclo;
+  if ($("#cfgUrlCorretivas")) $("#cfgUrlCorretivas").value = ESTADO.configSite.urlCorretivas;
+  if ($("#cfgPredios")) $("#cfgPredios").value = ESTADO.configSite.predios.join("\n");
+}
+
+$("#btnSalvarConfigSite")?.addEventListener("click", async () => {
+  const mesesCiclo = Math.max(1, parseInt($("#cfgMesesCiclo").value, 10) || 4);
+  const urlCorretivas = $("#cfgUrlCorretivas").value.trim();
+  const predios = $("#cfgPredios").value.split("\n").map((p) => p.trim()).filter(Boolean);
+
+  if (!predios.length) {
+    toast("Coloca pelo menos um prédio na lista.");
+    return;
+  }
+
+  const novaConfig = { mesesCiclo, urlCorretivas, predios };
+  try {
+    await setDoc(doc(db, "config", "site"), novaConfig);
+    ESTADO.configSite = novaConfig;
+    await registrarAuditoria("Alterar configurações do site", `Ciclo: ${mesesCiclo} meses`);
+    toast("Configurações salvas!");
+    carregarChamadosCorretivos(true);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao salvar: " + err.message);
+  }
+  const selectEqLocal = $("#eqLocal");
+  if (selectEqLocal) {
+    selectEqLocal.innerHTML = ESTADO.configSite.predios.map((p) => `<option value="${p}">${p}</option>`).join("");
+  }
+});
+
 async function carregarConfig() {
   try {
     const snap = await getDoc(doc(db, "config", "cronograma"));
@@ -993,6 +1046,7 @@ onAuthStateChanged(auth, async (user) => {
           appJaInicializado = true;
           inicializarApp();
           if (ESTADO.permissao === "admin") { iniciarSincronizacaoUsuarios(); iniciarSincronizacaoAuditoria(); }
+          await carregarConfigSite();
           const abaSalva = localStorage.getItem("ultimaAbaPMOC") || "dashboard";
           irParaAba(abaSalva);
         }
@@ -1010,6 +1064,9 @@ function atualizarVisibilidadeAdmin() {
 
   const btnAud = $("#navAuditoria");
   if (btnAud) btnAud.hidden = !isAdmin;
+
+  const btnCfg = $("#navConfigSite");
+  if (btnCfg) btnCfg.hidden = !isAdmin;
 
   if (isAdmin) {
     document.body.classList.remove("modo-padrao");
@@ -2316,8 +2373,8 @@ async function abrirDrawerEquipamento(id) {
       <label>Ambiente<input type="text" id="drawerAmbiente" value="${item.ambiente || ""}"></label>
       <label>Prédio
         <select id="drawerLocal">
-          ${["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"].map((l) =>
-            `<option value="${l}" ${(item.local || "SEDE") === l ? "selected" : ""}>${l}</option>`).join("")}
+          ${ESTADO.configSite.predios.map((l) =>
+            `<option value="${l}" ${(item.local || ESTADO.configSite.predios[0]) === l ? "selected" : ""}>${l}</option>`).join("")}
         </select>
       </label>
       <div class="drawer-acoes">
