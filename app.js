@@ -1327,9 +1327,10 @@ function renderEquipesPorPredio() {
 
       linhas += `
         <div class="eq-linha">
+          <span style="color: var(--borda-forte); cursor: grab; font-size: 14px;" title="Mover ou Reordenar">⋮⋮</span>
           <input type="text" data-predio="${predio}" data-ordem="${ordem}" class="eq-nome-input"
-            value="${existente ? existente.nome : ""}" placeholder="Nome da equipe">
-          ${ehExtra ? '<span class="pill" style="background:var(--dourado-tint);color:var(--dourado-escuro)">extra</span>' : ""}
+            value="${existente ? existente.nome : ""}" placeholder="Nome da equipe ${ordem}...">
+          ${ehExtra ? '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px;">Extra</span>' : ""}
           <details class="menu-linha">
             <summary>⋯</summary>
             <div class="menu-linha-opcoes">
@@ -1343,13 +1344,19 @@ function renderEquipesPorPredio() {
     }
 
     return `
-      <div class="card eq-predio-card">
-        <p class="eq-predio-titulo">${predio} <span class="muted" style="text-transform:none;font-weight:400">(${nEquipes} usada(s) nas preventivas)</span></p>
-        ${linhas}
-        <button class="btn ghost btn-adicionar-vaga" data-predio="${predio}" style="margin-top:8px">+ Adicionar equipe</button>
+      <div class="eq-predio-card">
+        <div class="eq-predio-titulo">
+          ${predio}
+          <span class="badge-capacidade">${nEquipes} na rotina</span>
+        </div>
+        <div style="margin-bottom: 12px; display: flex; flex-direction: column; flex: 1;">
+          ${linhas}
+        </div>
+        <button class="btn ghost btn-adicionar-vaga" data-predio="${predio}" style="margin-top:auto">+ Adicionar equipe</button>
       </div>`;
   }).join("");
 
+  // Re-atachando os eventos (idêntico ao seu original)
   container.querySelectorAll(".btn-adicionar-vaga").forEach((btn) => {
     btn.addEventListener("click", () => {
       const predio = btn.dataset.predio;
@@ -1421,6 +1428,7 @@ function renderEquipesPorPredio() {
     });
   });
 }
+
 function renderCapacidadesPorPredio() {
   const container = $("#capacidadesPorPredio");
   if (!container) return;
