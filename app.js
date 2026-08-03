@@ -2,17 +2,21 @@ import { db, auth, firebaseConfig } from "./firebase-config.js?v=4";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   collection, collectionGroup, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query,
-  orderBy, where, writeBatch, deleteDoc, addDoc, limit,
+  orderBy, where, writeBatch, deleteDoc, addDoc, limit, arrayUnion,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
   setPersistence, inMemoryPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getMessaging, getToken, onMessage, isSupported as messagingSuportado,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => Array.from(document.querySelectorAll(sel));
 
 const SUFIXO_LOGIN = "@pcm-alece.local";
+const VAPID_KEY_PUSH = "COLOQUE_AQUI_A_VAPID_KEY_DO_FIREBASE_CONSOLE";
 function usuarioParaEmail(usuario) {
   return usuario.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") + SUFIXO_LOGIN;
 }
@@ -1074,6 +1078,59 @@ async function registrarUsuarioLogado(user) {
   return snap.data();
 }
 
+let pushForegroundConfigurado = false;
+
+async function configurarNotificacoesPushForeground() {
+  if (pushForegroundConfigurado) return;
+  try {
+    if (!(await messagingSuportado())) return;
+    onMessage(getMessaging(), (payload) => {
+      const titulo = (payload.notification && payload.notification.title) || "PMOK ALECE";
+      const corpo = (payload.notification && payload.notification.body) || "";
+      toast(`${titulo}: ${corpo}`);
+    });
+    pushForegroundConfigurado = true;
+  } catch (err) {
+    console.error("Erro ao configurar notificações em primeiro plano:", err);
+  }
+}
+
+async function ativarNotificacoesPush() {
+  if (VAPID_KEY_PUSH.startsWith("COLOQUE_AQUI")) {
+    toast("Notificações push ainda não foram configuradas pelo administrador.");
+    return;
+  }
+  try {
+    if (!(await messagingSuportado())) {
+      toast("Seu navegador não suporta notificações push.");
+      return;
+    }
+    const permissao = await Notification.requestPermission();
+    if (permissao !== "granted") {
+      toast("Permissão de notificação negada.");
+      return;
+    }
+    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const token = await getToken(getMessaging(), {
+      vapidKey: VAPID_KEY_PUSH,
+      serviceWorkerRegistration: registration,
+    });
+    if (!token || !auth.currentUser) {
+      toast("Não foi possível ativar as notificações.");
+      return;
+    }
+    await updateDoc(doc(db, "usuarios", auth.currentUser.uid), {
+      fcmTokens: arrayUnion(token),
+    });
+    toast("Notificações ativadas neste dispositivo!");
+  } catch (err) {
+    console.error("Erro ao ativar notificações push:", err);
+    toast("Erro ao ativar notificações: " + err.message);
+  }
+}
+
+$("#btnAtivarNotificacoes")?.addEventListener("click", ativarNotificacoesPush);
+
 onAuthStateChanged(auth, async (user) => {
   const overlay = $("#authOverlay");
   const appRoot = $("#appRoot");
@@ -1096,6 +1153,7 @@ onAuthStateChanged(auth, async (user) => {
     if (overlay) overlay.hidden = true;
     if (appRoot) appRoot.hidden = false;
     atualizarVisibilidadeAdmin();
+    configurarNotificacoesPushForeground();
     if (!appJaInicializado) {
           appJaInicializado = true;
           inicializarApp();
