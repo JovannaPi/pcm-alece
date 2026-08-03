@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
@@ -171,15 +170,6 @@
       <div class="local-filtro" id="localFiltroDashboard"></div>
       <div class="ciclo-resumo" id="cicloResumo"></div>
       <div class="kpi-row" id="kpiRow"></div>
-      <div class="card">
-        <h2>Gráficos e Indicadores</h2>
-        <div class="secao-graficos">
-          <div class="grafico-container"><canvas id="graficoTendencia"></canvas></div>
-          <div class="grafico-container"><canvas id="graficoDistribuicao"></canvas></div>
-          <div class="grafico-container"><canvas id="graficoPorSetor"></canvas></div>
-          <div class="grafico-container"><canvas id="graficoProgresso"></canvas></div>
-        </div>
-      </div>
       <details class="ciclos-discreto">
         <summary id="resumoAtrasosResumo">Atrasos: carregando...</summary>
         <div class="card" style="margin-top:10px">
@@ -426,6 +416,7 @@
           <div class="grid-form">
             <label>Usuário<input type="text" id="novoUsuarioNome" placeholder="ex: joana.ferreira"></label>
             <label>Senha temporária<input type="password" id="novoUsuarioSenha" placeholder="Mínimo 6 caracteres"></label>
+            <label>Email para notificações<input type="email" id="novoUsuarioEmail" placeholder="ex: joana@alece.ce.gov.br"></label>
             <label>Permissão
               <select id="novoUsuarioPermissao">
                 <option value="padrao">Padrão</option>
@@ -486,7 +477,6 @@
   <div class="drawer-body" id="drawerCorpo"></div>
 </aside>
 <div class="toast" id="toast"></div>
-<script src="utils/chartsConfig.js"></script>
 <script src="utils/pdfGenerator.js"></script>
 <script type="module" src="firebase-config.js?v=4"></script>
 <script type="module" src="app.js?v=11"></script>

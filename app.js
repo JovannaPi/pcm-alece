@@ -1128,18 +1128,18 @@ function atualizarVisibilidadeAdmin() {
 // Administração de usuários (só visível/funcional para permissao=="admin";
 // a trava de verdade está nas regras do Firestore, não só aqui)
 // ------------------------------------------------------------------
-async function criarContaAdmin(usuario, senha, permissao) {
+async function criarContaAdmin(usuario, senha, permissao, emailNotificacao) {
   const nomeAppTemp = "temp_" + Date.now();
   const appTemp = initializeApp(firebaseConfig, nomeAppTemp);
   const authTemp = getAuth(appTemp);
-  
+
   try {
     await setPersistence(authTemp, inMemoryPersistence);
-    
+
     const email = usuarioParaEmail(usuario);
     const cred = await createUserWithEmailAndPassword(authTemp, email, senha);
     const uid = cred.user.uid;
-    
+
     await signOut(authTemp);
 
     await setDoc(doc(db, "usuarios", uid), {
@@ -1149,6 +1149,8 @@ async function criarContaAdmin(usuario, senha, permissao) {
       criadoEm: new Date().toISOString(),
       ultimoLogin: "",
       criadoPor: ESTADO.usuarioNome || "",
+      email: (emailNotificacao || "").trim(),
+      ativo: !!(emailNotificacao || "").trim(),
     });
     await registrarAuditoria("Criar usuário", `${usuario} (${permissao})`);
   } finally {
@@ -1160,24 +1162,26 @@ $("#btnCriarUsuario")?.addEventListener("click", async () => {
   const usuario = $("#novoUsuarioNome").value.trim();
   const senha = $("#novoUsuarioSenha").value;
   const permissao = $("#novoUsuarioPermissao").value;
-  
+  const emailNotificacao = $("#novoUsuarioEmail").value.trim();
+
   if (!usuario || senha.length < 6) {
     toast("Preencha o usuário e uma senha com 6 ou mais caracteres.");
     return;
   }
-  
+
   // Muda o botão para mostrar que está carregando
   const btn = $("#btnCriarUsuario");
   btn.disabled = true;
   btn.textContent = "Criando...";
-  
+
   try {
-    await criarContaAdmin(usuario, senha, permissao);
+    await criarContaAdmin(usuario, senha, permissao, emailNotificacao);
     toast(`Conta "${usuario}" criada com sucesso!`);
-    
+
     // Limpa os campos
     $("#novoUsuarioNome").value = "";
     $("#novoUsuarioSenha").value = "";
+    $("#novoUsuarioEmail").value = "";
     
     // FORÇA O SISTEMA A RECARREGAR A TABELA NA MESMA HORA
     iniciarSincronizacaoUsuarios();
@@ -1916,13 +1920,6 @@ function renderDashboard() {
   }
   renderResumoAtrasos();
   renderVisaoGerencial();
-
-  if (typeof Chart !== "undefined" && $("#graficoTendencia")) {
-    renderGraficoTendencia(itens, ESTADO.historico);
-    renderGraficoDistribuicao(itens);
-    renderGraficoPorSetor(itens);
-    renderGraficoProgresso(itens);
-  }
 }
 
 async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva") {
