@@ -3760,6 +3760,96 @@ async function verificarFechamentoCiclo() {
   }
 }
 
+function ehDiaUtilConfigAtual(data) {
+  const diasSemana = (ESTADO.config && ESTADO.config.diasSemana) || 5;
+  const DIAS_UTEIS = NOMES_DIAS.slice(0, diasSemana);
+  return DIAS_UTEIS.includes(NOMES_DIAS[(data.getDay() + 6) % 7]) && !estaEmFeriado(data);
+}
+
+// Percorre, prédio por prédio, do primeiro ao último dia agendado, e aponta
+// dias úteis sem nenhum item — normalmente sobra de feriados cadastrados
+// depois que cada aparelho já tinha sua próxima data calculada individualmente.
+function detectarDiasVaziosNoCronograma(itens) {
+  if (!itens.length) return [];
+
+  const porPredio = new Map();
+  itens.forEach((item) => {
+    const local = item.local || "SEDE";
+    if (!porPredio.has(local)) porPredio.set(local, []);
+    porPredio.get(local).push(item);
+  });
+
+  const diasVazios = [];
+  porPredio.forEach((itensDoPredio, local) => {
+    const datasComItem = new Set(itensDoPredio.map((i) => i.dataAgendada).filter(Boolean));
+    if (datasComItem.size === 0) return;
+    const datasOrdenadas = [...datasComItem].sort();
+    const [aI, mI, dI] = datasOrdenadas[0].split("-");
+    const [aF, mF, dF] = datasOrdenadas[datasOrdenadas.length - 1].split("-");
+    const cursor = new Date(aI, parseInt(mI, 10) - 1, dI, 12, 0, 0);
+    const fim = new Date(aF, parseInt(mF, 10) - 1, dF, 12, 0, 0);
+
+    while (cursor <= fim) {
+      if (ehDiaUtilConfigAtual(cursor) && !datasComItem.has(formatISO(cursor))) {
+        diasVazios.push({ local, data: formatISO(cursor) });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  });
+
+  return diasVazios;
+}
+
+// Reorganiza os itens (em memória, ainda não salvos) prédio por prédio,
+// preenchendo cada dia útil até a capacidade antes de avançar — igual à
+// lógica do gerarCronograma — pra fechar os buracos deixados por feriados.
+function compactarCronograma(itens) {
+  const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
+
+  const primeiraData = itens.reduce((min, i) =>
+    (i.dataAgendada && (!min || i.dataAgendada < min)) ? i.dataAgendada : min, null);
+  if (!primeiraData) return itens;
+  const [aI, mI, dI] = primeiraData.split("-");
+  const dataBase = new Date(aI, parseInt(mI, 10) - 1, dI, 12, 0, 0);
+  while (!ehDiaUtilConfigAtual(dataBase)) dataBase.setDate(dataBase.getDate() + 1);
+
+  const porPredio = new Map();
+  itens.forEach((item) => {
+    const local = item.local || "SEDE";
+    if (!porPredio.has(local)) porPredio.set(local, []);
+    porPredio.get(local).push(item);
+  });
+
+  porPredio.forEach((itensDoPredio, local) => {
+    const cap = capacidades[local] || { nEquipes: 1, aparelhosDia: 2 };
+    const capacidadeDia = Math.max(1, cap.nEquipes) * Math.max(1, cap.aparelhosDia);
+    itensDoPredio.sort((a, b) => (a.dataAgendada || "").localeCompare(b.dataAgendada || ""));
+
+    const dataCursor = new Date(dataBase);
+    let contador = 0;
+    itensDoPredio.forEach((item) => {
+      item.dataAgendada = formatISO(dataCursor);
+      item.diaPlanejado = NOMES_DIAS[(dataCursor.getDay() + 6) % 7];
+      contador++;
+      if (contador >= capacidadeDia) {
+        contador = 0;
+        do { dataCursor.setDate(dataCursor.getDate() + 1); } while (!ehDiaUtilConfigAtual(dataCursor));
+      }
+    });
+  });
+
+  itens.forEach((item) => {
+    const [a, m, d] = item.dataAgendada.split("-");
+    const dt = new Date(a, parseInt(m, 10) - 1, d, 12, 0, 0);
+    const diffDias = Math.floor((dt - dataBase) / 86400000);
+    item.semanaPlanejada = `Semana ${Math.max(1, Math.floor(diffDias / 7) + 1)}`;
+  });
+
+  itens.sort((a, b) => (a.dataAgendada || "").localeCompare(b.dataAgendada || ""));
+  itens.forEach((item, idx) => { item.ordemExecucao = idx + 1; });
+  return itens;
+}
+
 async function fecharCicloEIniciarProximo() {
   const itens = ESTADO.equipamentos;
   const hojeISO = formatISO(new Date());
@@ -3799,6 +3889,18 @@ async function fecharCicloEIniciarProximo() {
   });
   novosItens.sort((a, b) => (a.dataAgendada || "").localeCompare(b.dataAgendada || ""));
   novosItens.forEach((item, idx) => { item.ordemExecucao = idx + 1; });
+
+  const diasVazios = detectarDiasVaziosNoCronograma(novosItens);
+  if (diasVazios.length > 0) {
+    const exemplos = diasVazios.slice(0, 5).map((d) => `${formatarDataBR(d.data)} (${d.local})`).join(", ");
+    const maisTexto = diasVazios.length > 5 ? ` e mais ${diasVazios.length - 5}` : "";
+    const querAdiantar = window.confirm(
+      `O cronograma do novo ciclo ficou com ${diasVazios.length} dia(s) útil(eis) sem nada agendado — provavelmente por causa de feriados cadastrados.\n\nExemplos: ${exemplos}${maisTexto}.\n\nDeseja adiantar os itens seguintes para preencher esses dias?`
+    );
+    if (querAdiantar) {
+      compactarCronograma(novosItens);
+    }
+  }
 
   const novoCicloRef = doc(collection(db, "ciclos"));
   await setDoc(novoCicloRef, { criadoEm: new Date().toISOString(), dataInicio: menorData, status: "Ativo" });
