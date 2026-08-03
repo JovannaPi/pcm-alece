@@ -1,10 +1,10 @@
-# 📖 GUIA DE USO - PMOK ALECE
+# GUIA DE USO - PMOK ALECE
 
 **Sistema de Manutenção Preventiva da Assembleia Legislativa do Estado do Ceará**
 
 ---
 
-## 📋 Índice
+## Índice
 1. [Login e Acesso](#login-e-acesso)
 2. [Fluxo Principal](#fluxo-principal)
 3. [Entendendo os Parâmetros](#entendendo-os-parâmetros)
@@ -13,7 +13,7 @@
 
 ---
 
-## 🔐 Login e Acesso
+## Login e Acesso
 
 ### Primeira Vez?
 
@@ -32,7 +32,7 @@
 
 ---
 
-## 🚀 Fluxo Principal
+## Fluxo Principal
 
 O sistema funciona em 4 etapas:
 
@@ -60,7 +60,7 @@ O sistema funciona em 4 etapas:
 
 ---
 
-## 📊 Entendendo os Parâmetros
+## Entendendo os Parâmetros
 
 ### Aba "Levantamento" (Upload)
 
@@ -71,10 +71,10 @@ O sistema funciona em 4 etapas:
 
 **Formato esperado:**
 Seu arquivo precisa ter as colunas:
-- ✅ **Setor** (obrigatório)
-- ✅ **Ambiente** (obrigatório)
-- ⭐ **Patrimônio** (opcional, mas recomendado)
-- ⭐ **Status / ano** (opcional)
+- **Setor** (obrigatório)
+- **Ambiente** (obrigatório)
+- **Patrimônio** (opcional, mas recomendado)
+- **Status / ano** (opcional)
 
 **Exemplo:**
 
@@ -87,7 +87,7 @@ Seu arquivo precisa ter as colunas:
 
 ### Aba "Cronograma" (Configuração)
 
-#### 📅 Parâmetros Iniciais
+#### Parâmetros Iniciais
 
 **Dias úteis por semana**
 - O que é: Quantos dias por semana sua equipe trabalha
@@ -98,11 +98,11 @@ Seu arquivo precisa ter as colunas:
 **Data de início**
 - O que é: Quando o ciclo de manutenção começa
 - Formato: YYYY-MM-DD (ex: 2025-01-15)
-- ⚠️ O sistema ajustará automaticamente para o primeiro dia útil se cair em fim de semana/feriado
+- O sistema ajustará automaticamente para o primeiro dia útil se cair em fim de semana/feriado
 
 ---
 
-#### 💪 Capacidade por Prédio
+#### Capacidade por Prédio
 
 **Por que configurar?**
 O cronograma é distribuído de forma realista baseado na capacidade de trabalho de cada prédio.
@@ -125,8 +125,8 @@ Capacidade do Dia = (Nº de Equipes) × (Aparelhos por Dia)
 ### Aba "Calendário"
 
 **Como funciona:**
-- 📍 Mostra todos os equipamentos agendados
-- 🎨 Código de cores:
+- Mostra todos os equipamentos agendados
+- Código de cores:
   - 🟢 **Verde** = Concluído
   - 🟡 **Amarelo** = Em andamento
   - 🔴 **Vermelho** = Pendente
@@ -142,10 +142,10 @@ Capacidade do Dia = (Nº de Equipes) × (Aparelhos por Dia)
 ### Aba "Dashboard"
 
 **Indicadores (KPIs):**
-- 📊 **Equipamentos**: Total de itens no cronograma
-- ✅ **Concluídas**: Manutenções já feitas
-- 🔄 **Em andamento**: Manutenções começadas
-- ⏳ **Pendentes**: Aguardando início
+- **Equipamentos**: Total de itens no cronograma
+- **Concluídas**: Manutenções já feitas
+- **Em andamento**: Manutenções começadas
+- **Pendentes**: Aguardando início
 
 **Execução (%):**
 ```
@@ -156,14 +156,14 @@ Execução = (Concluídas + Em Andamento) / Total
 
 ## 🛠️ Usando o Sistema
 
-### Passo 1️⃣: Envie o Levantamento
+### Passo 1️: Envie o Levantamento
 
 1. Acesse a aba **"Levantamento"**
 2. Prepare sua planilha com as colunas necessárias
 3. Faça upload
 4. O sistema classificará automaticamente cada equipamento por prioridade
 
-### Passo 2️⃣: Configure o Cronograma
+### Passo 2️: Configure o Cronograma
 
 1. Acesse a aba **"Cronograma"**
 2. Defina:
@@ -173,14 +173,14 @@ Execução = (Concluídas + Em Andamento) / Total
 3. Clique em **"Gerar Cronograma"**
 4. Aguarde a confirmação
 
-### Passo 3️⃣: Visualize no Calendário
+### Passo 3️: Visualize no Calendário
 
 1. Acesse a aba **"Calendário"**
 2. Navegue pelos meses
 3. Veja os equipamentos agendados por data
 4. Clique em um equipamento para editar status
 
-### Passo 4️⃣: Acompanhe no Dashboard
+### Passo 4️: Acompanhe no Dashboard
 
 1. Acesse a aba **"Dashboard"**
 2. Veja o progresso em tempo real
@@ -189,7 +189,7 @@ Execução = (Concluídas + Em Andamento) / Total
 
 ---
 
-## 🎨 Gerenciando Feriados e Férias
+## Gerenciando Feriados e Férias
 
 ### Adicionar um Feriado
 
@@ -204,13 +204,13 @@ Execução = (Concluídas + Em Andamento) / Total
 ### O que acontece?
 
 Automaticamente o sistema:
-- 🔄 Reagenda equipamentos que caem naquele dia
-- 📅 Avança para o próximo dia útil disponível
-- ✅ Mantém a ordem e capacidade respeitadas
+- Reagenda equipamentos que caem naquele dia
+- Avança para o próximo dia útil disponível
+- Mantém a ordem e capacidade respeitadas
 
 ---
 
-## 👥 Gerenciando Usuários e Permissões
+## Gerenciando Usuários e Permissões
 
 ### Como Administrador
 
@@ -222,13 +222,11 @@ Automaticamente o sistema:
 ### Tipos de Permissão
 
 - **Admin**: Acesso total ao sistema
-- **Gerente**: Pode ver e editar cronograma
-- **Técnico**: Pode apenas atualizar status
 - **Leitor**: Apenas visualiza (read-only)
 
 ---
 
-## 📤 Exportando Dados
+##  Exportando Dados
 
 ### Gerar Relatório em Excel
 
@@ -249,7 +247,7 @@ O relatório exportado contém:
 
 ---
 
-## ❓ FAQ
+##  FAQ
 
 ### P: Posso editar um equipamento depois de gerar o cronograma?
 
@@ -312,13 +310,13 @@ Exemplo:
 ### P: Onde estão meus dados salvos?
 
 **R:** Seus dados estão em um banco de dados na nuvem (Firebase Firestore). Eles são:
-- ✅ Sincronizados em tempo real
-- ✅ Automaticamente backup
-- ✅ Acessíveis de qualquer navegador
+- Sincronizados em tempo real
+- Automaticamente backup
+   Acessíveis de qualquer navegador
 
 ---
 
-## 📞 Suporte
+##  Suporte
 
 Se encontrar problemas:
 
@@ -329,22 +327,17 @@ Se encontrar problemas:
 
 ---
 
-## 🎯 Dicas Práticas
+##  Dicas Práticas
 
-✅ **Ao começar:**
+ **Ao começar:**
 - Comece com um pequeno grupo de equipamentos para testar
 - Ajuste os parâmetros conforme necessário
 
-✅ **Durante a operação:**
+ **Durante a operação:**
 - Verifique o Dashboard diariamente
 - Reagende atrasados no mesmo dia
 
-✅ **Manutenção:**
+ **Manutenção:**
 - Faça backup exportando Excel regularmente
 - Mantenha a lista de feriados atualizada
 
----
-
-**Versão:** 1.0  
-**Última atualização:** 2025-01-01  
-**Desenvolvido para:** Assembleia Legislativa do Estado do Ceará
