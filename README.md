@@ -1,8 +1,8 @@
-# 🏛️ PMOK ALECE
+#  PMOK ALECE
 
 **Sistema de Manutenção Preventiva da Assembleia Legislativa do Estado do Ceará**
 
-## 📌 Descrição
+## Descrição
 
 O PMOK ALECE é uma aplicação web inteligente para gerenciar cronogramas de manutenção preventiva em equipamentos. O sistema:
 
@@ -14,20 +14,20 @@ O PMOK ALECE é uma aplicação web inteligente para gerenciar cronogramas de ma
 
 ---
 
-## 🚀 Como Usar
+##  Como Usar
 
-### 1️⃣ Acesse a Aplicação
+### 1️ Acesse a Aplicação
 
 ```
 https://seu-dominio.com/pcm-alece
 ```
 
-### 2️⃣ Faça Login
+### 2️ Faça Login
 
 - Primeira vez? Clique em **"Criar uma conta nova"**
 - Já tem conta? Use **"Entrar"**
 
-### 3️⃣ Siga o Fluxo
+### 3️ Siga o Fluxo
 
 ```
 Levantamento → Cronograma → Calendário → Dashboard
@@ -37,7 +37,7 @@ Levantamento → Cronograma → Calendário → Dashboard
 
 ---
 
-## 📋 Funcionalidades Principais
+##  Funcionalidades Principais
 
 | Funcionalidade | Descrição |
 |---|---|
@@ -53,7 +53,7 @@ Levantamento → Cronograma → Calendário → Dashboard
 
 ---
 
-## 🛠️ Tecnologias
+##  Tecnologias
 
 - **Frontend:** Vanilla JavaScript (ES6+)
 - **Backend:** Firebase (Firestore + Authentication)
@@ -63,7 +63,7 @@ Levantamento → Cronograma → Calendário → Dashboard
 
 ---
 
-## 📁 Estrutura de Arquivos
+##  Estrutura de Arquivos
 
 ```
 pcm-alece/
@@ -79,16 +79,16 @@ pcm-alece/
 
 ---
 
-## 🔐 Segurança
+##  Segurança
 
-- ✅ Autenticação obrigatória via Firebase Auth
-- ✅ Dados sincronizados e criptografados
-- ✅ Sem permissão de acesso antes do login
-- ⚠️ Credenciais Firebase expostas no código (necessário para apps públicas)
+-  Autenticação obrigatória via Firebase Auth
+-  Dados sincronizados e criptografados
+-  Sem permissão de acesso antes do login
+-  Credenciais Firebase expostas no código (necessário para apps públicas)
 
 ---
 
-## 📊 Fluxo de Dados
+##  Fluxo de Dados
 
 ```
 User → Upload Planilha → Classificação → Cronograma → Firebase
@@ -101,7 +101,7 @@ User → Upload Planilha → Classificação → Cronograma → Firebase
 
 ---
 
-## ⚙️ Parâmetros Configuráveis
+##  Parâmetros Configuráveis
 
 ### Cronograma
 
@@ -118,27 +118,27 @@ User → Upload Planilha → Classificação → Cronograma → Firebase
 
 ---
 
-## 📈 KPIs e Métricas
+## 📈KPIs e Métricas
 
 O dashboard mostra:
 
-- 📊 **Total de equipamentos**
-- ✅ **Concluídas** (quantidade e %)
-- 🔄 **Em andamento** (quantidade e %)
-- ⏳ **Pendentes** (quantidade e %)
-- 📉 **Taxa de execução** (% conclusão)
-- 👥 **Equipes envolvidas**
-- 🏢 **Prédios atendidos**
+-  **Total de equipamentos**
+-  **Concluídas** (quantidade e %)
+-  **Em andamento** (quantidade e %)
+-  **Pendentes** (quantidade e %)
+-  **Taxa de execução** (% conclusão)
+-  **Equipes envolvidas**
+-  **Prédios atendidos**
 
 ---
 
-## 🐛 Problemas Conhecidos
+##  Problemas Conhecidos
 
 Nenhum bug crítico identificado. Consulte a [análise de código](./ANALISE_CODIGO.md) para detalhes.
 
 ---
 
-## 💡 Melhorias Futuras
+##  Melhorias Futuras
 
 - [ ] Offline mode com Service Worker
 - [ ] Testes automatizados
@@ -149,21 +149,21 @@ Nenhum bug crítico identificado. Consulte a [análise de código](./ANALISE_COD
 
 ---
 
-## 📞 Suporte
+##  Suporte
 
-- 📖 **Documentação:** Veja [GUIA.md](./GUIA.md)
-- 🐛 **Reportar bugs:** Abra uma issue no GitHub
-- 💬 **Dúvidas:** Entre em contato com o time
+-  **Documentação:** Veja [GUIA.md](./GUIA.md)
+-  **Reportar bugs:** Abra uma issue no GitHub
+-  **Dúvidas:** Entre em contato com o time
 
 ---
 
-## 📜 Licença
+##  Licença
 
 Desenvolvido para a Assembleia Legislativa do Estado do Ceará.
 
 ---
 
-## 👨‍💻 Desenvolvimento
+##  Desenvolvimento
 
 ### Stack de Desenvolvimento
 
