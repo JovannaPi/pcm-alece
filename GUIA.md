@@ -154,7 +154,7 @@ Execução = (Concluídas + Em Andamento) / Total
 
 ---
 
-## 🛠️ Usando o Sistema
+## Usando o Sistema
 
 ### Passo 1️: Envie o Levantamento
 
