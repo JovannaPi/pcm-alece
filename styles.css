@@ -523,6 +523,27 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 }
 .search-input:focus { background: var(--superficie); border-color: var(--azul-700); }
 
+.tooltip-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  background: var(--azul-700);
+  border-radius: 50%;
+  cursor: help;
+  vertical-align: super;
+  position: relative;
+}
+
+.tooltip-icon:hover {
+  background: var(--azul-600);
+}
+
 .filtros-equipamentos {
   display: grid;
   grid-template-columns: repeat(3, 1fr); /* Divide em 3 colunas iguais */

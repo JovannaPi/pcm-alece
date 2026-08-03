@@ -100,8 +100,20 @@
         <h2>Parâmetros Iniciais</h2>
         <p class="muted">Defina a base do calendário para o início do ciclo de manutenção.</p>
         <div class="grid-form" style="margin-top: 16px;">
-          <label>Dias úteis por semana<input type="number" id="diasSemana" value="5" min="1" max="7"></label>
-          <label>Data de início<input type="date" id="dataInicio"></label>
+          <div>
+            <label>Dias úteis por semana
+              <span class="tooltip-icon" title="Quantos dias da semana sua equipe trabalha (ex: 5 = seg-sex)">?</span>
+              <input type="number" id="diasSemana" value="5" min="1" max="7">
+            </label>
+            <small style="color: #999;">Ex: 5 = segunda a sexta</small>
+          </div>
+          <div>
+            <label>Data de início
+              <span class="tooltip-icon" title="Quando o ciclo de manutenção começa">?</span>
+              <input type="date" id="dataInicio">
+            </label>
+            <small style="color: #999;">Primeira data útil do cronograma</small>
+          </div>
         </div>
       </div>
 

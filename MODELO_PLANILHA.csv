@@ -1,0 +1,13 @@
+Setor,Ambiente,Patrimônio,Status / ano
+Presidência,Sala de Reuniões Presidencial,PRES-001,Bom
+Presidência,Gabinete Presidencial,PRES-002,Bom
+Primeiro Secretário,Sala de Trabalho,SEC1-001,Crítico
+Gabinetes,Gabinete 101,GAB-101,Bom
+Gabinetes,Gabinete 102,GAB-102,Bom
+Gabinetes,Gabinete 201,GAB-201,Crítico
+TI/Racks,Sala de Servidores,TI-RACK-001,Crítico
+TI/Racks,Sala de Roteadores,TI-ROTA-001,Bom
+Plenário,Plenário Principal,PLE-001,Crítico
+Administração,Protocolo,ADM-PROT-001,Bom
+Administração,Reprografia,ADM-REPRO-001,Bom
+Administração,Sala de Arquivos,ADM-ARQ-001,Bom
