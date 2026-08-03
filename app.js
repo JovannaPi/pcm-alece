@@ -16,7 +16,7 @@ const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => Array.from(document.querySelectorAll(sel));
 
 const SUFIXO_LOGIN = "@pcm-alece.local";
-const VAPID_KEY_PUSH = "COLOQUE_AQUI_A_VAPID_KEY_DO_FIREBASE_CONSOLE";
+const VAPID_KEY_PUSH = "BHaXD8IIA2Izrbtu1deF1dOq7GOzz9v2DSNt8nmKd9f1DInW7iOjH5TpCXUmo7tsjBNhc1MImCStPsJY8b2B-eM";
 function usuarioParaEmail(usuario) {
   return usuario.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") + SUFIXO_LOGIN;
 }
