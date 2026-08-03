@@ -1,6 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const { enviarPush } = require('./sendPush');
 
 admin.initializeApp();
 
@@ -41,33 +42,47 @@ exports.enviarAlertaAtrasados = functions.pubsub
 
       if (atrasados.length === 0) return;
 
-      const usuariosSnap = await db.collection('usuarios').where('ativo', '==', true).get();
+      const usuariosSnap = await db.collection('usuarios').get();
       const emails = usuariosSnap.docs
-        .map(doc => doc.data().email)
-        .filter(Boolean);
-
-      if (emails.length === 0) return;
+        .map(doc => doc.data())
+        .filter(u => u.ativo && u.email)
+        .map(u => u.email);
 
       const resumo = atrasados
         .map(eq => `${eq.patrimonio} - ${eq.ambiente} (Agendado: ${eq.dataAgendada})`)
         .join('\n');
 
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: emails.join(','),
-        subject: `PMOK ALECE - Alerta: ${atrasados.length} equipamento(s) atrasado(s)`,
-        html: `
-          <h2>Alerta de Manutenção Atrasada</h2>
-          <p>Existem ${atrasados.length} equipamentos com manutenção atrasada:</p>
-          <pre>${resumo}</pre>
-          <p><a href="https://seu-dominio.com/pcm-alece">Acesse o PMOK ALECE</a></p>
-        `,
-      };
+      if (emails.length > 0) {
+        try {
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: emails.join(','),
+            subject: `PMOK ALECE - Alerta: ${atrasados.length} equipamento(s) atrasado(s)`,
+            html: `
+              <h2>Alerta de Manutenção Atrasada</h2>
+              <p>Existem ${atrasados.length} equipamentos com manutenção atrasada:</p>
+              <pre>${resumo}</pre>
+              <p><a href="https://seu-dominio.com/pcm-alece">Acesse o PMOK ALECE</a></p>
+            `,
+          });
+          console.log(`Email de alerta enviado para ${emails.length} destinatários`);
+        } catch (error) {
+          console.error('Erro ao enviar email:', error);
+        }
+      }
 
-      await transporter.sendMail(mailOptions);
-      console.log(`Email de alerta enviado para ${emails.length} destinatários`);
+      try {
+        await enviarPush(
+          db,
+          usuariosSnap,
+          'PMOK ALECE',
+          `${atrasados.length} equipamento(s) com manutenção atrasada.`
+        );
+      } catch (error) {
+        console.error('Erro ao enviar push:', error);
+      }
     } catch (error) {
-      console.error('Erro ao enviar email:', error);
+      console.error('Erro ao processar alerta de atrasados:', error);
     }
   });
 
@@ -100,12 +115,11 @@ exports.enviarRelatoriSemanal = functions.pubsub
       const equipamentos = equipamentosSnap.docs.map(doc => doc.data());
       if (equipamentos.length === 0) return;
 
-      const usuariosSnap = await db.collection('usuarios').where('ativo', '==', true).get();
+      const usuariosSnap = await db.collection('usuarios').get();
       const emails = usuariosSnap.docs
-        .map(doc => doc.data().email)
-        .filter(Boolean);
-
-      if (emails.length === 0) return;
+        .map(doc => doc.data())
+        .filter(u => u.ativo && u.email)
+        .map(u => u.email);
 
       const concluidas = equipamentos.filter(e => e.statusPreventiva === 'Concluída').length;
       const andamento = equipamentos.filter(e => e.statusPreventiva === 'Em andamento').length;
@@ -170,11 +184,13 @@ exports.enviarRelatoriSemanal = functions.pubsub
 
       const th = 'style="border: 1px solid #ccc; padding: 8px 10px; background: #1F4E78; color: #fff; text-align:left; font-size:12px;"';
 
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: emails.join(','),
-        subject: 'PMOK ALECE - Relatório Semanal de Manutenção',
-        html: `
+      if (emails.length > 0) {
+        try {
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: emails.join(','),
+            subject: 'PMOK ALECE - Relatório Semanal de Manutenção',
+            html: `
           <h2>Relatório Semanal - PMOK ALECE</h2>
           <p style="color:#666;font-size:12px">Gerado em ${hoje.toLocaleDateString('pt-BR')}</p>
 
@@ -211,12 +227,25 @@ exports.enviarRelatoriSemanal = functions.pubsub
           ${notaProximos}` : '<p>Nenhum equipamento agendado para os próximos 7 dias.</p>'}
 
           <p style="margin-top:20px"><a href="https://seu-dominio.com/pcm-alece">Acessar Dashboard</a></p>
-        `,
-      };
+            `,
+          });
+          console.log(`Relatório semanal enviado para ${emails.length} destinatários`);
+        } catch (error) {
+          console.error('Erro ao enviar relatório por email:', error);
+        }
+      }
 
-      await transporter.sendMail(mailOptions);
-      console.log(`Relatório semanal enviado para ${emails.length} destinatários`);
+      try {
+        await enviarPush(
+          db,
+          usuariosSnap,
+          'PMOK ALECE',
+          `Relatório semanal: ${concluidas}/${equipamentos.length} concluídos (${execucao}%). ${atrasados.length} atrasado(s).`
+        );
+      } catch (error) {
+        console.error('Erro ao enviar push:', error);
+      }
     } catch (error) {
-      console.error('Erro ao enviar relatório:', error);
+      console.error('Erro ao processar relatório semanal:', error);
     }
   });
