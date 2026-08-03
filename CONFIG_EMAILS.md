@@ -5,123 +5,87 @@ FUNCIONALIDADES IMPLEMENTADAS
 1. Alertas Automáticos de Equipamentos Atrasados
    - Enviados diariamente às 8h (horário de Fortaleza)
    - Mostra equipamentos com manutenção atrasada
-   - Enviado para todos os usuários cadastrados
+   - Enviado para todos os usuários com email de notificação cadastrado e ativo
 
-2. Relatório Semanal em PDF
+2. Relatório Semanal por Email
    - Enviado toda segunda-feira às 9h
-   - Inclui: KPIs, resumo por setor, equipamentos atrasados
-   - Formato: PDF formatado profissionalmente
+   - Visão geral: total, concluídas, em andamento, pendentes, concluídas nos
+     últimos 7 dias e taxa de execução geral
+   - Resumo por setor (total, concluídas, em andamento, pendentes, progresso)
+   - Lista de equipamentos atrasados (até 20, com contagem do restante)
+   - Agenda dos próximos 7 dias (até 20, com contagem do restante)
 
-3. Gráficos Avançados no Dashboard
-   - Tendência de execução (7 meses)
-   - Distribuição de status (pizza)
-   - Equipamentos por setor (barra)
-   - Taxa de execução (progresso)
+3. Relatório em PDF (sob demanda)
+   - Botão "Baixar relatório (PDF)" na aba Dashboard
+   - Inclui KPIs, resumo por setor e equipamentos atrasados
 
-CONFIGURAÇÃO DO FIREBASE
+PASSO A PASSO — CONFIGURAR O ENVIO DE EMAIL
 
-1. Crie um arquivo .env.local na raiz do projeto:
+1. Instale o Firebase CLI (se ainda não tiver):
+   npm install -g firebase-tools
+
+2. Faça login:
+   firebase login
+
+3. Na raiz do projeto, confirme que o projeto Firebase certo está selecionado:
+   firebase use --add
+
+4. Gere uma Senha de App do Gmail (não use a senha normal da conta):
+   https://myaccount.google.com/apppasswords
+   (exige verificação em duas etapas ativada na conta Google)
+
+5. Crie o arquivo de variáveis de ambiente DENTRO da pasta functions/
+   (não na raiz do projeto — é isso que o Firebase carrega automaticamente
+   nas Cloud Functions):
+
+   functions/.env
    EMAIL_USER=seu-email@gmail.com
-   EMAIL_PASSWORD=sua-senha-de-app
+   EMAIL_PASSWORD=senha-de-app-gerada-no-passo-4
 
-2. Para Gmail, use Senha de App (não a senha comum):
-   https://support.google.com/accounts/answer/185833
+   Esse arquivo já está no .gitignore — nunca commite ele.
 
-3. Deploy das Cloud Functions:
+6. Instale as dependências das functions:
+   cd functions
+   npm install
+   cd ..
+
+7. Publique as Cloud Functions:
    firebase deploy --only functions
 
-4. Configure as regras de Firestore para permitir leitura de usuarios:
-   match /usuarios/{userId} {
-     allow read, write: if request.auth.uid == userId;
-   }
+CADASTRAR QUEM RECEBE OS EMAILS
 
-IMPLEMENTAÇÃO NO HTML
+Vá em Configurações > Usuários > Criar nova conta. Existe um campo
+"Email para notificações" — preencha com um email real (ex: gmail,
+institucional). Só quem tiver esse campo preenchido recebe os alertas
+automáticos e o relatório semanal. Contas antigas, criadas antes dessa
+mudança, não têm email cadastrado — edite-as ou recrie-as para começar a
+receber notificações.
 
-Adicione ao seu index.html dentro da view dashboard:
+TESTAR SEM ESPERAR O HORÁRIO AGENDADO
 
-<div class="secao-graficos">
-  <div class="grafico-container">
-    <canvas id="graficoTendencia"></canvas>
-  </div>
-  <div class="grafico-container">
-    <canvas id="graficoDistribuicao"></canvas>
-  </div>
-  <div class="grafico-container">
-    <canvas id="graficoPorSetor"></canvas>
-  </div>
-  <div class="grafico-container">
-    <canvas id="graficoProgresso"></canvas>
-  </div>
-</div>
-
-ADICIONE AO SEU APP.JS
-
-Importe as funções:
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-<script src="utils/chartsConfig.js"></script>
-<script src="utils/pdfGenerator.js"></script>
-
-Quando carregar o dashboard, chame:
-renderGraficoTendencia(ESTADO.equipamentos);
-renderGraficoDistribuicao(ESTADO.equipamentos);
-renderGraficoPorSetor(ESTADO.equipamentos);
-renderGraficoProgresso(ESTADO.equipamentos);
-
-Botão para Exportar PDF:
-<button id="btnExportarPDF" class="btn primary">Exportar Relatório PDF</button>
-
-Document.getElementById('btnExportarPDF').addEventListener('click', () => {
-  baixarRelatorioPDF(ESTADO.equipamentos, ESTADO.cicloAtual);
-});
-
-DADOS NECESSÁRIOS NO FIRESTORE
-
-Crie uma coleção usuarios com documentos contendo:
-- email: string (email da pessoa)
-- nome: string (nome do usuário)
-- ativo: boolean (se recebe notificações)
-
-Exemplo:
-usuarios/user123 {
-  email: "joana@email.com"
-  nome: "Joana Ferreira"
-  ativo: true
-}
-
-ESTRUTURA DE PASTAS
-
-pcm-alece/
-├── functions/
-│   ├── sendEmails.js (Cloud Functions)
-│   └── index.js (export das funções)
-├── utils/
-│   ├── chartsConfig.js (Gráficos)
-│   └── pdfGenerator.js (Gerador PDF)
-├── CONFIG_EMAILS.md (este arquivo)
-└── app.js (modificar)
-
-TESTE LOCAL
-
-Para testar emails localmente sem deploy:
-1. Use nodemailer em desenvolvimento
-2. Configure as variáveis de ambiente
-3. Dispare manualmente a função para testar
+No Firebase Console > Functions, você pode disparar manualmente uma função
+agendada clicando em "Testar função" ou usando:
+firebase functions:shell
+depois, dentro do shell interativo:
+enviarAlertaAtrasados()
+enviarRelatoriSemanal()
 
 SUPORTE
 
 Problemas comuns:
 
 1. "Email não foi enviado"
-   - Verifique as credenciais no .env.local
-   - Confirme que Gmail permite apps menos seguros
+   - Verifique se functions/.env existe e tem EMAIL_USER e EMAIL_PASSWORD
+   - Confirme que gerou uma Senha de App (não a senha normal do Gmail)
+   - Veja os logs: firebase functions:log
 
-2. "Gráficos não aparecem"
-   - Incluiu Chart.js no HTML?
-   - Chamou as funções renderGrafico*() ?
+2. "Ninguém recebeu o email, mas rodou sem erro"
+   - Verifique se algum usuário na coleção "usuarios" tem o campo "email"
+     preenchido e "ativo": true
 
-3. "PDF está vazio"
+3. "PDF está vazio ou não baixa"
    - Há dados em ESTADO.equipamentos?
-   - Incluiu a biblioteca html2pdf?
+   - html2pdf carregou no index.html?
 
 PRÓXIMAS MELHORIAS
 
