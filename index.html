@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="auth-overlay" id="authOverlay" hidden>
@@ -169,6 +171,15 @@
       <div class="local-filtro" id="localFiltroDashboard"></div>
       <div class="ciclo-resumo" id="cicloResumo"></div>
       <div class="kpi-row" id="kpiRow"></div>
+      <div class="card">
+        <h2>Gráficos e Indicadores</h2>
+        <div class="secao-graficos">
+          <div class="grafico-container"><canvas id="graficoTendencia"></canvas></div>
+          <div class="grafico-container"><canvas id="graficoDistribuicao"></canvas></div>
+          <div class="grafico-container"><canvas id="graficoPorSetor"></canvas></div>
+          <div class="grafico-container"><canvas id="graficoProgresso"></canvas></div>
+        </div>
+      </div>
       <details class="ciclos-discreto">
         <summary id="resumoAtrasosResumo">Atrasos: carregando...</summary>
         <div class="card" style="margin-top:10px">
@@ -210,8 +221,9 @@
       </details>
       <div class="card">
         <h2>Exportar</h2>
-        <p class="muted">Baixa uma planilha .xlsx com os dados atuais.</p>
+        <p class="muted">Baixa uma planilha .xlsx com os dados atuais ou um relatório em PDF.</p>
         <button class="btn secondary" id="btnExport">Baixar planilha (.xlsx)</button>
+        <button class="btn primary" id="btnExportarPDF" style="margin-left:10px">Baixar relatório (PDF)</button>
       </div>
     </section>
     
@@ -474,6 +486,8 @@
   <div class="drawer-body" id="drawerCorpo"></div>
 </aside>
 <div class="toast" id="toast"></div>
+<script src="utils/chartsConfig.js"></script>
+<script src="utils/pdfGenerator.js"></script>
 <script type="module" src="firebase-config.js?v=4"></script>
 <script type="module" src="app.js?v=11"></script>
 </body>
