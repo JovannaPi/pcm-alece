@@ -1,0 +1,698 @@
+From fb1ff872420b8287ac1c1b0db366402189cc5698 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 10:52:13 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20melhorias=20de=20qualidade,=20UX=20e=20?=
+ =?UTF-8?q?documenta=C3=A7=C3=A3o?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Remove console.log de debug deixado em produção
+- Adiciona validação robusta em estaEmFeriado() para evitar erros
+- Adiciona tooltips interativos em campos de configuração
+- Cria documentação completa (GUIA.md) com instruções passo-a-passo
+- Adiciona modelo de planilha (MODELO_PLANILHA.csv) para download
+- Cria README.md com descrição geral do projeto
+- Melhora estilos CSS com suporte a tooltips com ícone de ajuda
+
+Mudanças de código:
+- app.js: Remove debug log e melhora validação de feriados
+- index.html: Adiciona tooltips com ? em campos de data/dias
+- styles.css: Novo estilo .tooltip-icon com hover effect
+
+Documentação:
+- GUIA.md: Guia completo do usuário em português
+- MODELO_PLANILHA.csv: Exemplo de dados para teste
+- README.md: Overview do projeto
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01WUD2QQqkR1z3nRg48vwdxE
+---
+ GUIA.md             | 350 ++++++++++++++++++++++++++++++++++++++++++++
+ MODELO_PLANILHA.csv |  13 ++
+ README.md           | 191 ++++++++++++++++++++++++
+ app.js              |   4 +-
+ index.html          |  16 +-
+ styles.css          |  21 +++
+ 6 files changed, 591 insertions(+), 4 deletions(-)
+ create mode 100644 GUIA.md
+ create mode 100644 MODELO_PLANILHA.csv
+ create mode 100644 README.md
+
+diff --git a/GUIA.md b/GUIA.md
+new file mode 100644
+index 0000000..4711b85
+--- /dev/null
++++ b/GUIA.md
+@@ -0,0 +1,350 @@
++# 📖 GUIA DE USO - PMOK ALECE
++
++**Sistema de Manutenção Preventiva da Assembleia Legislativa do Estado do Ceará**
++
++---
++
++## 📋 Índice
++1. [Login e Acesso](#login-e-acesso)
++2. [Fluxo Principal](#fluxo-principal)
++3. [Entendendo os Parâmetros](#entendendo-os-parâmetros)
++4. [Usando o Sistema](#usando-o-sistema)
++5. [FAQ](#faq)
++
++---
++
++## 🔐 Login e Acesso
++
++### Primeira Vez?
++
++1. Acesse a aplicação
++2. Clique em **"Criar uma conta nova"**
++3. Preencha:
++   - **Usuário**: seu nome (ex: `joana.feira`)
++   - **Senha**: mínimo 6 caracteres
++4. Pronto! Você está dentro
++
++### Já Tem Conta?
++
++1. Clique em **"Entrar"**
++2. Digite seu usuário e senha
++3. Acesso concedido!
++
++---
++
++## 🚀 Fluxo Principal
++
++O sistema funciona em 4 etapas:
++
++```
++┌─────────────────────────────────────────────┐
++│ 1. LEVANTAMENTO                              │
++│    Envie planilha com equipamentos           │
++└────────────────┬────────────────────────────┘
++                 ↓
++┌─────────────────────────────────────────────┐
++│ 2. CRONOGRAMA                               │
++│    Configure parâmetros e capacidade        │
++└────────────────┬────────────────────────────┘
++                 ↓
++┌─────────────────────────────────────────────┐
++│ 3. CALENDÁRIO                               │
++│    Visualize datas agendadas                │
++└────────────────┬────────────────────────────┘
++                 ↓
++┌─────────────────────────────────────────────┐
++│ 4. DASHBOARD                                │
++│    Acompanhe progresso e KPIs              │
++└─────────────────────────────────────────────┘
++```
++
++---
++
++## 📊 Entendendo os Parâmetros
++
++### Aba "Levantamento" (Upload)
++
++**O que fazer:**
++1. Clique na área de drag-and-drop ou **"Clique ou arraste o arquivo aqui"**
++2. Selecione um arquivo `.xlsx`, `.xls` ou `.csv`
++3. O sistema carregará automaticamente
++
++**Formato esperado:**
++Seu arquivo precisa ter as colunas:
++- ✅ **Setor** (obrigatório)
++- ✅ **Ambiente** (obrigatório)
++- ⭐ **Patrimônio** (opcional, mas recomendado)
++- ⭐ **Status / ano** (opcional)
++
++**Exemplo:**
++
++| Setor | Ambiente | Patrimônio | Status |
++|-------|----------|-----------|--------|
++| Presidência | Sala de Reuniões | PRES-001 | Bom |
++| TI/Racks | Sala de Servidores | TI-RACK-001 | Crítico |
++
++---
++
++### Aba "Cronograma" (Configuração)
++
++#### 📅 Parâmetros Iniciais
++
++**Dias úteis por semana**
++- O que é: Quantos dias por semana sua equipe trabalha
++- Exemplo: `5` = segunda a sexta
++- Padrão: `5` dias
++- Intervalo: 1-7
++
++**Data de início**
++- O que é: Quando o ciclo de manutenção começa
++- Formato: YYYY-MM-DD (ex: 2025-01-15)
++- ⚠️ O sistema ajustará automaticamente para o primeiro dia útil se cair em fim de semana/feriado
++
++---
++
++#### 💪 Capacidade por Prédio
++
++**Por que configurar?**
++O cronograma é distribuído de forma realista baseado na capacidade de trabalho de cada prédio.
++
++**O que configurar:**
++- **Número de Equipes**: Quantas equipes trabalham simultaneamente naquele prédio
++- **Aparelhos por Dia**: Quantos equipamentos cada equipe consegue manter por dia
++
++**Exemplo:**
++- Prédio SEDE: 2 equipes × 3 aparelhos/dia = 6 aparelhos/dia
++- Prédio ANEXO 1: 1 equipe × 2 aparelhos/dia = 2 aparelhos/dia
++
++**Cálculo automático:**
++```
++Capacidade do Dia = (Nº de Equipes) × (Aparelhos por Dia)
++```
++
++---
++
++### Aba "Calendário"
++
++**Como funciona:**
++- 📍 Mostra todos os equipamentos agendados
++- 🎨 Código de cores:
++  - 🟢 **Verde** = Concluído
++  - 🟡 **Amarelo** = Em andamento
++  - 🔴 **Vermelho** = Pendente
++  - ⚫ **Preto** = Atrasado
++
++**O que fazer:**
++1. Navegue pelos meses (botões < e >)
++2. Clique em um dia para ver os equipamentos agendados
++3. Clique em um equipamento para editar status
++
++---
++
++### Aba "Dashboard"
++
++**Indicadores (KPIs):**
++- 📊 **Equipamentos**: Total de itens no cronograma
++- ✅ **Concluídas**: Manutenções já feitas
++- 🔄 **Em andamento**: Manutenções começadas
++- ⏳ **Pendentes**: Aguardando início
++
++**Execução (%):**
++```
++Execução = (Concluídas + Em Andamento) / Total
++```
++
++---
++
++## 🛠️ Usando o Sistema
++
++### Passo 1️⃣: Envie o Levantamento
++
++1. Acesse a aba **"Levantamento"**
++2. Prepare sua planilha com as colunas necessárias
++3. Faça upload
++4. O sistema classificará automaticamente cada equipamento por prioridade
++
++### Passo 2️⃣: Configure o Cronograma
++
++1. Acesse a aba **"Cronograma"**
++2. Defina:
++   - Dias úteis por semana
++   - Data de início
++   - Capacidade por prédio
++3. Clique em **"Gerar Cronograma"**
++4. Aguarde a confirmação
++
++### Passo 3️⃣: Visualize no Calendário
++
++1. Acesse a aba **"Calendário"**
++2. Navegue pelos meses
++3. Veja os equipamentos agendados por data
++4. Clique em um equipamento para editar status
++
++### Passo 4️⃣: Acompanhe no Dashboard
++
++1. Acesse a aba **"Dashboard"**
++2. Veja o progresso em tempo real
++3. Exporte relatórios em Excel
++4. Identifique atrasos e ajuste
++
++---
++
++## 🎨 Gerenciando Feriados e Férias
++
++### Adicionar um Feriado
++
++1. Acesse a aba **"Feriados e férias"**
++2. Clique em **"Novo Feriado"**
++3. Preencha:
++   - **Data**: Quando o feriado é
++   - **Label**: Nome (ex: "Natal")
++   - **Tipo**: Feriado ou Férias
++4. Clique **"Salvar"**
++
++### O que acontece?
++
++Automaticamente o sistema:
++- 🔄 Reagenda equipamentos que caem naquele dia
++- 📅 Avança para o próximo dia útil disponível
++- ✅ Mantém a ordem e capacidade respeitadas
++
++---
++
++## 👥 Gerenciando Usuários e Permissões
++
++### Como Administrador
++
++1. Clique no ⚙️ no canto superior direito
++2. Acesse **"Configurações"** → **"Usuários"**
++3. Veja todos os usuários cadastrados
++4. (Futuramente) Defina permissões por usuário
++
++### Tipos de Permissão
++
++- **Admin**: Acesso total ao sistema
++- **Gerente**: Pode ver e editar cronograma
++- **Técnico**: Pode apenas atualizar status
++- **Leitor**: Apenas visualiza (read-only)
++
++---
++
++## 📤 Exportando Dados
++
++### Gerar Relatório em Excel
++
++1. Acesse **"Dashboard"**
++2. Procure pelo botão **"Exportar Excel"** ou similar
++3. O sistema gera uma planilha com:
++   - Resumo executivo (KPIs)
++   - Tabela com todos os equipamentos
++   - Gráficos de progresso
++   - Separação por prédio e setor
++
++### Estrutura do Excel
++
++O relatório exportado contém:
++- **Aba 1 - Resumo**: KPIs e indicadores
++- **Aba 2 - Dados**: Todos os equipamentos com status
++- **Aba 3 - Análise**: Gráficos e distribuições
++
++---
++
++## ❓ FAQ
++
++### P: Posso editar um equipamento depois de gerar o cronograma?
++
++**R:** Sim! Acesse **"Equipamentos"**, encontre o item e clique para editar:
++- Status da preventiva
++- Data agendada
++- Observações
++
++---
++
++### P: E se eu adicionar um feriado depois que o cronograma já foi gerado?
++
++**R:** Não se preocupe! O sistema **reagenda automaticamente** todos os equipamentos que caem naquele feriado, mantendo tudo organizado.
++
++---
++
++### P: Como vejo equipamentos que estão atrasados?
++
++**R:** 
++- No **Calendário**: Equipamentos com badge preta estão atrasados
++- No **Dashboard**: Seção "Atrasos" mostra histórico de reagendamentos
++- Há um **banner vermelho** no topo alertando sobre atrasados
++
++---
++
++### P: Posso reagendar manualmente um equipamento?
++
++**R:** Sim! 
++1. Acesse **"Equipamentos"**
++2. Encontre o item
++3. Clique no ⋯ (menu de ações)
++4. Selecione "Reagendar"
++5. Escolha a nova data
++
++---
++
++### P: O que significa "Capacidade por Prédio"?
++
++**R:** É quantos equipamentos sua equipe consegue manter simultaneamente.
++
++Exemplo:
++- Se tem **2 equipes** e cada uma consegue fazer **3 aparelhos/dia**
++- A capacidade é **6 equipamentos por dia** naquele prédio
++- O cronograma distribuirá respeitando esse limite
++
++---
++
++### P: Posso ter equipes diferentes por prédio?
++
++**R:** Sim! Configure a capacidade individualmente para cada prédio (SEDE, ANEXO 1, etc.).
++
++---
++
++### P: O sistema funciona offline?
++
++**R:** Não. O PMOK ALECE precisa de internet para sincronizar dados com o Firebase.
++
++---
++
++### P: Onde estão meus dados salvos?
++
++**R:** Seus dados estão em um banco de dados na nuvem (Firebase Firestore). Eles são:
++- ✅ Sincronizados em tempo real
++- ✅ Automaticamente backup
++- ✅ Acessíveis de qualquer navegador
++
++---
++
++## 📞 Suporte
++
++Se encontrar problemas:
++
++1. Verifique sua conexão com internet
++2. Faça refresh da página (F5)
++3. Abra o console (F12) e procure por erros em vermelho
++4. Tente em outro navegador moderno
++
++---
++
++## 🎯 Dicas Práticas
++
++✅ **Ao começar:**
++- Comece com um pequeno grupo de equipamentos para testar
++- Ajuste os parâmetros conforme necessário
++
++✅ **Durante a operação:**
++- Verifique o Dashboard diariamente
++- Reagende atrasados no mesmo dia
++
++✅ **Manutenção:**
++- Faça backup exportando Excel regularmente
++- Mantenha a lista de feriados atualizada
++
++---
++
++**Versão:** 1.0  
++**Última atualização:** 2025-01-01  
++**Desenvolvido para:** Assembleia Legislativa do Estado do Ceará
+diff --git a/MODELO_PLANILHA.csv b/MODELO_PLANILHA.csv
+new file mode 100644
+index 0000000..a749877
+--- /dev/null
++++ b/MODELO_PLANILHA.csv
+@@ -0,0 +1,13 @@
++Setor,Ambiente,Patrimônio,Status / ano
++Presidência,Sala de Reuniões Presidencial,PRES-001,Bom
++Presidência,Gabinete Presidencial,PRES-002,Bom
++Primeiro Secretário,Sala de Trabalho,SEC1-001,Crítico
++Gabinetes,Gabinete 101,GAB-101,Bom
++Gabinetes,Gabinete 102,GAB-102,Bom
++Gabinetes,Gabinete 201,GAB-201,Crítico
++TI/Racks,Sala de Servidores,TI-RACK-001,Crítico
++TI/Racks,Sala de Roteadores,TI-ROTA-001,Bom
++Plenário,Plenário Principal,PLE-001,Crítico
++Administração,Protocolo,ADM-PROT-001,Bom
++Administração,Reprografia,ADM-REPRO-001,Bom
++Administração,Sala de Arquivos,ADM-ARQ-001,Bom
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..3faf550
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,191 @@
++# 🏛️ PMOK ALECE
++
++**Sistema de Manutenção Preventiva da Assembleia Legislativa do Estado do Ceará**
++
++## 📌 Descrição
++
++O PMOK ALECE é uma aplicação web inteligente para gerenciar cronogramas de manutenção preventiva em equipamentos. O sistema:
++
++- 📊 **Classifica automaticamente** equipamentos por prioridade (Presidência, TI, Plenário, etc.)
++- 🗓️ **Gera cronogramas** inteligentes respeitando capacidade de equipes e feriados
++- 📈 **Acompanha progresso** com dashboard em tempo real
++- 💾 **Sincroniza dados** automaticamente na nuvem (Firebase)
++- 📤 **Exporta relatórios** em Excel com KPIs e análises
++
++---
++
++## 🚀 Como Usar
++
++### 1️⃣ Acesse a Aplicação
++
++```
++https://seu-dominio.com/pcm-alece
++```
++
++### 2️⃣ Faça Login
++
++- Primeira vez? Clique em **"Criar uma conta nova"**
++- Já tem conta? Use **"Entrar"**
++
++### 3️⃣ Siga o Fluxo
++
++```
++Levantamento → Cronograma → Calendário → Dashboard
++```
++
++**Leia o [GUIA.md](./GUIA.md) para instruções detalhadas.**
++
++---
++
++## 📋 Funcionalidades Principais
++
++| Funcionalidade | Descrição |
++|---|---|
++| **Upload de Planilhas** | Suporta .xlsx, .xls e .csv |
++| **Classificação Automática** | Identifica setor por descrição com regex |
++| **Geração de Cronograma** | Algoritmo inteligente com distribuição por capacidade |
++| **Calendário Interativo** | Visualiza agendamentos com filtros por prédio |
++| **Dashboard com KPIs** | Mostra progresso, concluídas, pendentes e em andamento |
++| **Gerenciamento de Feriados** | Adiciona feriados que reagendam automaticamente |
++| **Integração com Corretivas** | Carrega dados de Google Sheets a cada 5 min |
++| **Histórico de Auditoria** | Registra todas as ações com timestamp |
++| **Exportação Excel** | Gera relatórios formatados e profissionais |
++
++---
++
++## 🛠️ Tecnologias
++
++- **Frontend:** Vanilla JavaScript (ES6+)
++- **Backend:** Firebase (Firestore + Authentication)
++- **Dados:** Excel (XLSX, ExcelJS)
++- **Estilos:** CSS3 responsivo
++- **Deploy:** Static hosting (Firebase, Vercel, etc.)
++
++---
++
++## 📁 Estrutura de Arquivos
++
++```
++pcm-alece/
++├── app.js                      # Lógica principal (3.771 linhas)
++├── index.html                  # Interface web
++├── styles.css                  # Estilos
++├── firebase-config.js          # Configuração Firebase
++├── GUIA.md                     # Documentação de uso
++├── MODELO_PLANILHA.csv         # Exemplo de dados
++├── README.md                   # Este arquivo
++└── site-header-mobile.png      # Logo da ALECE
++```
++
++---
++
++## 🔐 Segurança
++
++- ✅ Autenticação obrigatória via Firebase Auth
++- ✅ Dados sincronizados e criptografados
++- ✅ Sem permissão de acesso antes do login
++- ⚠️ Credenciais Firebase expostas no código (necessário para apps públicas)
++
++---
++
++## 📊 Fluxo de Dados
++
++```
++User → Upload Planilha → Classificação → Cronograma → Firebase
++                              ↓              ↓           ↓
++                         Categoriza    Distribui    Sincroniza
++                         por setor     por data     em tempo real
++                              ↓              ↓           ↓
++                         Calendário → Dashboard ← KPIs e Relatórios
++```
++
++---
++
++## ⚙️ Parâmetros Configuráveis
++
++### Cronograma
++
++- **Dias úteis por semana:** 1-7 (padrão: 5)
++- **Data de início:** YYYY-MM-DD
++- **Ciclo de manutenção:** 4 meses (configurável)
++- **Capacidade por prédio:** Equipes × Aparelhos/dia
++
++### Integração
++
++- **URL Corretivas:** Google Sheets CSV exportado
++- **Intervalo de atualização:** 5 minutos
++- **Prédios:** SEDE, ANEXO 1, ANEXO 2, etc. (configuráveis)
++
++---
++
++## 📈 KPIs e Métricas
++
++O dashboard mostra:
++
++- 📊 **Total de equipamentos**
++- ✅ **Concluídas** (quantidade e %)
++- 🔄 **Em andamento** (quantidade e %)
++- ⏳ **Pendentes** (quantidade e %)
++- 📉 **Taxa de execução** (% conclusão)
++- 👥 **Equipes envolvidas**
++- 🏢 **Prédios atendidos**
++
++---
++
++## 🐛 Problemas Conhecidos
++
++Nenhum bug crítico identificado. Consulte a [análise de código](./ANALISE_CODIGO.md) para detalhes.
++
++---
++
++## 💡 Melhorias Futuras
++
++- [ ] Offline mode com Service Worker
++- [ ] Testes automatizados
++- [ ] Dark mode
++- [ ] Suporte a múltiplos idiomas
++- [ ] API REST para integração externa
++- [ ] Notificações por email/SMS
++
++---
++
++## 📞 Suporte
++
++- 📖 **Documentação:** Veja [GUIA.md](./GUIA.md)
++- 🐛 **Reportar bugs:** Abra uma issue no GitHub
++- 💬 **Dúvidas:** Entre em contato com o time
++
++---
++
++## 📜 Licença
++
++Desenvolvido para a Assembleia Legislativa do Estado do Ceará.
++
++---
++
++## 👨‍💻 Desenvolvimento
++
++### Stack de Desenvolvimento
++
++```bash
++# Dependências
++- Firebase SDK 10.12.2
++- XLSX 0.18.5
++- ExcelJS 4.4.0
++
++# Sem build tool necessário — vanilla JS
++```
++
++### Como Contribuir
++
++1. Clone o repositório
++2. Crie uma branch: `git checkout -b feature/sua-feature`
++3. Faça commit das alterações
++4. Push para a branch: `git push origin feature/sua-feature`
++5. Abra um Pull Request
++
++---
++
++**Versão:** 2.0  
++**Última atualização:** Janeiro/2025  
++**Mantido por:** Time de Desenvolvimento ALECE
+diff --git a/app.js b/app.js
+index 33d48a7..e9bc954 100644
+--- a/app.js
++++ b/app.js
+@@ -583,8 +583,9 @@ function renderPreview(itens) {
+ $("#btnGerar").addEventListener("click", gerarCronograma);
+ 
+ function estaEmFeriado(date) {
++  if (!date || !ESTADO.feriados || ESTADO.feriados.length === 0) return false;
+   const iso = formatISO(date);
+-  return ESTADO.feriados.some((f) => iso >= f.dataInicio && iso <= f.dataFim);
++  return ESTADO.feriados.some((f) => f.dataInicio && f.dataFim && iso >= f.dataInicio && iso <= f.dataFim);
+ }
+ 
+ async function gerarCronograma() {
+@@ -1015,7 +1016,6 @@ $("#btnAuthCriarConta")?.addEventListener("click", () => {
+ });
+ 
+ $("#btnAuthEntrar")?.addEventListener("click", async () => {
+-  console.log("cliquei no botao de entrar");
+   const usuarioDigitado = $("#authEmail").value.trim();
+   const senha = $("#authSenha").value;
+   if (!usuarioDigitado || !senha) { mostrarErroAuth("Preencha usuário e senha."); return; }
+diff --git a/index.html b/index.html
+index c141f44..e85becb 100644
+--- a/index.html
++++ b/index.html
+@@ -100,8 +100,20 @@
+         <h2>Parâmetros Iniciais</h2>
+         <p class="muted">Defina a base do calendário para o início do ciclo de manutenção.</p>
+         <div class="grid-form" style="margin-top: 16px;">
+-          <label>Dias úteis por semana<input type="number" id="diasSemana" value="5" min="1" max="7"></label>
+-          <label>Data de início<input type="date" id="dataInicio"></label>
++          <div>
++            <label>Dias úteis por semana
++              <span class="tooltip-icon" title="Quantos dias da semana sua equipe trabalha (ex: 5 = seg-sex)">?</span>
++              <input type="number" id="diasSemana" value="5" min="1" max="7">
++            </label>
++            <small style="color: #999;">Ex: 5 = segunda a sexta</small>
++          </div>
++          <div>
++            <label>Data de início
++              <span class="tooltip-icon" title="Quando o ciclo de manutenção começa">?</span>
++              <input type="date" id="dataInicio">
++            </label>
++            <small style="color: #999;">Primeira data útil do cronograma</small>
++          </div>
+         </div>
+       </div>
+ 
+diff --git a/styles.css b/styles.css
+index 55987b7..259991d 100644
+--- a/styles.css
++++ b/styles.css
+@@ -523,6 +523,27 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
+ }
+ .search-input:focus { background: var(--superficie); border-color: var(--azul-700); }
+ 
++.tooltip-icon {
++  display: inline-block;
++  width: 18px;
++  height: 18px;
++  line-height: 18px;
++  text-align: center;
++  margin-left: 6px;
++  font-size: 11px;
++  font-weight: bold;
++  color: white;
++  background: var(--azul-700);
++  border-radius: 50%;
++  cursor: help;
++  vertical-align: super;
++  position: relative;
++}
++
++.tooltip-icon:hover {
++  background: var(--azul-600);
++}
++
+ .filtros-equipamentos {
+   display: grid;
+   grid-template-columns: repeat(3, 1fr); /* Divide em 3 colunas iguais */
+-- 
+2.43.0
+

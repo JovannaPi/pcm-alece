@@ -583,8 +583,9 @@ function renderPreview(itens) {
 $("#btnGerar").addEventListener("click", gerarCronograma);
 
 function estaEmFeriado(date) {
+  if (!date || !ESTADO.feriados || ESTADO.feriados.length === 0) return false;
   const iso = formatISO(date);
-  return ESTADO.feriados.some((f) => iso >= f.dataInicio && iso <= f.dataFim);
+  return ESTADO.feriados.some((f) => f.dataInicio && f.dataFim && iso >= f.dataInicio && iso <= f.dataFim);
 }
 
 async function gerarCronograma() {
@@ -1015,7 +1016,6 @@ $("#btnAuthCriarConta")?.addEventListener("click", () => {
 });
 
 $("#btnAuthEntrar")?.addEventListener("click", async () => {
-  console.log("cliquei no botao de entrar");
   const usuarioDigitado = $("#authEmail").value.trim();
   const senha = $("#authSenha").value;
   if (!usuarioDigitado || !senha) { mostrarErroAuth("Preencha usuário e senha."); return; }
