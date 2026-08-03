@@ -186,9 +186,9 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
         <div class="secao-titulo">Equipamentos em Atraso</div>
   `;
 
-  const hoje = new Date().toISOString().split('T')[0];
+  const hojeISO = new Date().toISOString().split('T')[0];
   const atrasados = equipamentos.filter(e =>
-    e.dataAgendada < hoje && e.statusPreventiva !== 'Concluída'
+    e.dataAgendada < hojeISO && e.statusPreventiva !== 'Concluída'
   );
 
   if (atrasados.length > 0) {

@@ -1,45 +1,45 @@
-function renderGraficoTendencia(equipamentos) {
-  const ctx = document.getElementById('graficoTendencia').getContext('2d');
+const graficosAtivos = {};
 
-  const ultimosMeses = [];
+function destruirGrafico(chave) {
+  if (graficosAtivos[chave]) {
+    graficosAtivos[chave].destroy();
+    graficosAtivos[chave] = null;
+  }
+}
+
+function renderGraficoTendencia(equipamentos, historico) {
+  const canvas = document.getElementById('graficoTendencia');
+  if (!canvas) return;
+  destruirGrafico('tendencia');
+
+  const meses = [];
   for (let i = 6; i >= 0; i--) {
     const data = new Date();
+    data.setDate(1);
     data.setMonth(data.getMonth() - i);
-    ultimosMeses.push(data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }));
+    meses.push({
+      chave: `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`,
+      label: data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+    });
   }
 
-  const concluidas = [12, 15, 18, 22, 25, 28, 32];
-  const emAndamento = [8, 10, 12, 14, 16, 18, 20];
-  const pendentes = [20, 18, 15, 12, 10, 8, 5];
+  const concluidasPorMes = {};
+  (historico || []).forEach(h => {
+    if (h.statusNovo !== 'Concluída' || !h.registradoEm) return;
+    const chave = h.registradoEm.slice(0, 7);
+    concluidasPorMes[chave] = (concluidasPorMes[chave] || 0) + 1;
+  });
 
-  new Chart(ctx, {
+  graficosAtivos.tendencia = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: {
-      labels: ultimosMeses,
+      labels: meses.map(m => m.label),
       datasets: [
         {
           label: 'Concluídas',
-          data: concluidas,
+          data: meses.map(m => concluidasPorMes[m.chave] || 0),
           borderColor: '#28A745',
           backgroundColor: 'rgba(40, 167, 69, 0.1)',
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true
-        },
-        {
-          label: 'Em Andamento',
-          data: emAndamento,
-          borderColor: '#FFC107',
-          backgroundColor: 'rgba(255, 193, 7, 0.1)',
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true
-        },
-        {
-          label: 'Pendentes',
-          data: pendentes,
-          borderColor: '#DC3545',
-          backgroundColor: 'rgba(220, 53, 69, 0.1)',
           borderWidth: 2,
           tension: 0.4,
           fill: true
@@ -56,14 +56,14 @@ function renderGraficoTendencia(equipamentos) {
         },
         title: {
           display: true,
-          text: 'Tendência de Execução (Últimos 7 Meses)',
+          text: 'Manutenções Concluídas (Últimos 7 Meses)',
           font: { size: 14, weight: 'bold' }
         }
       },
       scales: {
         y: {
           beginAtZero: true,
-          ticks: { font: { size: 12 } }
+          ticks: { precision: 0, font: { size: 12 } }
         },
         x: {
           ticks: { font: { size: 12 } }
@@ -74,13 +74,15 @@ function renderGraficoTendencia(equipamentos) {
 }
 
 function renderGraficoDistribuicao(equipamentos) {
-  const ctx = document.getElementById('graficoDistribuicao').getContext('2d');
+  const canvas = document.getElementById('graficoDistribuicao');
+  if (!canvas) return;
+  destruirGrafico('distribuicao');
 
   const concluidas = equipamentos.filter(e => e.statusPreventiva === 'Concluída').length;
   const emAndamento = equipamentos.filter(e => e.statusPreventiva === 'Em andamento').length;
-  const pendentes = equipamentos.filter(e => e.statusPreventiva === 'Pendente').length;
+  const pendentes = equipamentos.length - concluidas - emAndamento;
 
-  new Chart(ctx, {
+  graficosAtivos.distribuicao = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
     data: {
       labels: ['Concluídas', 'Em Andamento', 'Pendentes'],
@@ -110,7 +112,9 @@ function renderGraficoDistribuicao(equipamentos) {
 }
 
 function renderGraficoPorSetor(equipamentos) {
-  const ctx = document.getElementById('graficoPorSetor').getContext('2d');
+  const canvas = document.getElementById('graficoPorSetor');
+  if (!canvas) return;
+  destruirGrafico('porSetor');
 
   const porSetor = {};
   equipamentos.forEach(e => {
@@ -119,7 +123,7 @@ function renderGraficoPorSetor(equipamentos) {
     porSetor[setor]++;
   });
 
-  new Chart(ctx, {
+  graficosAtivos.porSetor = new Chart(canvas.getContext('2d'), {
     type: 'bar',
     data: {
       labels: Object.keys(porSetor),
@@ -148,7 +152,7 @@ function renderGraficoPorSetor(equipamentos) {
       scales: {
         x: {
           beginAtZero: true,
-          ticks: { font: { size: 12 } }
+          ticks: { precision: 0, font: { size: 12 } }
         },
         y: {
           ticks: { font: { size: 12 } }
@@ -159,21 +163,21 @@ function renderGraficoPorSetor(equipamentos) {
 }
 
 function renderGraficoProgresso(equipamentos) {
-  const ctx = document.getElementById('graficoProgresso').getContext('2d');
+  const canvas = document.getElementById('graficoProgresso');
+  if (!canvas) return;
+  destruirGrafico('progresso');
 
   const concluidas = equipamentos.filter(e => e.statusPreventiva === 'Concluída').length;
   const total = equipamentos.length;
-  const percentual = (concluidas / total * 100).toFixed(1);
+  const percentual = total ? Number((concluidas / total * 100).toFixed(1)) : 0;
 
-  const dadosProgresso = [percentual, 100 - percentual];
-
-  new Chart(ctx, {
+  graficosAtivos.progresso = new Chart(canvas.getContext('2d'), {
     type: 'bar',
     data: {
       labels: ['Completado', 'Restante'],
       datasets: [{
         label: 'Taxa de Execução (%)',
-        data: dadosProgresso,
+        data: [percentual, 100 - percentual],
         backgroundColor: ['#28A745', '#e9ecef'],
         borderColor: ['#1e7e34', '#dee2e6'],
         borderWidth: 1

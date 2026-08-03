@@ -883,6 +883,20 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--sp-3);
 }
+
+.secao-graficos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-4);
+  margin-top: 16px;
+}
+.grafico-container {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: var(--sp-4);
+  min-height: 260px;
+}
 .kpi-card {
   background: var(--superficie);
   border: 1px solid var(--borda);

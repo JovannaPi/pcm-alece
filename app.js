@@ -1916,6 +1916,13 @@ function renderDashboard() {
   }
   renderResumoAtrasos();
   renderVisaoGerencial();
+
+  if (typeof Chart !== "undefined" && $("#graficoTendencia")) {
+    renderGraficoTendencia(itens, ESTADO.historico);
+    renderGraficoDistribuicao(itens);
+    renderGraficoPorSetor(itens);
+    renderGraficoProgresso(itens);
+  }
 }
 
 async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva") {
@@ -3148,6 +3155,18 @@ $("#btnExport").addEventListener("click", async () => {
     toast("Erro ao gerar planilha: " + err.message);
   }
 });
+
+const btnExportarPDF = $("#btnExportarPDF");
+if (btnExportarPDF) {
+  btnExportarPDF.addEventListener("click", () => {
+    if (!ESTADO.equipamentos.length) {
+      toast("Gere o cronograma primeiro.");
+      return;
+    }
+    toast("Gerando relatório PDF...");
+    baixarRelatorioPDF(ESTADO.equipamentos, ESTADO.cicloAtual);
+  });
+}
 
 const btnApagarCronograma = $("#btnApagarCronograma");
 if (btnApagarCronograma) {
