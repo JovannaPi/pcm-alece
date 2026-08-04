@@ -968,6 +968,47 @@ $("#btnCancelarEdicaoCfg")?.addEventListener("click", () => {
   preencherFormularioConfigSite(); // Volta os inputs pro valor original se a pessoa desistir
 });
 
+// Prédio é referenciado por nome (texto puro) em equipamentos.local,
+// config.capacidades e equipes.predio — renomear/apagar na lista de
+// prédios sem cascatear deixa tudo isso órfão silenciosamente.
+async function propagarRenomeacaoPredios(renomeacoes) {
+  for (const { antigo, novo } of renomeacoes) {
+    const afetados = ESTADO.equipamentos.filter((e) => (e.local || "SEDE") === antigo);
+    if (afetados.length && ESTADO.cicloAtual) {
+      const TAMANHO_LOTE = 400;
+      for (let inicio = 0; inicio < afetados.length; inicio += TAMANHO_LOTE) {
+        const pedaco = afetados.slice(inicio, inicio + TAMANHO_LOTE);
+        const batch = writeBatch(db);
+        pedaco.forEach((item) => {
+          batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), { local: novo });
+        });
+        await batch.commit();
+      }
+    }
+
+    const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === antigo);
+    if (equipesDoPredio.length) {
+      const batch = writeBatch(db);
+      equipesDoPredio.forEach((eq) => batch.update(doc(db, "equipes", eq.id), { predio: novo }));
+      await batch.commit();
+    }
+  }
+
+  const capacidadesAtuais = { ...((ESTADO.config && ESTADO.config.capacidades) || {}) };
+  let capacidadesMudaram = false;
+  for (const { antigo, novo } of renomeacoes) {
+    if (capacidadesAtuais[antigo]) {
+      capacidadesAtuais[novo] = capacidadesAtuais[antigo];
+      delete capacidadesAtuais[antigo];
+      capacidadesMudaram = true;
+    }
+  }
+  if (capacidadesMudaram) {
+    ESTADO.config = { ...(ESTADO.config || {}), capacidades: capacidadesAtuais };
+    await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
+  }
+}
+
 // --- SALVAR CONFIGURAÇÕES ---
 $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
   const mesesCiclo = Math.max(1, parseInt($("#cfgMesesCiclo").value, 10) || 4);
@@ -979,14 +1020,44 @@ $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
     return;
   }
 
+  const prediosAntigos = ESTADO.configSite.predios || [];
+  const removidos = prediosAntigos.filter((p) => !predios.includes(p));
+  const adicionados = predios.filter((p) => !prediosAntigos.includes(p));
+
+  let renomeacoes = [];
+  if (removidos.length && removidos.length === adicionados.length) {
+    renomeacoes = removidos.map((antigo, i) => ({ antigo, novo: adicionados[i] }));
+    const descricao = renomeacoes.map((r) => `"${r.antigo}" → "${r.novo}"`).join(", ");
+    const ok = window.confirm(
+      `Parece que você renomeou: ${descricao}.\n\nQuer que eu atualize automaticamente os equipamentos, equipes e capacidades já cadastrados pra usar o nome novo? Se a lista mudou por outro motivo, clique em Cancelar (a lista de prédios salva do mesmo jeito, só não mexe em mais nada).`
+    );
+    if (!ok) renomeacoes = [];
+  } else if (removidos.length) {
+    const impacto = removidos
+      .map((p) => `${p} (${ESTADO.equipamentos.filter((e) => (e.local || "SEDE") === p).length} equipamento(s))`)
+      .join(", ");
+    const temImpacto = removidos.some((p) => ESTADO.equipamentos.some((e) => (e.local || "SEDE") === p));
+    if (temImpacto) {
+      const ok = window.confirm(
+        `Remover ${removidos.join(", ")} da lista vai deixar estes equipamentos sem prédio válido: ${impacto}.\n\nEles continuam existindo, mas somem dos filtros por prédio. Quer continuar mesmo assim?`
+      );
+      if (!ok) return;
+    }
+  }
+
   const novaConfig = { mesesCiclo, urlCorretivas, predios };
   try {
     await setDoc(doc(db, "config", "site"), novaConfig);
     ESTADO.configSite = novaConfig;
+
+    if (renomeacoes.length) {
+      await propagarRenomeacaoPredios(renomeacoes);
+    }
+
     await registrarAuditoria("Alterar parâmetros do sistema", `Ciclo: ${mesesCiclo} meses`);
     toast("Configurações salvas com sucesso!");
     carregarChamadosCorretivos(true);
-    
+
     // Sucesso! Volta para o Modo Leitura automaticamente
     $("#btnCancelarEdicaoCfg").click();
 
@@ -994,7 +1065,7 @@ $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
     console.error(err);
     toast("Erro ao salvar: " + err.message);
   }
-  
+
   const selectEqLocal = $("#eqLocal");
   if (selectEqLocal) {
     selectEqLocal.innerHTML = ESTADO.configSite.predios.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -2437,23 +2508,55 @@ async function adicionarEquipamentoManual() {
     return;
   }
 
+  if (patrimonio) {
+    const duplicado = ESTADO.equipamentos.find((e) =>
+      e.patrimonio && e.patrimonio.trim() === patrimonio && e.id !== idEquipamentoEmEdicao
+    );
+    if (duplicado) {
+      const ok = window.confirm(
+        `Já existe um equipamento com o patrimônio "${patrimonio}" (${duplicado.setor} — ${duplicado.ambiente}, ${duplicado.local || "SEDE"}).\n\nQuer continuar mesmo assim?`
+      );
+      if (!ok) return;
+    }
+  }
+
   const setorPCM = identificarSetor(setor, ambiente);
   const prioridadeSetor = PRIORIDADE[setorPCM] || 7;
   const pisoPCM = descobrirPiso(setor);
 
   if (idEquipamentoEmEdicao) {
     const local = $("#eqLocal")?.value || "SEDE";
+    const itemOriginal = ESTADO.equipamentos.find((e) => e.id === idEquipamentoEmEdicao);
+    const localMudou = itemOriginal && (itemOriginal.local || "SEDE") !== local;
+    // Só limpa e reagenda automaticamente quando o item ainda está Pendente —
+    // pra um item Concluída/Em andamento, limpar a data quebraria ele (o
+    // reagendarTudo() não recalcula quem não está pendente).
+    const podeReagendar = localMudou && itemOriginal.statusPreventiva === "Pendente";
     try {
-      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", idEquipamentoEmEdicao), {
-        patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM
-      });
+      const camposAtualizados = { patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM };
+      if (podeReagendar) {
+        // Equipe e data eram do prédio antigo — ficariam presas lá se não
+        // limpar aqui, já que reagendarTudo() não mexe em quem já tem data.
+        camposAtualizados.equipeResponsavel = "";
+        camposAtualizados.dataAgendada = "";
+        camposAtualizados.diaPlanejado = "";
+        camposAtualizados.semanaPlanejada = "";
+      }
+      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", idEquipamentoEmEdicao), camposAtualizados);
       await registrarHistorico(
         { id: idEquipamentoEmEdicao, patrimonio, setor, ambiente, local, equipeResponsavel: "" },
         "-", "Editado", "Cadastro"
       );
-      toast("Equipamento atualizado com sucesso!");
       idEquipamentoEmEdicao = null;
       if (btnAdicionarEquipamento) btnAdicionarEquipamento.textContent = "Adicionar Equipamento";
+      if (podeReagendar) {
+        toast("Prédio alterado — reagendando para a nova rotina...");
+        await reagendarTudo();
+      } else if (localMudou) {
+        toast("Prédio alterado. Como o item já não está mais pendente, a equipe e a data não foram mexidas — confira manualmente se precisa ajustar.");
+      } else {
+        toast("Equipamento atualizado com sucesso!");
+      }
     } catch (err) {
       console.error(err);
       toast("Erro ao atualizar: " + err.message);
