@@ -2897,49 +2897,115 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     }
 
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Condensadoras e Evaporadoras");
-    sheet.columns = [
-      { header: "Patrimônio (sistema)", key: "patrimonio", width: 18 },
-      { header: "Setor", key: "setor", width: 24 },
-      { header: "Ambiente", key: "ambiente", width: 24 },
-      { header: "Prédio", key: "local", width: 14 },
-      { header: "Informante", key: "informante", width: 20 },
-      { header: "Preenchido em", key: "preenchidoEm", width: 18 },
-      { header: "Cond. Nº", key: "condNumero", width: 12 },
-      { header: "Cond. Tombo", key: "condTombo", width: 14 },
-      { header: "Cond. Tag", key: "condTag", width: 14 },
-      { header: "Cond. Marca", key: "condMarca", width: 14 },
-      { header: "Cond. Modelo", key: "condModelo", width: 14 },
-      { header: "Cond. Capacidade", key: "condCapacidade", width: 16 },
-      { header: "Cond. Espessura Fio", key: "condFio", width: 16 },
-      { header: "Evap. Nº", key: "evapNumero", width: 12 },
-      { header: "Evap. Tombo", key: "evapTombo", width: 14 },
-      { header: "Evap. Tag", key: "evapTag", width: 14 },
-      { header: "Evap. Marca", key: "evapMarca", width: 14 },
-      { header: "Evap. Modelo", key: "evapModelo", width: 14 },
-      { header: "Evap. Capacidade", key: "evapCapacidade", width: 16 },
-      { header: "Evap. Espessura Fio", key: "evapFio", width: 16 },
-    ];
-    sheet.getRow(1).font = { bold: true };
+    const sheet = workbook.addWorksheet("Dados Técnicos");
+    sheet.views = [{ showGridLines: false, state: "frozen", ySplit: 2 }];
 
-    snap.docs.forEach((d) => {
+    // Definindo as colunas
+    sheet.columns = [
+      // DADOS GERAIS (1 a 6)
+      { key: "patrimonio", width: 16 },
+      { key: "setor", width: 28 },
+      { key: "ambiente", width: 28 },
+      { key: "local", width: 14 },
+      { key: "informante", width: 18 },
+      { key: "preenchidoEm", width: 16 },
+      // CONDENSADORA (7 a 13)
+      { key: "condNumero", width: 10 },
+      { key: "condTombo", width: 14 },
+      { key: "condTag", width: 14 },
+      { key: "condMarca", width: 14 },
+      { key: "condModelo", width: 16 },
+      { key: "condCapacidade", width: 16 },
+      { key: "condFio", width: 16 },
+      // EVAPORADORA (14 a 19)
+      { key: "evapTombo", width: 14 },
+      { key: "evapTag", width: 14 },
+      { key: "evapMarca", width: 14 },
+      { key: "evapModelo", width: 16 },
+      { key: "evapCapacidade", width: 16 },
+      { key: "evapFio", width: 16 },
+    ];
+
+    // LINHA 1: Super-Cabeçalhos (Mesclados)
+    sheet.mergeCells('A1:F1');
+    sheet.mergeCells('G1:M1');
+    sheet.mergeCells('N1:S1');
+    
+    const r1 = sheet.getRow(1);
+    r1.height = 25;
+    r1.getCell(1).value = "DADOS GERAIS DA MÁQUINA";
+    r1.getCell(7).value = "UNIDADE EXTERNA (CONDENSADORA)";
+    r1.getCell(14).value = "UNIDADE INTERNA (EVAPORADORA)";
+
+    // Estilo da Linha 1
+    r1.eachCell((cell, colNumber) => {
+      cell.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      let cor = "FF1F4E78"; // Azul padrão para Geral
+      if (colNumber >= 7 && colNumber <= 13) cor = "FF9C6500"; // Amarelo/Dourado escuro
+      if (colNumber >= 14 && colNumber <= 19) cor = "FF375623"; // Verde escuro
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
+    });
+
+    // LINHA 2: Cabeçalhos reais
+    const r2 = sheet.getRow(2);
+    r2.height = 20;
+    r2.values = [
+      "Patrimônio", "Setor", "Ambiente", "Prédio", "Informante", "Preenchido em",
+      "Nº", "Tombo", "Tag", "Marca", "Modelo", "Capacidade", "Fio (mm)",
+      "Tombo", "Tag", "Marca", "Modelo", "Capacidade", "Fio (mm)"
+    ];
+
+    // Estilo da Linha 2
+    r2.eachCell((cell, colNumber) => {
+      cell.font = { name: "Arial", bold: true, color: { argb: "FF000000" }, size: 10 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFBFBFBF" } },
+        bottom: { style: "thin", color: { argb: "FFBFBFBF" } },
+        left: { style: "thin", color: { argb: "FFBFBFBF" } },
+        right: { style: "thin", color: { argb: "FFBFBFBF" } }
+      };
+      let cor = "FFEEF3F8"; // Fundo claro Geral
+      if (colNumber >= 7 && colNumber <= 13) cor = "FFFFE699"; // Fundo claro Condensadora
+      if (colNumber >= 14 && colNumber <= 19) cor = "FFC6E0B4"; // Fundo claro Evaporadora
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
+    });
+
+    // Inserindo os Dados
+    snap.docs.forEach((d, index) => {
       const dados = d.data();
       const item = ESTADO.equipamentos.find((e) => e.id === d.id) || {};
       const cond = dados.condensadora || {};
       const evap = dados.evaporadora || {};
-      sheet.addRow({
-        patrimonio: item.patrimonio || "-",
+      
+      const row = sheet.addRow({
+        patrimonio: item.patrimonio || evap.tombo || "-", // Usa o tombo da evap se não tiver no item principal
         setor: item.setor || "-",
         ambiente: item.ambiente || "-",
         local: dados.local || item.local || "-",
         informante: dados.informante || "-",
-        preenchidoEm: dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleString("pt-BR") : "-",
+        preenchidoEm: dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleDateString("pt-BR") : "-",
         condNumero: cond.numero || "-", condTombo: cond.tombo || "-", condTag: cond.tag || "-",
         condMarca: cond.marca || "-", condModelo: cond.modelo || "-",
         condCapacidade: cond.capacidade || "-", condFio: cond.espessuraFio || "-",
-        evapNumero: evap.numero || "-", evapTombo: evap.tombo || "-", evapTag: evap.tag || "-",
+        evapTombo: evap.tombo || "-", evapTag: evap.tag || "-",
         evapMarca: evap.marca || "-", evapModelo: evap.modelo || "-",
         evapCapacidade: evap.capacidade || "-", evapFio: evap.espessuraFio || "-",
+      });
+
+      // Borda fina e cores intercaladas (zebra) para leitura
+      row.eachCell((cell) => {
+        cell.font = { name: "Arial", size: 10 };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE0E0E0" } },
+          bottom: { style: "thin", color: { argb: "FFE0E0E0" } },
+          left: { style: "thin", color: { argb: "FFE0E0E0" } },
+          right: { style: "thin", color: { argb: "FFE0E0E0" } }
+        };
+        if (index % 2 !== 0) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9F9F9" } };
+        }
       });
     });
 
@@ -2950,12 +3016,12 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `condensadoras-pmok-${formatISO(new Date())}.xlsx`;
+    a.download = `Dados_Tecnicos_PMOC_${formatISO(new Date())}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast("Planilha baixada!");
+    toast("Planilha baixada com sucesso!");
   } catch (err) {
     console.error(err);
     toast("Erro ao gerar planilha: " + err.message);
