@@ -2508,6 +2508,18 @@ async function adicionarEquipamentoManual() {
     return;
   }
 
+  if (patrimonio) {
+    const duplicado = ESTADO.equipamentos.find((e) =>
+      e.patrimonio && e.patrimonio.trim() === patrimonio && e.id !== idEquipamentoEmEdicao
+    );
+    if (duplicado) {
+      const ok = window.confirm(
+        `Já existe um equipamento com o patrimônio "${patrimonio}" (${duplicado.setor} — ${duplicado.ambiente}, ${duplicado.local || "SEDE"}).\n\nQuer continuar mesmo assim?`
+      );
+      if (!ok) return;
+    }
+  }
+
   const setorPCM = identificarSetor(setor, ambiente);
   const prioridadeSetor = PRIORIDADE[setorPCM] || 7;
   const pisoPCM = descobrirPiso(setor);
