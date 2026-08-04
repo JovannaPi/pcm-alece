@@ -2,21 +2,17 @@ import { db, auth, firebaseConfig } from "./firebase-config.js?v=4";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   collection, collectionGroup, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query,
-  orderBy, where, writeBatch, deleteDoc, addDoc, limit, arrayUnion,
+  orderBy, where, writeBatch, deleteDoc, addDoc, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
   setPersistence, inMemoryPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getMessaging, getToken, onMessage, isSupported as messagingSuportado,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => Array.from(document.querySelectorAll(sel));
 
 const SUFIXO_LOGIN = "@pcm-alece.local";
-const VAPID_KEY_PUSH = "BHaXD8IIA2Izrbtu1deF1dOq7GOzz9v2DSNt8nmKd9f1DInW7iOjH5TpCXUmo7tsjBNhc1MImCStPsJY8b2B-eM";
 function usuarioParaEmail(usuario) {
   return usuario.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") + SUFIXO_LOGIN;
 }
@@ -157,6 +153,7 @@ configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: "", predios: ["SEDE", "ANE
   calMonth: null,
   diaSelecionado: null,
   localFiltro: "Todos",
+  diasVaziosCronograma: [],
 };
 const URL_CHAMADOS_CORRETIVOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR2Ysf9JofZL_2Xn_JPJFaPrMX6IGiwMQWFyhgJcqu8BK_4imC_lmrMgfpDWLnI6MIdcC0OYSDUQFPw/pub?gid=1978174237&single=true&output=csv";
 ESTADO.configSite.urlCorretivas = URL_CHAMADOS_CORRETIVOS;
@@ -429,6 +426,74 @@ function atualizarBannerAtrasados() {
   banner.hidden = false;
   if (btnCal) btnCal.hidden = true;
 }
+// ------------------------------------------------------------------
+// Aviso de dias vazios no cronograma (aparece só na aba Calendário)
+// ------------------------------------------------------------------
+function atualizarAlertaDiasVazios() {
+  const banner = $("#alertaDiasVazios");
+  if (!banner) return;
+
+  const diasVazios = ESTADO.diasVaziosCronograma || [];
+  if (!diasVazios.length) {
+    banner.hidden = true;
+    return;
+  }
+
+  const txt = $("#alertaDiasVaziosTexto");
+  if (txt) {
+    txt.textContent = diasVazios.length === 1
+      ? "1 dia útil ficou sem nada agendado (provavelmente por causa de um feriado)."
+      : `${diasVazios.length} dias úteis ficaram sem nada agendado (provavelmente por causa de feriados).`;
+  }
+  banner.hidden = false;
+}
+
+$("#fecharAlertaDiasVazios")?.addEventListener("click", () => {
+  const banner = $("#alertaDiasVazios");
+  if (banner) banner.hidden = true;
+});
+
+$("#btnAdiantarDiasVazios")?.addEventListener("click", async () => {
+  const btn = $("#btnAdiantarDiasVazios");
+  btn.disabled = true;
+  try {
+    await adiantarDiasVazios();
+    toast("Cronograma reorganizado para preencher os dias vazios.");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao reorganizar o cronograma: " + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function adiantarDiasVazios() {
+  const itens = ESTADO.equipamentos.filter((e) =>
+    e.statusPreventiva !== "Concluída" && e.fixadoManualmente !== true
+  );
+  if (!itens.length) return;
+
+  compactarCronograma(itens);
+
+  const TAMANHO_LOTE = 200;
+  for (let inicio = 0; inicio < itens.length; inicio += TAMANHO_LOTE) {
+    const pedaco = itens.slice(inicio, inicio + TAMANHO_LOTE);
+    const batch = writeBatch(db);
+    pedaco.forEach((item) => {
+      batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), {
+        dataAgendada: item.dataAgendada,
+        diaPlanejado: item.diaPlanejado,
+        semanaPlanejada: item.semanaPlanejada,
+        ordemExecucao: item.ordemExecucao,
+      });
+    });
+    await batch.commit();
+  }
+
+  ESTADO.diasVaziosCronograma = [];
+  atualizarAlertaDiasVazios();
+}
+
 function jaVerificouAtrasadosHoje() {
   try {
     return localStorage.getItem(CHAVE_VERIFICACAO_ATRASADOS) === formatISO(new Date());
@@ -984,6 +1049,7 @@ function iniciarSincronizacao() {
     renderDashboard();
     renderEquipamentosCadastro();
     atualizarBannerAtrasados();
+    atualizarAlertaDiasVazios();
     renderCiclos();
     verificarFechamentoCiclo();
     renderTodosSeletoresLocal();
@@ -1078,59 +1144,6 @@ async function registrarUsuarioLogado(user) {
   return snap.data();
 }
 
-let pushForegroundConfigurado = false;
-
-async function configurarNotificacoesPushForeground() {
-  if (pushForegroundConfigurado) return;
-  try {
-    if (!(await messagingSuportado())) return;
-    onMessage(getMessaging(), (payload) => {
-      const titulo = (payload.notification && payload.notification.title) || "PMOK ALECE";
-      const corpo = (payload.notification && payload.notification.body) || "";
-      toast(`${titulo}: ${corpo}`);
-    });
-    pushForegroundConfigurado = true;
-  } catch (err) {
-    console.error("Erro ao configurar notificações em primeiro plano:", err);
-  }
-}
-
-async function ativarNotificacoesPush() {
-  if (VAPID_KEY_PUSH.startsWith("COLOQUE_AQUI")) {
-    toast("Notificações push ainda não foram configuradas pelo administrador.");
-    return;
-  }
-  try {
-    if (!(await messagingSuportado())) {
-      toast("Seu navegador não suporta notificações push.");
-      return;
-    }
-    const permissao = await Notification.requestPermission();
-    if (permissao !== "granted") {
-      toast("Permissão de notificação negada.");
-      return;
-    }
-    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-    const token = await getToken(getMessaging(), {
-      vapidKey: VAPID_KEY_PUSH,
-      serviceWorkerRegistration: registration,
-    });
-    if (!token || !auth.currentUser) {
-      toast("Não foi possível ativar as notificações.");
-      return;
-    }
-    await updateDoc(doc(db, "usuarios", auth.currentUser.uid), {
-      fcmTokens: arrayUnion(token),
-    });
-    toast("Notificações ativadas neste dispositivo!");
-  } catch (err) {
-    console.error("Erro ao ativar notificações push:", err);
-    toast("Erro ao ativar notificações: " + err.message);
-  }
-}
-
-$("#btnAtivarNotificacoes")?.addEventListener("click", ativarNotificacoesPush);
-
 onAuthStateChanged(auth, async (user) => {
   const overlay = $("#authOverlay");
   const appRoot = $("#appRoot");
@@ -1153,7 +1166,6 @@ onAuthStateChanged(auth, async (user) => {
     if (overlay) overlay.hidden = true;
     if (appRoot) appRoot.hidden = false;
     atualizarVisibilidadeAdmin();
-    configurarNotificacoesPushForeground();
     if (!appJaInicializado) {
           appJaInicializado = true;
           inicializarApp();
@@ -1186,7 +1198,7 @@ function atualizarVisibilidadeAdmin() {
 // Administração de usuários (só visível/funcional para permissao=="admin";
 // a trava de verdade está nas regras do Firestore, não só aqui)
 // ------------------------------------------------------------------
-async function criarContaAdmin(usuario, senha, permissao, emailNotificacao) {
+async function criarContaAdmin(usuario, senha, permissao) {
   const nomeAppTemp = "temp_" + Date.now();
   const appTemp = initializeApp(firebaseConfig, nomeAppTemp);
   const authTemp = getAuth(appTemp);
@@ -1207,8 +1219,6 @@ async function criarContaAdmin(usuario, senha, permissao, emailNotificacao) {
       criadoEm: new Date().toISOString(),
       ultimoLogin: "",
       criadoPor: ESTADO.usuarioNome || "",
-      email: (emailNotificacao || "").trim(),
-      ativo: !!(emailNotificacao || "").trim(),
     });
     await registrarAuditoria("Criar usuário", `${usuario} (${permissao})`);
   } finally {
@@ -1220,7 +1230,6 @@ $("#btnCriarUsuario")?.addEventListener("click", async () => {
   const usuario = $("#novoUsuarioNome").value.trim();
   const senha = $("#novoUsuarioSenha").value;
   const permissao = $("#novoUsuarioPermissao").value;
-  const emailNotificacao = $("#novoUsuarioEmail").value.trim();
 
   if (!usuario || senha.length < 6) {
     toast("Preencha o usuário e uma senha com 6 ou mais caracteres.");
@@ -1233,14 +1242,13 @@ $("#btnCriarUsuario")?.addEventListener("click", async () => {
   btn.textContent = "Criando...";
 
   try {
-    await criarContaAdmin(usuario, senha, permissao, emailNotificacao);
+    await criarContaAdmin(usuario, senha, permissao);
     toast(`Conta "${usuario}" criada com sucesso!`);
 
     // Limpa os campos
     $("#novoUsuarioNome").value = "";
     $("#novoUsuarioSenha").value = "";
-    $("#novoUsuarioEmail").value = "";
-    
+
     // FORÇA O SISTEMA A RECARREGAR A TABELA NA MESMA HORA
     iniciarSincronizacaoUsuarios();
     
@@ -1598,6 +1606,11 @@ function renderCalendar() {
   for (const item of aplicarFiltroLocal(ESTADO.equipamentos)) {
     (porData[item.dataAgendada] ||= []).push(item);
   }
+  const datasVazias = new Set(
+    (ESTADO.diasVaziosCronograma || [])
+      .filter((d) => ESTADO.localFiltro === "Todos" || d.local === ESTADO.localFiltro)
+      .map((d) => d.data)
+  );
 
   grid.innerHTML = "";
   ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].forEach((d) => {
@@ -1621,14 +1634,23 @@ function renderCalendar() {
     const iso = `${ESTADO.calYear}-${String(ESTADO.calMonth + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
     const itensDoDia = porData[iso] || [];
     const feriadoDoDia = ESTADO.feriados.find((f) => iso >= f.dataInicio && iso <= f.dataFim);
+    const ehDiaVazio = datasVazias.has(iso);
     const el = document.createElement("div");
     el.className = "cal-day" + (itensDoDia.length ? " has-tasks" : "") +
-      (ESTADO.diaSelecionado === iso ? " selected" : "") + (feriadoDoDia ? " is-holiday" : "");
+      (ESTADO.diaSelecionado === iso ? " selected" : "") + (feriadoDoDia ? " is-holiday" : "") +
+      (ehDiaVazio ? " is-gap" : "");
 
     const num = document.createElement("div");
     num.className = "cal-day-num";
     num.textContent = dia;
     el.appendChild(num);
+
+    if (ehDiaVazio) {
+      const tag = document.createElement("div");
+      tag.className = "cal-day-badge gap";
+      tag.textContent = "Sem agenda";
+      el.appendChild(tag);
+    }
 
     if (feriadoDoDia) {
       const tag = document.createElement("div");
@@ -3267,9 +3289,11 @@ async function apagarCronograma() {
     $("#resumoCapacidade").textContent = "";
     $("#dayDetailCard").hidden = true;
 
+    ESTADO.diasVaziosCronograma = [];
     renderCalendar();
     renderDashboard();
     atualizarBannerAtrasados();
+    atualizarAlertaDiasVazios();
 
     toast(`Cronograma apagado (${ids.length} itens removidos).`);
   } catch (err) {
@@ -3890,17 +3914,7 @@ async function fecharCicloEIniciarProximo() {
   novosItens.sort((a, b) => (a.dataAgendada || "").localeCompare(b.dataAgendada || ""));
   novosItens.forEach((item, idx) => { item.ordemExecucao = idx + 1; });
 
-  const diasVazios = detectarDiasVaziosNoCronograma(novosItens);
-  if (diasVazios.length > 0) {
-    const exemplos = diasVazios.slice(0, 5).map((d) => `${formatarDataBR(d.data)} (${d.local})`).join(", ");
-    const maisTexto = diasVazios.length > 5 ? ` e mais ${diasVazios.length - 5}` : "";
-    const querAdiantar = window.confirm(
-      `O cronograma do novo ciclo ficou com ${diasVazios.length} dia(s) útil(eis) sem nada agendado — provavelmente por causa de feriados cadastrados.\n\nExemplos: ${exemplos}${maisTexto}.\n\nDeseja adiantar os itens seguintes para preencher esses dias?`
-    );
-    if (querAdiantar) {
-      compactarCronograma(novosItens);
-    }
-  }
+  ESTADO.diasVaziosCronograma = detectarDiasVaziosNoCronograma(novosItens);
 
   const novoCicloRef = doc(collection(db, "ciclos"));
   await setDoc(novoCicloRef, { criadoEm: new Date().toISOString(), dataInicio: menorData, status: "Ativo" });
@@ -3922,6 +3936,10 @@ async function fecharCicloEIniciarProximo() {
   iniciarSincronizacaoOrdens();
 
   toast(`Ciclo encerrado! Novo ciclo iniciado com as datas individuais de cada aparelho.`);
+
+  if (ESTADO.diasVaziosCronograma.length > 0) {
+    irParaAba("calendar");
+  }
 }
 
 // Limpar seleção: Ordens

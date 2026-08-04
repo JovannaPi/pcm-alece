@@ -68,9 +68,6 @@
       <span class="sidenav-icon"></span> Feriados e férias
     </button>
     <div class="sidenav-spacer"></div>
-    <button class="sidenav-item" id="btnAtivarNotificacoes">
-      <span class="sidenav-icon"></span> Ativar notificações
-    </button>
     <button class="sidenav-item" id="btnSair" style="margin-top:8px">
       <span class="sidenav-icon"></span> Sair
     </button>
@@ -153,6 +150,14 @@
           </div>
         </div>
         <div class="local-filtro" id="localFiltroCalendario"></div>
+        <div class="alert-banner" id="alertaDiasVazios" hidden style="margin-bottom:10px">
+          <span class="alert-banner-icon"></span>
+          <span class="alert-banner-text" id="alertaDiasVaziosTexto"></span>
+          <button id="btnAdiantarDiasVazios" class="btn primary" style="margin-left: 15px; font-size: 12px; padding: 4px 12px;">
+            Adiantar itens
+          </button>
+          <button class="alert-banner-close" id="fecharAlertaDiasVazios" aria-label="Fechar aviso">×</button>
+        </div>
        <div style="text-align:right;margin-bottom:8px">
           <button class="btn ghost" id="btnReagendarCalendario" style="font-size:12px;padding:6px 12px" hidden>Reagendar atrasados</button>
         </div>
@@ -419,7 +424,6 @@
           <div class="grid-form">
             <label>Usuário<input type="text" id="novoUsuarioNome" placeholder="ex: joana.ferreira"></label>
             <label>Senha temporária<input type="password" id="novoUsuarioSenha" placeholder="Mínimo 6 caracteres"></label>
-            <label>Email para notificações<input type="email" id="novoUsuarioEmail" placeholder="ex: joana@alece.ce.gov.br"></label>
             <label>Permissão
               <select id="novoUsuarioPermissao">
                 <option value="padrao">Padrão</option>
