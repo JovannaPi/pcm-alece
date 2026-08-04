@@ -2443,17 +2443,37 @@ async function adicionarEquipamentoManual() {
 
   if (idEquipamentoEmEdicao) {
     const local = $("#eqLocal")?.value || "SEDE";
+    const itemOriginal = ESTADO.equipamentos.find((e) => e.id === idEquipamentoEmEdicao);
+    const localMudou = itemOriginal && (itemOriginal.local || "SEDE") !== local;
+    // Só limpa e reagenda automaticamente quando o item ainda está Pendente —
+    // pra um item Concluída/Em andamento, limpar a data quebraria ele (o
+    // reagendarTudo() não recalcula quem não está pendente).
+    const podeReagendar = localMudou && itemOriginal.statusPreventiva === "Pendente";
     try {
-      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", idEquipamentoEmEdicao), {
-        patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM
-      });
+      const camposAtualizados = { patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM };
+      if (podeReagendar) {
+        // Equipe e data eram do prédio antigo — ficariam presas lá se não
+        // limpar aqui, já que reagendarTudo() não mexe em quem já tem data.
+        camposAtualizados.equipeResponsavel = "";
+        camposAtualizados.dataAgendada = "";
+        camposAtualizados.diaPlanejado = "";
+        camposAtualizados.semanaPlanejada = "";
+      }
+      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", idEquipamentoEmEdicao), camposAtualizados);
       await registrarHistorico(
         { id: idEquipamentoEmEdicao, patrimonio, setor, ambiente, local, equipeResponsavel: "" },
         "-", "Editado", "Cadastro"
       );
-      toast("Equipamento atualizado com sucesso!");
       idEquipamentoEmEdicao = null;
       if (btnAdicionarEquipamento) btnAdicionarEquipamento.textContent = "Adicionar Equipamento";
+      if (podeReagendar) {
+        toast("Prédio alterado — reagendando para a nova rotina...");
+        await reagendarTudo();
+      } else if (localMudou) {
+        toast("Prédio alterado. Como o item já não está mais pendente, a equipe e a data não foram mexidas — confira manualmente se precisa ajustar.");
+      } else {
+        toast("Equipamento atualizado com sucesso!");
+      }
     } catch (err) {
       console.error(err);
       toast("Erro ao atualizar: " + err.message);
