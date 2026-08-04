@@ -3241,7 +3241,7 @@ if (btnExportarPDF) {
       return;
     }
     toast("Gerando relatório PDF...");
-    baixarRelatorioPDF(ESTADO.equipamentos, ESTADO.cicloAtual);
+    baixarRelatorioPDF(ESTADO.equipamentos, ESTADO.cicloAtual, ESTADO.historico);
   });
 }
 

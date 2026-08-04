@@ -1,11 +1,31 @@
-function gerarRelatorioPDF(equipamentos, cicloInfo) {
+function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
   const hoje = new Date();
   const dataFormatada = hoje.toLocaleDateString('pt-BR');
+  const hojeISO = hoje.toISOString().split('T')[0];
+
+  const seteDiasAtras = new Date(hoje);
+  seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+  const seteDiasAtrasISO = seteDiasAtras.toISOString();
+  const seteDiasAtrasData = seteDiasAtras.toISOString().split('T')[0];
+
+  const catorzeDiasAtras = new Date(hoje);
+  catorzeDiasAtras.setDate(catorzeDiasAtras.getDate() - 14);
+  const catorzeDiasAtrasISO = catorzeDiasAtras.toISOString();
 
   const concluidas = equipamentos.filter(e => e.statusPreventiva === 'Concluída').length;
   const andamento = equipamentos.filter(e => e.statusPreventiva === 'Em andamento').length;
   const pendentes = equipamentos.filter(e => e.statusPreventiva === 'Pendente').length;
-  const execucao = ((concluidas + andamento) / equipamentos.length * 100).toFixed(1);
+  const execucao = equipamentos.length ? (concluidas / equipamentos.length * 100).toFixed(1) : '0.0';
+
+  const historicoSeguro = historico || [];
+  const concluidosSemana = historicoSeguro.filter(h =>
+    h.statusNovo === 'Concluída' && h.registradoEm >= seteDiasAtrasISO
+  ).length;
+  const concluidosSemanaAnterior = historicoSeguro.filter(h =>
+    h.statusNovo === 'Concluída' && h.registradoEm >= catorzeDiasAtrasISO && h.registradoEm < seteDiasAtrasISO
+  ).length;
+  const deltaSemana = concluidosSemana - concluidosSemanaAnterior;
+  const deltaTexto = deltaSemana > 0 ? `+${deltaSemana}` : `${deltaSemana}`;
 
   const porSetor = {};
   equipamentos.forEach(e => {
@@ -13,6 +33,11 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
     if (!porSetor[setor]) porSetor[setor] = [];
     porSetor[setor].push(e);
   });
+
+  const atrasados = equipamentos.filter(e =>
+    e.dataAgendada < hojeISO && e.statusPreventiva !== 'Concluída'
+  );
+  const atrasaramSemana = atrasados.filter(e => e.dataAgendada >= seteDiasAtrasData).length;
 
   let conteudoHTML = `
     <!DOCTYPE html>
@@ -43,7 +68,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
         }
         .kpi-container {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(5, 1fr);
           gap: 15px;
           margin: 30px 0;
         }
@@ -64,6 +89,36 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
           color: #1F4E78;
           margin-top: 10px;
         }
+        .semana-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 15px;
+          margin: 20px 0 30px;
+        }
+        .semana-card {
+          background: #f9f9f9;
+          border-left: 4px solid #C9A34E;
+          padding: 15px;
+          border-radius: 4px;
+        }
+        .semana-label {
+          font-size: 12px;
+          color: #666;
+          text-transform: uppercase;
+        }
+        .semana-valor {
+          font-size: 22px;
+          font-weight: bold;
+          color: #1F4E78;
+          margin-top: 8px;
+        }
+        .semana-delta {
+          font-size: 12px;
+          margin-top: 4px;
+        }
+        .delta-positivo { color: #28A745; }
+        .delta-negativo { color: #DC3545; }
+        .delta-neutro { color: #666; }
         .secao {
           margin-top: 40px;
           page-break-inside: avoid;
@@ -121,7 +176,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
     <body>
       <div class="cabecalho">
         <h1 class="titulo">PMOK ALECE - Relatório de Manutenção Preventiva</h1>
-        <div class="data">Gerado em ${dataFormatada}</div>
+        <div class="data">Gerado em ${dataFormatada} · Período da semana: ${seteDiasAtras.toLocaleDateString('pt-BR')} a ${dataFormatada}</div>
       </div>
 
       <div class="kpi-container">
@@ -138,8 +193,29 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
           <div class="kpi-valor">${andamento}</div>
         </div>
         <div class="kpi">
+          <div class="kpi-label">Pendentes</div>
+          <div class="kpi-valor">${pendentes}</div>
+        </div>
+        <div class="kpi">
           <div class="kpi-label">Taxa de Execução</div>
           <div class="kpi-valor">${execucao}%</div>
+        </div>
+      </div>
+
+      <div class="secao">
+        <div class="secao-titulo">Progresso da Semana</div>
+        <div class="semana-container">
+          <div class="semana-card">
+            <div class="semana-label">Concluídos nos últimos 7 dias</div>
+            <div class="semana-valor">${concluidosSemana}</div>
+            <div class="semana-delta ${deltaSemana > 0 ? 'delta-positivo' : deltaSemana < 0 ? 'delta-negativo' : 'delta-neutro'}">
+              ${deltaTexto} em relação aos 7 dias anteriores (${concluidosSemanaAnterior})
+            </div>
+          </div>
+          <div class="semana-card">
+            <div class="semana-label">Atrasaram nesta semana</div>
+            <div class="semana-valor">${atrasaramSemana}</div>
+          </div>
         </div>
       </div>
 
@@ -163,7 +239,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
     const setorConcluidas = itens.filter(e => e.statusPreventiva === 'Concluída').length;
     const setorAndamento = itens.filter(e => e.statusPreventiva === 'Em andamento').length;
     const setorPendentes = itens.filter(e => e.statusPreventiva === 'Pendente').length;
-    const setorProgresso = ((setorConcluidas + setorAndamento) / itens.length * 100).toFixed(0);
+    const setorProgresso = (setorConcluidas / itens.length * 100).toFixed(0);
 
     conteudoHTML += `
       <tr>
@@ -186,19 +262,24 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
         <div class="secao-titulo">Equipamentos em Atraso</div>
   `;
 
-  const hojeISO = new Date().toISOString().split('T')[0];
-  const atrasados = equipamentos.filter(e =>
-    e.dataAgendada < hojeISO && e.statusPreventiva !== 'Concluída'
-  );
-
   if (atrasados.length > 0) {
+    const porEquipe = {};
+    atrasados.forEach(e => {
+      const equipe = e.equipeResponsavel || 'Sem equipe definida';
+      porEquipe[equipe] = (porEquipe[equipe] || 0) + 1;
+    });
+
     conteudoHTML += `
+      <p style="font-size:12px;color:#666;margin-bottom:10px">Atrasados por equipe: ${
+        Object.entries(porEquipe).map(([equipe, qtd]) => `${equipe} (${qtd})`).join(' · ')
+      }</p>
       <table>
         <thead>
           <tr>
             <th>Patrimônio</th>
             <th>Setor</th>
             <th>Ambiente</th>
+            <th>Equipe</th>
             <th>Data Agendada</th>
             <th>Status</th>
           </tr>
@@ -216,6 +297,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
           <td>${eq.patrimonio || '-'}</td>
           <td>${eq.setor}</td>
           <td>${eq.ambiente}</td>
+          <td>${eq.equipeResponsavel || '-'}</td>
           <td>${eq.dataAgendada}</td>
           <td><span class="${classeStatus}">${eq.statusPreventiva}</span></td>
         </tr>
@@ -244,8 +326,8 @@ function gerarRelatorioPDF(equipamentos, cicloInfo) {
   return conteudoHTML;
 }
 
-function baixarRelatorioPDF(equipamentos, cicloInfo) {
-  const html = gerarRelatorioPDF(equipamentos, cicloInfo);
+function baixarRelatorioPDF(equipamentos, cicloInfo, historico) {
+  const html = gerarRelatorioPDF(equipamentos, cicloInfo, historico);
 
   const opt = {
     margin: 10,
