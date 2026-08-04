@@ -4061,6 +4061,49 @@ async function apagarCronograma() {
     btnApagarCronograma.disabled = false;
   }
 }
+const btnApagarDadosTecnicos = $("#btnApagarDadosTecnicos");
+if (btnApagarDadosTecnicos) {
+  btnApagarDadosTecnicos.addEventListener("click", apagarDadosTecnicos);
+}
+
+async function apagarDadosTecnicos() {
+  const confirmado = window.confirm(
+    "Isso vai apagar TODOS os dados técnicos (Marca, Modelo, Capacidade, Fio, etc.) salvos de TODAS as máquinas permanentemente, voltando o sistema ao estado zero. Continuar?"
+  );
+  if (!confirmado) return;
+
+  btnApagarDadosTecnicos.disabled = true;
+  toast("Apagando dados técnicos do banco...");
+  try {
+    await registrarAuditoria("Apagar dados técnicos", "Limpou toda a base de informações técnicas");
+    
+    // Busca todos os documentos salvos na pasta infoCondensadoras
+    const snap = await getDocs(collection(db, "infoCondensadoras"));
+    const ids = snap.docs.map(d => d.id);
+
+    if (!ids.length) {
+      toast("Não há dados técnicos salvos para apagar.");
+      btnApagarDadosTecnicos.disabled = false;
+      return;
+    }
+
+    // Apaga em lotes para não sobrecarregar o Firebase
+    const TAMANHO_LOTE = 400;
+    for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+      const pedaco = ids.slice(inicio, inicio + TAMANHO_LOTE);
+      const batch = writeBatch(db);
+      pedaco.forEach((id) => batch.delete(doc(db, "infoCondensadoras", id)));
+      await batch.commit();
+    }
+
+    toast(`Limpeza concluída! ${ids.length} registros técnicos foram apagados.`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao apagar dados técnicos: " + err.message);
+  } finally {
+    btnApagarDadosTecnicos.disabled = false;
+  }
+}
 
 async function apagarColecaoCompleta(nomeColecao, mensagem) {
 
