@@ -768,6 +768,7 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .cal-day.empty { background: var(--fundo); cursor: default; }
 .cal-day.selected { background: var(--azul-100); box-shadow: inset 0 0 0 2px var(--azul-700); }
 .cal-day.is-holiday { background: var(--dourado-tint); }
+.cal-day.is-gap { box-shadow: inset 0 0 0 2px var(--vermelho); }
 
 .cal-day-num {
   font-family: var(--fonte-dado);
@@ -821,6 +822,7 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .cal-day-badge.concluido { background: var(--verde-fundo); color: var(--verde-texto); }
 .cal-day-badge.atrasado { background: var(--azul-900); color: #fff; }
 .cal-day-badge.holiday { background: var(--dourado); color: #fff; }
+.cal-day-badge.gap { background: var(--vermelho-fundo); color: var(--vermelho-texto); border: 1px dashed var(--vermelho); cursor: default; }
 
 .cal-badge-tooltip {
   position: fixed;
