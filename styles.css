@@ -1318,14 +1318,14 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 }
 
 body.modo-padrao .status-select,
-body.modo-padrao input:not(.search-input):not(#authEmail):not(#authSenha),
-body.modo-padrao select:not(#filtroStatus):not(#filtroSetorPCM):not(#filtroOrigem),
-body.modo-padrao button.btn.primary,
+body.modo-padrao input:not(.search-input):not(#authEmail):not(#authSenha):not(#modalConclusao *),
+body.modo-padrao select:not(#filtroStatus):not(#filtroSetorPCM):not(#filtroOrigem):not(.status-select):not(#modalConclusao *),
+body.modo-padrao button.btn.primary:not(#modalConclusao *),
 body.modo-padrao button.btn.danger-inverted,
 body.modo-padrao button.sidenav-danger,
 body.modo-padrao .menu-linha-item,
 body.modo-padrao .link-discreto,
-body.modo-padrao input[type="checkbox"] {
+body.modo-padrao input[type="checkbox"]:not(#modalConclusao *) {
   pointer-events: none !important;
   opacity: 0.5;
   cursor: not-allowed;
@@ -1335,20 +1335,13 @@ body.modo-padrao .badge-somente-leitura {
   display: inline-flex;
 }
 
-/* Trabalhador: pode mudar status no calendário e usar o formulário de
-   concluir preventiva, mesmo com o resto travado como no modo padrão. */
-body.modo-trabalhador .status-select,
-body.modo-trabalhador #modalConclusao input:not([disabled]),
-body.modo-trabalhador #modalConclusao select,
-body.modo-trabalhador #modalConclusao button,
-body.modo-trabalhador #modalConclusao input[type="checkbox"] {
+/* Trabalhador: pode mudar status no calendário — os elementos dentro do
+   #modalConclusao já ficam de fora do travamento geral do modo padrão
+   (ver os :not(#modalConclusao *) acima), não precisam de exceção aqui. */
+body.modo-trabalhador .status-select {
   pointer-events: auto !important;
   opacity: 1;
   cursor: pointer;
-}
-body.modo-trabalhador #modalConclusao input[type="text"],
-body.modo-trabalhador #modalConclusao input[type="number"] {
-  cursor: text;
 }
 .badge-somente-leitura {
   display: none;
