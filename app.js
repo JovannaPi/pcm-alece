@@ -596,6 +596,11 @@ function classificar(rows) {
   const colAmbiente = localizarColuna(["Ambiente"], headers);
   const colStatus = localizarColuna(["Status / ano", "Status"], headers);
   const colPatrimonio = localizarColuna(["Patrimônio", "Patrimonio"], headers);
+  
+  // Novas colunas ensinadas ao sistema
+  const colMarca = localizarColuna(["Marca"], headers);
+  const colModelo = localizarColuna(["Modelo"], headers);
+  const colPotencia = localizarColuna(["Potência", "BTU", "Capacidade"], headers);
 
   if (!colSetor || !colAmbiente) {
     toast("Não encontrei as colunas 'Setor' e 'Ambiente'. Confira o cabeçalho.");
@@ -625,11 +630,28 @@ function classificar(rows) {
   const itens = rows.map((row, idx) => {
     const setor = row[colSetor];
     const ambiente = row[colAmbiente];
-    const patrimonio = colPatrimonio ? String(row[colPatrimonio]) : "";
+    
+    // Limpador de valores (Transforma "X" e "-" em vazio)
+    const limparValor = (v) => {
+      const str = String(v || "").trim();
+      if (str === "-" || str.toUpperCase() === "X" || str.toUpperCase() === "N/A" || str === "") return "";
+      return str;
+    };
+
+    const patrimonio = colPatrimonio ? limparValor(row[colPatrimonio]) : "";
+    const marca = colMarca ? limparValor(row[colMarca]) : "";
+    const modelo = colModelo ? limparValor(row[colModelo]) : "";
+    
+    let capacidade = colPotencia ? limparValor(row[colPotencia]) : "";
+    if (capacidade && !capacidade.toLowerCase().includes("btu")) capacidade += " BTU/h"; 
+
     const setorPCM = identificarSetor(setor, ambiente);
     return {
       id: patrimonio ? `${patrimonio.replace(/[\s/\\"']/g, "_")}_${idx}` : `item_${idx}`,
       patrimonio,
+      marca,          // <--- Salva no Firebase
+      modelo,         // <--- Salva no Firebase
+      capacidade,     // <--- Salva no Firebase
       setor, ambiente,
       local: row.__local || "SEDE",
       statusCondicao: colStatus ? row[colStatus] : "",
@@ -2390,10 +2412,33 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
     } catch (err) {
       console.error("Erro ao verificar info técnica:", err);
     }
+    
+    // Garante que a estrutura exista
+    dadosExistentes = dadosExistentes || {};
+    dadosExistentes.condensadora = dadosExistentes.condensadora || {};
+    dadosExistentes.evaporadora = dadosExistentes.evaporadora || {};
+
+    // INJEÇÃO AUTOMÁTICA: Oculta os campos que já vieram da planilha
+    if (item.patrimonio) {
+      dadosExistentes.evaporadora.tombo = dadosExistentes.evaporadora.tombo || item.patrimonio;
+    }
+    if (item.marca) {
+      dadosExistentes.evaporadora.marca = dadosExistentes.evaporadora.marca || item.marca;
+      dadosExistentes.condensadora.marca = dadosExistentes.condensadora.marca || item.marca;
+    }
+    if (item.modelo) {
+      dadosExistentes.evaporadora.modelo = dadosExistentes.evaporadora.modelo || item.modelo;
+      dadosExistentes.condensadora.modelo = dadosExistentes.condensadora.modelo || item.modelo;
+    }
+    if (item.capacidade) {
+      dadosExistentes.evaporadora.capacidade = dadosExistentes.evaporadora.capacidade || item.capacidade;
+      dadosExistentes.condensadora.capacidade = dadosExistentes.condensadora.capacidade || item.capacidade;
+    }
+
     modalConclusaoEstado.dadosExistentes = dadosExistentes;
 
-    const secaoCond = renderSecaoUnidade("cond", "Condensadora (unidade externa)", dadosExistentes && dadosExistentes.condensadora);
-    const secaoEvap = renderSecaoUnidade("evap", "Evaporadora (unidade interna)", dadosExistentes && dadosExistentes.evaporadora);
+    const secaoCond = renderSecaoUnidade("cond", "Condensadora (unidade externa)", dadosExistentes.condensadora, "cond");
+    const secaoEvap = renderSecaoUnidade("evap", "Evaporadora (unidade interna)", dadosExistentes.evaporadora, "evap");
 
     if (!secaoCond.html && !secaoEvap.html) {
       await finalizarConclusao();
@@ -2409,16 +2454,59 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
 // Define os campos técnicos de UMA unidade (condensadora ou evaporadora —
 // mesma estrutura pras duas). "semOutro" é tipo select com opção "sem" +
 // "outro" (texto livre); "select" tem opções fixas + "Outro" (texto livre).
-function definirCamposUnidade() {
-  return [
-    { chave: "numero", tipo: "texto", rotulo: "Nº", obrigatorio: true },
-    { chave: "tombo", tipo: "semOutro", rotulo: "Tombo", labelSem: "Sem tombo", obrigatorio: false },
+function definirCamposUnidade(tipoUnidade) {
+  const camposBase = [
+    { chave: "tombo", tipo: "semOutro", rotulo: "Tombo/Patrimônio", labelSem: "Sem tombo", obrigatorio: false },
     { chave: "tag", tipo: "texto", rotulo: "Tag (se tiver)", obrigatorio: false },
     { chave: "marca", tipo: "select", opcoes: MARCAS_CONDENSADORA, rotulo: "Marca", obrigatorio: true },
     { chave: "modelo", tipo: "semOutro", rotulo: "Modelo", labelSem: "Sem modelo", obrigatorio: false },
     { chave: "capacidade", tipo: "select", opcoes: CAPACIDADES_CONDENSADORA, rotulo: "Capacidade", obrigatorio: true },
     { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
   ];
+
+  // O campo Número só entra se for a condensadora
+  if (tipoUnidade === "cond") {
+    camposBase.unshift({ chave: "numero", tipo: "texto", rotulo: "Nº (Condensadora)", obrigatorio: true });
+  }
+
+  return camposBase;
+}
+
+function renderSecaoUnidade(prefixo, titulo, dadosExistentes, tipoUnidade) {
+  const existentes = dadosExistentes || {};
+  const campos = definirCamposUnidade(tipoUnidade).filter((c) => {
+    const valor = existentes[c.chave];
+    return valor === undefined || valor === null || valor === "";
+  });
+
+  if (!campos.length) return { html: "", campos: [] };
+
+  const html = `
+    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 10px">${titulo}</h3>
+    <div class="grid-form">
+      ${campos.map((c) => {
+        const id = `${prefixo}_${c.chave}`;
+        const marcador = c.obrigatorio ? " *" : "";
+        if (c.tipo === "texto") {
+          return `<label>${c.rotulo}${marcador}<input type="text" id="${id}"></label>`;
+        }
+        const opcoesExtras = c.tipo === "select"
+          ? `<option value="">Selecione...</option>${c.opcoes.map((o) => `<option value="${o}">${o}</option>`).join("")}<option value="Outro">Outro</option>`
+          : `<option value="sem">${c.labelSem}</option><option value="outro">Outro</option>`;
+        return `
+          <div>
+            <label>${c.rotulo}${marcador}
+              <select id="${id}">${opcoesExtras}</select>
+            </label>
+            <div class="campo-outro" id="${id}OutroWrap" hidden>
+              <input type="text" id="${id}Outro" placeholder="Especifique">
+            </div>
+          </div>`;
+      }).join("")}
+    </div>
+  `;
+
+  return { html, campos };
 }
 
 // Monta o HTML só dos campos que AINDA NÃO existem nos dados salvos dessa
@@ -2525,8 +2613,8 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
       return;
     }
 
-    const dadosCond = (dadosExistentes && dadosExistentes.condensadora) || {};
-    const dadosEvap = (dadosExistentes && dadosExistentes.evaporadora) || {};
+    const dadosCond = dadosExistentes.condensadora;
+    const dadosEvap = dadosExistentes.evaporadora;
     const { resultado: condensadora, faltouObrigatorio: faltouCond } = lerSecaoUnidade("cond", secaoCond.campos, dadosCond);
     const { resultado: evaporadora, faltouObrigatorio: faltouEvap } = lerSecaoUnidade("evap", secaoEvap.campos, dadosEvap);
 
@@ -2545,7 +2633,6 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
     await finalizarConclusao();
   });
 }
-
 async function finalizarConclusao() {
   const { item, checklist, avaliacaoEstrelas, infoTecnica, statusAnterior, aoAtualizar } = modalConclusaoEstado;
   const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
