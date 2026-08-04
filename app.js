@@ -1408,6 +1408,27 @@ function nomeEquipePorVaga(predio, vaga, nEquipes) {
   return encontrada ? encontrada.nome : `Equipe ${ordem}`;
 }
 
+// Time atribuído em equipamentos é uma cópia do nome, não uma referência —
+// então renomear a equipe não reflete sozinho no calendário/dashboard.
+// Isso propaga o nome novo pra tudo que já está agendado no ciclo atual.
+async function propagarRenomeacaoEquipe(nomeAntigo, nomeNovo) {
+  if (!ESTADO.cicloAtual) return;
+  const afetados = ESTADO.equipamentos.filter((e) => e.equipeResponsavel === nomeAntigo);
+  if (!afetados.length) return;
+
+  const TAMANHO_LOTE = 400;
+  for (let inicio = 0; inicio < afetados.length; inicio += TAMANHO_LOTE) {
+    const pedaco = afetados.slice(inicio, inicio + TAMANHO_LOTE);
+    const batch = writeBatch(db);
+    pedaco.forEach((item) => {
+      batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), {
+        equipeResponsavel: nomeNovo,
+      });
+    });
+    await batch.commit();
+  }
+}
+
 function renderEquipesPorPredio() {
   const container = $("#equipesPorPredio");
   if (!container) return;
@@ -1420,6 +1441,12 @@ function renderEquipesPorPredio() {
     const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === predio).sort((a, b) => a.ordem - b.ordem);
     const maiorOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0);
     const totalVagas = Math.max(nEquipes, maiorOrdem);
+
+    const vagasAtivasVazias = [];
+    for (let o = 1; o <= nEquipes; o++) {
+      if (!equipesDoPredio.find((e) => e.ordem === o)) vagasAtivasVazias.push(o);
+    }
+    const equipesNaRotina = equipesDoPredio.filter((e) => e.ordem <= nEquipes);
 
     let linhas = "";
     for (let ordem = 1; ordem <= totalVagas; ordem++) {
@@ -1436,6 +1463,12 @@ function renderEquipesPorPredio() {
           <details class="menu-linha">
             <summary>⋯</summary>
             <div class="menu-linha-opcoes">
+              ${existente && ehExtra ? equipesNaRotina.map((ativa) =>
+                `<button class="menu-linha-item eq-promover-btn" data-id="${existente.id}" data-id-destino="${ativa.id}">Trocar com "${ativa.nome}" (rotina)</button>`
+              ).join("") : ""}
+              ${existente && ehExtra ? vagasAtivasVazias.map((vaga) =>
+                `<button class="menu-linha-item eq-promover-vaga-btn" data-id="${existente.id}" data-vaga="${vaga}">Mover para vaga ${vaga} da rotina (vazia)</button>`
+              ).join("") : ""}
               ${existente ? outrosPredios.map((p) =>
                 `<button class="menu-linha-item eq-mover-btn" data-id="${existente.id}" data-destino="${p}">Mover para ${p}</button>`
               ).join("") : ""}
@@ -1484,7 +1517,11 @@ function renderEquipesPorPredio() {
           return;
         }
         if (existente) {
+          const nomeAntigo = existente.nome;
           await updateDoc(doc(db, "equipes", existente.id), { nome });
+          if (nomeAntigo && nomeAntigo !== nome) {
+            await propagarRenomeacaoEquipe(nomeAntigo, nome);
+          }
         } else {
           await addDoc(collection(db, "equipes"), { predio, ordem, nome });
         }
@@ -1493,6 +1530,41 @@ function renderEquipesPorPredio() {
       } catch (err) {
         console.error(err);
         toast("Erro ao salvar: " + err.message);
+      }
+    });
+  });
+
+  container.querySelectorAll(".eq-promover-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const extra = ESTADO.equipes.find((e) => e.id === btn.dataset.id);
+      const ativa = ESTADO.equipes.find((e) => e.id === btn.dataset.idDestino);
+      if (!extra || !ativa) return;
+      try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, "equipes", extra.id), { ordem: ativa.ordem });
+        batch.update(doc(db, "equipes", ativa.id), { ordem: extra.ordem });
+        await batch.commit();
+        await registrarAuditoria("Trocar posição de equipe", `${extra.nome} ↔ ${ativa.nome} — ${extra.predio}`);
+        toast(`"${extra.nome}" agora está na rotina de preventivas.`);
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao trocar: " + err.message);
+      }
+    });
+  });
+
+  container.querySelectorAll(".eq-promover-vaga-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const extra = ESTADO.equipes.find((e) => e.id === btn.dataset.id);
+      if (!extra) return;
+      const novaOrdem = Number(btn.dataset.vaga);
+      try {
+        await updateDoc(doc(db, "equipes", extra.id), { ordem: novaOrdem });
+        await registrarAuditoria("Promover equipe para a rotina", `${extra.nome} — ${extra.predio}`);
+        toast(`"${extra.nome}" agora está na rotina de preventivas.`);
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao promover: " + err.message);
       }
     });
   });
