@@ -298,12 +298,14 @@
         <button class="btn primary" id="btnAdicionarEquipamento">+ Adicionar equipamento</button>
       </div>
       <div class="card">
-        <div class="card-head">
-          <h2>Equipamentos cadastrados</h2>
-          <span class="pill" id="equipamentosCount">0 itens</span>
-        </div>
-        <div style="text-align:right;margin-bottom:12px">
-          <button class="btn secondary" id="btnBaixarCondensadoras">Baixar dados técnicos (.xlsx)</button>
+        <div class="card-head" style="align-items: center;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <h2>Equipamentos cadastrados</h2>
+            <span class="pill" id="equipamentosCount">0 itens</span>
+          </div>
+          <button class="btn ghost" id="btnBaixarCondensadoras" style="font-size: 12.5px; padding: 6px 14px; border-color: var(--azul-700); color: var(--azul-800);">
+            Relatório Técnico (.xlsx)
+          </button>
         </div>
 
         <!-- Fica em cima da barra de pesquisa -->
