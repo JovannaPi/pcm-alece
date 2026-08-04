@@ -1098,6 +1098,30 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 .drawer-campo .rotulo { color: var(--texto-suave); flex-shrink: 0; }
 .drawer-campo .valor { text-align: right; font-weight: 500; color: var(--texto); font-family: var(--fonte-dado); font-size: 12.5px; }
 
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 9px 0;
+  border-bottom: 1px dotted var(--borda);
+  font-size: 13px;
+  cursor: pointer;
+}
+.checklist-item:last-child { border-bottom: none; }
+.checklist-item input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; }
+
+.estrelas-widget { display: flex; gap: 4px; margin: var(--sp-2) 0; }
+.estrelas-widget .estrela {
+  font-size: 26px;
+  line-height: 1;
+  color: var(--borda-forte);
+  cursor: pointer;
+  user-select: none;
+}
+.estrelas-widget .estrela.ativa { color: var(--dourado); }
+
+.campo-outro { margin-top: 6px; }
+
 .drawer-form { padding-bottom: var(--sp-2); }
 .drawer-form label {
   display: block;
@@ -1309,6 +1333,22 @@ body.modo-padrao input[type="checkbox"] {
 
 body.modo-padrao .badge-somente-leitura {
   display: inline-flex;
+}
+
+/* Trabalhador: pode mudar status no calendário e usar o formulário de
+   concluir preventiva, mesmo com o resto travado como no modo padrão. */
+body.modo-trabalhador .status-select,
+body.modo-trabalhador #modalConclusao input:not([disabled]),
+body.modo-trabalhador #modalConclusao select,
+body.modo-trabalhador #modalConclusao button,
+body.modo-trabalhador #modalConclusao input[type="checkbox"] {
+  pointer-events: auto !important;
+  opacity: 1;
+  cursor: pointer;
+}
+body.modo-trabalhador #modalConclusao input[type="text"],
+body.modo-trabalhador #modalConclusao input[type="number"] {
+  cursor: text;
 }
 .badge-somente-leitura {
   display: none;

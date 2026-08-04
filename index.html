@@ -427,6 +427,7 @@
             <label>Permissão
               <select id="novoUsuarioPermissao">
                 <option value="padrao">Padrão</option>
+                <option value="trabalhador">Trabalhador</option>
                 <option value="admin">Administrador</option>
               </select>
             </label>
@@ -482,6 +483,14 @@
     <button class="drawer-close" id="drawerFechar" aria-label="Fechar">×</button>
   </div>
   <div class="drawer-body" id="drawerCorpo"></div>
+</aside>
+<div class="drawer-overlay" id="modalConclusaoOverlay" hidden></div>
+<aside class="drawer" id="modalConclusao" hidden>
+  <div class="drawer-head">
+    <h2 id="modalConclusaoTitulo">Concluir preventiva</h2>
+    <button class="drawer-close" id="modalConclusaoFechar" aria-label="Fechar">×</button>
+  </div>
+  <div class="drawer-body" id="modalConclusaoCorpo"></div>
 </aside>
 <div class="toast" id="toast"></div>
 <script src="utils/pdfGenerator.js"></script>

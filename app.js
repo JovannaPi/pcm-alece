@@ -26,7 +26,28 @@ const PRIORIDADE = {
 };
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
+const ROTULOS_PERMISSAO = { admin: "Administrador", padrao: "Padrão", trabalhador: "Trabalhador" };
 const CHAVE_VERIFICACAO_ATRASADOS = "pmokVerificacaoAtrasados";
+
+const CHECKLIST_PREVENTIVA = [
+  "Limpeza do filtro de ar",
+  "Limpeza da serpentina evaporadora",
+  "Limpeza da serpentina condensadora",
+  "Verificação e limpeza do dreno de condensado",
+  "Verificação da pressão do gás refrigerante",
+  "Verificação de vazamentos",
+  "Verificação das conexões e fiação elétrica",
+  "Verificação da fixação/suportes da unidade",
+  "Teste de funcionamento geral",
+];
+
+const MARCAS_CONDENSADORA = ["Midea", "Springer", "Carrier", "LG", "Komeco", "Philco", "Elgin", "Hitachi"];
+const CAPACIDADES_CONDENSADORA = [
+  "7.500 BTU/h", "9.000 BTU/h", "12.000 BTU/h", "18.000 BTU/h", "22.000 BTU/h",
+  "24.000 BTU/h", "30.000 BTU/h", "32.000 BTU/h", "36.000 BTU/h", "48.000 BTU/h",
+  "56.000 BTU/h", "60.000 BTU/h",
+];
+const ESPESSURAS_FIO = ["2.5mm", "4mm", "6mm"];
 const MESES_CICLO = 4;
 
 async function calcularProximaData(item) {
@@ -1243,7 +1264,7 @@ onAuthStateChanged(auth, async (user) => {
           if (ESTADO.permissao === "admin") { iniciarSincronizacaoUsuarios(); iniciarSincronizacaoAuditoria(); iniciarSincronizacaoEquipes(); }
           await carregarConfigSite();
           const abaSalva = localStorage.getItem("ultimaAbaPMOC") || "dashboard";
-          irParaAba(abaSalva);
+          irParaAba(abaPermitida(abaSalva, ESTADO.permissao) ? abaSalva : "dashboard");
         }
   } else {
     if (overlay) overlay.hidden = false;
@@ -1252,16 +1273,37 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function atualizarVisibilidadeAdmin() {
-  const isAdmin = ESTADO.permissao === "admin";
+  const permissao = ESTADO.permissao;
+  const isAdmin = permissao === "admin";
+  const isTrabalhador = permissao === "trabalhador";
 
   const btnCfg = $("#navConfigSite");
   if (btnCfg) btnCfg.hidden = !isAdmin;
 
-  if (isAdmin) {
-    document.body.classList.remove("modo-padrao");
-  } else {
-    document.body.classList.add("modo-padrao");
-  }
+  // Trabalhador herda o mesmo travamento visual do padrão (não edita nada
+  // fora do previsto), mas com uma exceção: o status do calendário e o
+  // formulário de concluir preventiva continuam interativos (ver CSS).
+  document.body.classList.toggle("modo-padrao", permissao === "padrao" || isTrabalhador);
+  document.body.classList.toggle("modo-trabalhador", isTrabalhador);
+
+  // Levantamento e Cronograma só pra admin
+  ["upload", "config"].forEach((view) => {
+    const tab = $(`.tab[data-view="${view}"]`);
+    if (tab) tab.hidden = !isAdmin;
+  });
+
+  // Trabalhador só vê Calendário e Dashboard — some com o resto do menu
+  ["ordens", "historico", "equipamentos", "feriados"].forEach((view) => {
+    const tab = $(`.tab[data-view="${view}"]`);
+    if (tab) tab.hidden = isTrabalhador;
+  });
+}
+
+function abaPermitida(nome, permissao) {
+  if (permissao === "admin") return true;
+  if (["upload", "config"].includes(nome)) return false;
+  if (permissao === "trabalhador" && ["ordens", "historico", "equipamentos", "feriados"].includes(nome)) return false;
+  return true;
 }
 
 
@@ -1394,20 +1436,21 @@ function renderUsuarios() {
 
     tr.innerHTML = `
       <td ${estiloUsuario}>${u.usuario} ${u.bloqueado ? '(Bloqueado)' : ''}</td>
-      <td>${u.permissao === "admin" ? "Administrador" : "Padrão"}</td>
+      <td>${ROTULOS_PERMISSAO[u.permissao] || "Padrão"}</td>
       <td>${u.criadoEm ? new Date(u.criadoEm).toLocaleDateString("pt-BR") : "-"}</td>
       <td>${u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString("pt-BR") : "-"}</td>`;
-      
+
     const tdMenu = document.createElement("td");
-    
+
     const acaoBloqueio = u.bloqueado ? "Desbloquear" : "Bloquear";
-    const acaoPermissao = u.permissao === "admin" ? "Mudar para Padrão" : "Mudar para Admin";
-    const novaPermissao = u.permissao === "admin" ? "padrao" : "admin";
+    const outrasPermissoes = Object.keys(ROTULOS_PERMISSAO).filter((p) => p !== (u.permissao || "padrao"));
 
     tdMenu.innerHTML = `<details class="menu-linha"><summary>⋯</summary>
       <div class="menu-linha-opcoes">
         <button class="menu-linha-item" data-acao="bloqueio">${acaoBloqueio}</button>
-        <button class="menu-linha-item" data-acao="permissao">${acaoPermissao}</button>
+        ${outrasPermissoes.map((p) =>
+          `<button class="menu-linha-item eq-permissao-btn" data-permissao="${p}">Mudar para ${ROTULOS_PERMISSAO[p]}</button>`
+        ).join("")}
         <button class="menu-linha-item menu-linha-excluir" data-acao="excluir">Excluir conta</button>
       </div>
     </details>`;
@@ -1425,15 +1468,18 @@ function renderUsuarios() {
     });
 
     // Lógica 2: Mudar Permissão
-    tdMenu.querySelector('[data-acao="permissao"]').addEventListener("click", async () => {
-      try {
-        await updateDoc(doc(db, "usuarios", u.id), { permissao: novaPermissao });
-        await registrarAuditoria("Alterar permissão", `${u.usuario}: ${u.permissao} → ${novaPermissao}`);
-        toast(`Permissão alterada com sucesso.`);
-      } catch (err) {
-        console.error(err);
-        toast("Erro ao alterar permissão: " + err.message);
-      }
+    tdMenu.querySelectorAll('.eq-permissao-btn').forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const novaPermissao = btn.dataset.permissao;
+        try {
+          await updateDoc(doc(db, "usuarios", u.id), { permissao: novaPermissao });
+          await registrarAuditoria("Alterar permissão", `${u.usuario}: ${u.permissao} → ${novaPermissao}`);
+          toast(`Permissão alterada com sucesso.`);
+        } catch (err) {
+          console.error(err);
+          toast("Erro ao alterar permissão: " + err.message);
+        }
+      });
     });
 
     // Lógica 3: Excluir Conta
@@ -1972,6 +2018,12 @@ function renderTabelaDetalheDia(itensDoDia, aoAtualizar) {
     select.addEventListener("change", async () => {
       const statusAnterior = item.statusPreventiva;
       const statusNovo = select.value;
+
+      if (statusNovo === "Concluída") {
+        abrirModalConclusao(item, select, statusAnterior, aoAtualizar);
+        return;
+      }
+
       select.disabled = true;
       try {
         const camposStatus = {
@@ -2215,7 +2267,7 @@ async function registrarAuditoria(acao, detalhes) {
   }
 }
 
-async function registrarOrdemServico(item) {
+async function registrarOrdemServico(item, checklist, avaliacaoEstrelas) {
   const agora = new Date();
 
   // Só apaga ordens duplicadas DENTRO do ciclo atual — ordens de ciclos
@@ -2240,6 +2292,8 @@ async function registrarOrdemServico(item) {
     dataAgendada: item.dataAgendada || "",
     status: "Concluída",
     registradoEm: agora.toISOString(),
+    checklist: checklist || [],
+    avaliacaoEstrelas: avaliacaoEstrelas || 0,
   });
 }
 
@@ -2253,6 +2307,268 @@ async function removerOrdemServico(equipamentoId) {
     const batch = writeBatch(db);
     ordensDoEquipamento.forEach((o) => batch.delete(doc(db, "ciclos", o.cicloId, "ordens", o.id)));
     await batch.commit();
+  }
+}
+
+// ------------------------------------------------------------------
+// Modal de conclusão de preventiva — checklist + avaliação da máquina
+// sempre, e o formulário de dados da condensadora só na primeira vez
+// que essa máquina específica é concluída (fica salvo pra sempre).
+// ------------------------------------------------------------------
+let modalConclusaoEstado = null;
+
+function fecharModalConclusao(reverterSelect) {
+  const overlay = $("#modalConclusaoOverlay");
+  const modal = $("#modalConclusao");
+  if (modal) modal.hidden = true;
+  if (overlay) overlay.hidden = true;
+  if (reverterSelect && modalConclusaoEstado && modalConclusaoEstado.selectEl) {
+    modalConclusaoEstado.selectEl.value = modalConclusaoEstado.statusAnterior;
+  }
+  modalConclusaoEstado = null;
+}
+
+$("#modalConclusaoFechar")?.addEventListener("click", () => fecharModalConclusao(true));
+$("#modalConclusaoOverlay")?.addEventListener("click", () => fecharModalConclusao(true));
+
+function wireCampoOutro(selectId, wrapId, valorGatilho) {
+  const select = $(`#${selectId}`);
+  const wrap = $(`#${wrapId}`);
+  if (!select || !wrap) return;
+  select.addEventListener("change", () => {
+    wrap.hidden = select.value !== valorGatilho;
+  });
+}
+
+async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) {
+  modalConclusaoEstado = { item, selectEl, statusAnterior, aoAtualizar };
+
+  $("#modalConclusaoTitulo").textContent = `Concluir preventiva — ${item.patrimonio || item.ambiente}`;
+  $("#modalConclusaoCorpo").innerHTML = `
+    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">O que foi feito na máquina</h3>
+    <div id="checklistPreventiva">
+      ${CHECKLIST_PREVENTIVA.map((tarefa, i) => `
+        <label class="checklist-item">
+          <input type="checkbox" id="chkTarefa${i}" value="${tarefa}">
+          ${tarefa}
+        </label>
+      `).join("")}
+    </div>
+
+    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 6px">Avaliação do estado da máquina</h3>
+    <div class="estrelas-widget" id="estrelasConclusao" data-valor="0">
+      ${[1, 2, 3, 4, 5].map((n) => `<span class="estrela" data-valor="${n}">★</span>`).join("")}
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn primary" id="btnModalConclusaoContinuar">Continuar</button>
+      <button class="btn ghost" id="btnModalConclusaoCancelar">Cancelar</button>
+    </div>
+  `;
+
+  const widget = $("#estrelasConclusao");
+  widget.querySelectorAll(".estrela").forEach((estrela) => {
+    estrela.addEventListener("click", () => {
+      const valor = Number(estrela.dataset.valor);
+      widget.dataset.valor = valor;
+      widget.querySelectorAll(".estrela").forEach((e) => {
+        e.classList.toggle("ativa", Number(e.dataset.valor) <= valor);
+      });
+    });
+  });
+
+  $("#btnModalConclusaoCancelar").addEventListener("click", () => fecharModalConclusao(true));
+
+  $("#btnModalConclusaoContinuar").addEventListener("click", async () => {
+    modalConclusaoEstado.checklist = CHECKLIST_PREVENTIVA.filter((_, i) => $(`#chkTarefa${i}`).checked);
+    modalConclusaoEstado.avaliacaoEstrelas = Number(widget.dataset.valor) || 0;
+
+    let jaTemInfo = false;
+    try {
+      const snap = await getDoc(doc(db, "infoCondensadoras", item.id));
+      jaTemInfo = snap.exists();
+    } catch (err) {
+      console.error("Erro ao verificar info da condensadora:", err);
+    }
+
+    if (jaTemInfo) {
+      await finalizarConclusao();
+    } else {
+      renderPassoCondensadora();
+    }
+  });
+
+  $("#modalConclusao").hidden = false;
+  $("#modalConclusaoOverlay").hidden = false;
+}
+
+function renderPassoCondensadora() {
+  const { item } = modalConclusaoEstado;
+  $("#modalConclusaoTitulo").textContent = "Dados da condensadora (primeira vez)";
+  $("#modalConclusaoCorpo").innerHTML = `
+    <p class="muted">Primeira vez que essa máquina é registrada — preencha os dados dela. Da próxima vez que ela for concluída, isso não vai ser perguntado de novo.</p>
+    <div class="grid-form">
+      <label>Informante *<input type="text" id="cInformante" placeholder="Seu nome"></label>
+      <label>Nº da Condensadora *<input type="text" id="cNumero"></label>
+
+      <div>
+        <label>Tombo
+          <select id="cTombo">
+            <option value="sem">Sem tombo</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+        <div class="campo-outro" id="cTomboOutroWrap" hidden>
+          <input type="text" id="cTomboOutro" placeholder="Número do tombo">
+        </div>
+      </div>
+
+      <label>Tag (se tiver)<input type="text" id="cTag" placeholder="Opcional"></label>
+
+      <div>
+        <label>Marca da Condensadora *
+          <select id="cMarca">
+            <option value="">Selecione...</option>
+            ${MARCAS_CONDENSADORA.map((m) => `<option value="${m}">${m}</option>`).join("")}
+            <option value="Outro">Outro</option>
+          </select>
+        </label>
+        <div class="campo-outro" id="cMarcaOutroWrap" hidden>
+          <input type="text" id="cMarcaOutro" placeholder="Especifique a marca">
+        </div>
+      </div>
+
+      <div>
+        <label>Modelo da Condensadora
+          <select id="cModelo">
+            <option value="sem">Sem modelo</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+        <div class="campo-outro" id="cModeloOutroWrap" hidden>
+          <input type="text" id="cModeloOutro" placeholder="Modelo">
+        </div>
+      </div>
+
+      <div>
+        <label>Capacidade da Máquina *
+          <select id="cCapacidade">
+            <option value="">Selecione...</option>
+            ${CAPACIDADES_CONDENSADORA.map((c) => `<option value="${c}">${c}</option>`).join("")}
+            <option value="Outro">Outro</option>
+          </select>
+        </label>
+        <div class="campo-outro" id="cCapacidadeOutroWrap" hidden>
+          <input type="text" id="cCapacidadeOutro" placeholder="Especifique a capacidade">
+        </div>
+      </div>
+
+      <div>
+        <label>Espessura do fio de alimentação *
+          <select id="cFio">
+            <option value="">Selecione...</option>
+            ${ESPESSURAS_FIO.map((e) => `<option value="${e}">${e}</option>`).join("")}
+            <option value="Outro">Outro</option>
+          </select>
+        </label>
+        <div class="campo-outro" id="cFioOutroWrap" hidden>
+          <input type="text" id="cFioOutro" placeholder="Especifique a espessura">
+        </div>
+      </div>
+
+      <label>Local da Condensadora<input type="text" value="${item.local || "SEDE"}" disabled></label>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:24px">
+      <button class="btn primary" id="btnModalConclusaoSalvar">Salvar e concluir</button>
+      <button class="btn ghost" id="btnModalConclusaoCancelar2">Cancelar</button>
+    </div>
+  `;
+
+  wireCampoOutro("cTombo", "cTomboOutroWrap", "outro");
+  wireCampoOutro("cModelo", "cModeloOutroWrap", "outro");
+  wireCampoOutro("cMarca", "cMarcaOutroWrap", "Outro");
+  wireCampoOutro("cCapacidade", "cCapacidadeOutroWrap", "Outro");
+  wireCampoOutro("cFio", "cFioOutroWrap", "Outro");
+
+  $("#btnModalConclusaoCancelar2").addEventListener("click", () => fecharModalConclusao(true));
+
+  $("#btnModalConclusaoSalvar").addEventListener("click", async () => {
+    const informante = $("#cInformante").value.trim();
+    const numero = $("#cNumero").value.trim();
+    const marca = $("#cMarca").value;
+    const capacidade = $("#cCapacidade").value;
+    const fio = $("#cFio").value;
+
+    if (!informante || !numero || !marca || !capacidade || !fio) {
+      toast("Preencha os campos obrigatórios (*).");
+      return;
+    }
+
+    const tomboSel = $("#cTombo").value;
+    const tombo = tomboSel === "outro" ? $("#cTomboOutro").value.trim() : "";
+    const modeloSel = $("#cModelo").value;
+    const modelo = modeloSel === "outro" ? $("#cModeloOutro").value.trim() : "Sem modelo";
+    const marcaFinal = marca === "Outro" ? $("#cMarcaOutro").value.trim() : marca;
+    const capacidadeFinal = capacidade === "Outro" ? $("#cCapacidadeOutro").value.trim() : capacidade;
+    const fioFinal = fio === "Outro" ? $("#cFioOutro").value.trim() : fio;
+    const tag = $("#cTag").value.trim();
+
+    modalConclusaoEstado.infoCondensadora = {
+      informante, numeroCondensadora: numero, tombo, tag,
+      marca: marcaFinal, modelo, capacidade: capacidadeFinal,
+      espessuraFio: fioFinal, localCondensadora: item.local || "SEDE",
+    };
+
+    await finalizarConclusao();
+  });
+}
+
+async function finalizarConclusao() {
+  const { item, checklist, avaliacaoEstrelas, infoCondensadora, statusAnterior, aoAtualizar } = modalConclusaoEstado;
+  const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
+  if (btnSalvar) btnSalvar.disabled = true;
+
+  try {
+    const camposStatus = {
+      statusPreventiva: "Concluída",
+      dataConclusao: formatISO(new Date()),
+    };
+    const proxima = await calcularProximaData({ ...item, dataConclusao: camposStatus.dataConclusao });
+    camposStatus.proximaPreventiva = proxima.data;
+    camposStatus.proximaPreventivaDia = proxima.dia;
+
+    if (infoCondensadora && infoCondensadora.tombo) {
+      camposStatus.patrimonio = infoCondensadora.tombo;
+    }
+
+    await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
+    Object.assign(item, camposStatus);
+
+    const promessas = [
+      registrarHistorico(item, statusAnterior, "Concluída"),
+      registrarOrdemServico(item, checklist, avaliacaoEstrelas),
+    ];
+
+    if (infoCondensadora) {
+      promessas.push(setDoc(doc(db, "infoCondensadoras", item.id), {
+        ...infoCondensadora,
+        equipamentoId: item.id,
+        preenchidoPor: ESTADO.usuarioNome || "",
+        preenchidoEm: new Date().toISOString(),
+      }));
+    }
+
+    await Promise.all(promessas);
+
+    toast("Preventiva concluída com sucesso.");
+    fecharModalConclusao(false);
+    if (typeof aoAtualizar === "function") aoAtualizar();
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao concluir: " + err.message);
+  } finally {
+    if (btnSalvar) btnSalvar.disabled = false;
   }
 }
 
