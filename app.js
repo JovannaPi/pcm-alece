@@ -2472,6 +2472,64 @@ function definirCamposUnidade(tipoUnidade) {
   return camposBase;
 }
 
+// Define os campos técnicos de UMA unidade (condensadora ou evaporadora —
+// mesma estrutura pras duas). "semOutro" é tipo select com opção "sem" +
+// "outro" (texto livre); "select" tem opções fixas + "Outro" (texto livre).
+function definirCamposUnidade(tipoUnidade) {
+  const camposBase = [
+    { chave: "tombo", tipo: "semOutro", rotulo: "Tombo/Patrimônio", labelSem: "Sem tombo", obrigatorio: false },
+    { chave: "tag", tipo: "texto", rotulo: "Tag (se tiver)", obrigatorio: false },
+    { chave: "marca", tipo: "select", opcoes: MARCAS_CONDENSADORA, rotulo: "Marca", obrigatorio: true },
+    { chave: "modelo", tipo: "semOutro", rotulo: "Modelo", labelSem: "Sem modelo", obrigatorio: false },
+    { chave: "capacidade", tipo: "select", opcoes: CAPACIDADES_CONDENSADORA, rotulo: "Capacidade", obrigatorio: true },
+    { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
+  ];
+
+  // O campo Número só entra se for a condensadora
+  if (tipoUnidade === "cond") {
+    camposBase.unshift({ chave: "numero", tipo: "texto", rotulo: "Nº (Condensadora)", obrigatorio: true });
+  }
+
+  return camposBase;
+}
+
+function renderSecaoUnidade(prefixo, titulo, dadosExistentes, tipoUnidade) {
+  const existentes = dadosExistentes || {};
+  const campos = definirCamposUnidade(tipoUnidade).filter((c) => {
+    const valor = existentes[c.chave];
+    return valor === undefined || valor === null || valor === "";
+  });
+
+  if (!campos.length) return { html: "", campos: [] };
+
+  const html = `
+    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 10px">${titulo}</h3>
+    <div class="grid-form">
+      ${campos.map((c) => {
+        const id = `${prefixo}_${c.chave}`;
+        const marcador = c.obrigatorio ? " *" : "";
+        if (c.tipo === "texto") {
+          return \`<label>\${c.rotulo}\${marcador}<input type="text" id="\${id}"></label>\`;
+        }
+        const opcoesExtras = c.tipo === "select"
+          ? \`<option value="">Selecione...</option>\${c.opcoes.map((o) => \`<option value="\${o}">\${o}</option>\`).join("")}<option value="Outro">Outro</option>\`
+          : \`<option value="sem">\${c.labelSem}</option><option value="outro">Outro</option>\`;
+        return \`
+          <div>
+            <label>\${c.rotulo}\${marcador}
+              <select id="\${id}">\${opcoesExtras}</select>
+            </label>
+            <div class="campo-outro" id="\${id}OutroWrap" hidden>
+              <input type="text" id="\${id}Outro" placeholder="Especifique">
+            </div>
+          </div>\`;
+      }).join("")}
+    </div>
+  `;
+
+  return { html, campos };
+}
+
 function wireSecaoUnidade(prefixo, campos) {
   campos.forEach((c) => {
     if (c.tipo === "select") wireCampoOutro(`${prefixo}_${c.chave}`, `${prefixo}_${c.chave}OutroWrap`, "Outro");
