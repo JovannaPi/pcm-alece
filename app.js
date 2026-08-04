@@ -1306,15 +1306,16 @@ function renderUsuarios() {
   const table = $("#usuariosTable");
   if (!table) return;
   
-  $("#usuariosCount").textContent = `${ESTADO.usuarios.length} conta(s)`;
-  
+  const usuariosVisiveis = ESTADO.usuarios.filter((u) => !u.excluidoEm);
+  $("#usuariosCount").textContent = `${usuariosVisiveis.length} conta(s)`;
+
   table.innerHTML = `<thead><tr>
       <th>Usuário</th><th>Permissão</th><th>Criado em</th><th>Último login</th><th></th>
     </tr></thead><tbody></tbody>`;
-    
+
   const tbody = table.querySelector("tbody");
-  
-  ESTADO.usuarios.forEach((u) => {
+
+  usuariosVisiveis.forEach((u) => {
     const tr = document.createElement("tr");
     
     // Se o usuário estiver bloqueado, aplicamos um estilo CSS sutil (riscado + cinza)
@@ -1365,12 +1366,19 @@ function renderUsuarios() {
     });
 
     // Lógica 3: Excluir Conta
+    // Não dá pra apagar de verdade o login (Firebase Auth) sem um backend
+    // pago — então isso bloqueia a conta permanentemente e some ela da
+    // lista. Sem isso, apagar só o perfil deixava a pessoa "ressuscitar"
+    // a própria conta (com permissão padrão) só de logar de novo.
     tdMenu.querySelector('[data-acao="excluir"]').addEventListener("click", async () => {
-      const ok = window.confirm(`Tem certeza que deseja excluir o perfil de ${u.usuario}?`);
+      const ok = window.confirm(`Tem certeza que deseja excluir a conta de ${u.usuario}? Essa pessoa não vai mais conseguir acessar o sistema.`);
       if(!ok) return;
-      
+
       try {
-        await deleteDoc(doc(db, "usuarios", u.id));
+        await updateDoc(doc(db, "usuarios", u.id), {
+          bloqueado: true,
+          excluidoEm: new Date().toISOString(),
+        });
         await registrarAuditoria("Excluir conta", u.usuario);
         toast("Conta excluída.");
       } catch (err) {
@@ -1429,6 +1437,29 @@ async function propagarRenomeacaoEquipe(nomeAntigo, nomeNovo) {
   }
 }
 
+// Quando duas equipes trocam de posição (extra ↔ rotina), o trabalho que já
+// estava no calendário também troca de dono — não só as vagas futuras.
+async function propagarTrocaDeEquipes(nomeA, nomeB) {
+  if (!ESTADO.cicloAtual) return;
+  const afetados = ESTADO.equipamentos.filter((e) =>
+    e.equipeResponsavel === nomeA || e.equipeResponsavel === nomeB
+  );
+  if (!afetados.length) return;
+
+  const TAMANHO_LOTE = 400;
+  for (let inicio = 0; inicio < afetados.length; inicio += TAMANHO_LOTE) {
+    const pedaco = afetados.slice(inicio, inicio + TAMANHO_LOTE);
+    const batch = writeBatch(db);
+    pedaco.forEach((item) => {
+      const novoNome = item.equipeResponsavel === nomeA ? nomeB : nomeA;
+      batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), {
+        equipeResponsavel: novoNome,
+      });
+    });
+    await batch.commit();
+  }
+}
+
 function renderEquipesPorPredio() {
   const container = $("#equipesPorPredio");
   if (!container) return;
@@ -1442,11 +1473,17 @@ function renderEquipesPorPredio() {
     const maiorOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0);
     const totalVagas = Math.max(nEquipes, maiorOrdem);
 
+    // Usa a MESMA seleção "uma por ordem" (.find) da lista principal em vez
+    // de .filter — assim, se sobrar algum documento duplicado na mesma vaga
+    // (ordem repetida), o menu de trocar não mostra uma equipe "fantasma"
+    // que já sumiu da lista visível.
     const vagasAtivasVazias = [];
+    const equipesNaRotina = [];
     for (let o = 1; o <= nEquipes; o++) {
-      if (!equipesDoPredio.find((e) => e.ordem === o)) vagasAtivasVazias.push(o);
+      const eq = equipesDoPredio.find((e) => e.ordem === o);
+      if (eq) equipesNaRotina.push(eq);
+      else vagasAtivasVazias.push(o);
     }
-    const equipesNaRotina = equipesDoPredio.filter((e) => e.ordem <= nEquipes);
 
     let linhas = "";
     for (let ordem = 1; ordem <= totalVagas; ordem++) {
@@ -1544,8 +1581,9 @@ function renderEquipesPorPredio() {
         batch.update(doc(db, "equipes", extra.id), { ordem: ativa.ordem });
         batch.update(doc(db, "equipes", ativa.id), { ordem: extra.ordem });
         await batch.commit();
+        await propagarTrocaDeEquipes(extra.nome, ativa.nome);
         await registrarAuditoria("Trocar posição de equipe", `${extra.nome} ↔ ${ativa.nome} — ${extra.predio}`);
-        toast(`"${extra.nome}" agora está na rotina de preventivas.`);
+        toast(`"${extra.nome}" agora está na rotina de preventivas, e o calendário foi atualizado.`);
       } catch (err) {
         console.error(err);
         toast("Erro ao trocar: " + err.message);
@@ -1558,10 +1596,12 @@ function renderEquipesPorPredio() {
       const extra = ESTADO.equipes.find((e) => e.id === btn.dataset.id);
       if (!extra) return;
       const novaOrdem = Number(btn.dataset.vaga);
+      const nomeVagaFallback = `Equipe ${novaOrdem}`;
       try {
         await updateDoc(doc(db, "equipes", extra.id), { ordem: novaOrdem });
+        await propagarRenomeacaoEquipe(nomeVagaFallback, extra.nome);
         await registrarAuditoria("Promover equipe para a rotina", `${extra.nome} — ${extra.predio}`);
-        toast(`"${extra.nome}" agora está na rotina de preventivas.`);
+        toast(`"${extra.nome}" agora está na rotina de preventivas, e o calendário foi atualizado.`);
       } catch (err) {
         console.error(err);
         toast("Erro ao promover: " + err.message);
