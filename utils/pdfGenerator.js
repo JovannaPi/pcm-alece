@@ -315,3 +315,20 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
   return conteudoHTML;
 }
+
+function baixarRelatorioPDF(equipamentos, cicloInfo, historico) {
+  // 1. Chama a sua função para gerar o HTML
+  const html = gerarRelatorioPDF(equipamentos, cicloInfo, historico);
+
+  // 2. Configura as margens e a qualidade do PDF
+  const opt = {
+    margin: [10, 10, 10, 10], 
+    filename: `Relatorio_PMOC_ALECE_${new Date().toISOString().split('T')[0]}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+
+  // 3. Converte e baixa o arquivo
+  html2pdf().set(opt).from(html).save();
+}
