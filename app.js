@@ -2332,11 +2332,6 @@ async function removerOrdemServico(equipamentoId) {
   }
 }
 
-// ------------------------------------------------------------------
-// Modal de conclusão de preventiva — checklist + avaliação da máquina
-// sempre, e o formulário de dados da condensadora só na primeira vez
-// que essa máquina específica é concluída (fica salvo pra sempre).
-// ------------------------------------------------------------------
 let modalConclusaoEstado = null;
 
 function fecharModalConclusao(reverterSelect) {
@@ -2421,6 +2416,7 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
     // INJEÇÃO AUTOMÁTICA: Oculta os campos que já vieram da planilha
     if (item.patrimonio) {
       dadosExistentes.evaporadora.tombo = dadosExistentes.evaporadora.tombo || item.patrimonio;
+      dadosExistentes.condensadora.tombo = dadosExistentes.condensadora.tombo || item.patrimonio;
     }
     if (item.marca) {
       dadosExistentes.evaporadora.marca = dadosExistentes.evaporadora.marca || item.marca;
@@ -2451,9 +2447,7 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
   $("#modalConclusaoOverlay").hidden = false;
 }
 
-// Define os campos técnicos de UMA unidade (condensadora ou evaporadora —
-// mesma estrutura pras duas). "semOutro" é tipo select com opção "sem" +
-// "outro" (texto livre); "select" tem opções fixas + "Outro" (texto livre).
+// Define os campos técnicos de UMA unidade
 function definirCamposUnidade(tipoUnidade) {
   const camposBase = [
     { chave: "tombo", tipo: "semOutro", rotulo: "Tombo/Patrimônio", labelSem: "Sem tombo", obrigatorio: false },
@@ -2464,28 +2458,6 @@ function definirCamposUnidade(tipoUnidade) {
     { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
   ];
 
-  // O campo Número só entra se for a condensadora
-  if (tipoUnidade === "cond") {
-    camposBase.unshift({ chave: "numero", tipo: "texto", rotulo: "Nº (Condensadora)", obrigatorio: true });
-  }
-
-  return camposBase;
-}
-
-// Define os campos técnicos de UMA unidade (condensadora ou evaporadora —
-// mesma estrutura pras duas). "semOutro" é tipo select com opção "sem" +
-// "outro" (texto livre); "select" tem opções fixas + "Outro" (texto livre).
-function definirCamposUnidade(tipoUnidade) {
-  const camposBase = [
-    { chave: "tombo", tipo: "semOutro", rotulo: "Tombo/Patrimônio", labelSem: "Sem tombo", obrigatorio: false },
-    { chave: "tag", tipo: "texto", rotulo: "Tag (se tiver)", obrigatorio: false },
-    { chave: "marca", tipo: "select", opcoes: MARCAS_CONDENSADORA, rotulo: "Marca", obrigatorio: true },
-    { chave: "modelo", tipo: "semOutro", rotulo: "Modelo", labelSem: "Sem modelo", obrigatorio: false },
-    { chave: "capacidade", tipo: "select", opcoes: CAPACIDADES_CONDENSADORA, rotulo: "Capacidade", obrigatorio: true },
-    { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
-  ];
-
-  // O campo Número só entra se for a condensadora
   if (tipoUnidade === "cond") {
     camposBase.unshift({ chave: "numero", tipo: "texto", rotulo: "Nº (Condensadora)", obrigatorio: true });
   }
@@ -2537,9 +2509,6 @@ function wireSecaoUnidade(prefixo, campos) {
   });
 }
 
-// Lê os valores digitados/selecionados e devolve o objeto da unidade já
-// mesclado com o que já existia antes (pra não perder o que não foi
-// perguntado de novo). faltouObrigatorio avisa se algo obrigatório ficou vazio.
 function lerSecaoUnidade(prefixo, campos, dadosExistentes) {
   const resultado = { ...(dadosExistentes || {}) };
   let faltouObrigatorio = false;
@@ -2615,6 +2584,7 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
     await finalizarConclusao();
   });
 }
+
 async function finalizarConclusao() {
   const { item, checklist, avaliacaoEstrelas, infoTecnica, statusAnterior, aoAtualizar } = modalConclusaoEstado;
   const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
