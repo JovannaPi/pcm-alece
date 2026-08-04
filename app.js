@@ -2472,46 +2472,6 @@ function definirCamposUnidade(tipoUnidade) {
   return camposBase;
 }
 
-
-// Monta o HTML só dos campos que AINDA NÃO existem nos dados salvos dessa
-// unidade — se a unidade já está 100% completa, retorna html vazio.
-function renderSecaoUnidade(prefixo, titulo, dadosExistentes) {
-  const existentes = dadosExistentes || {};
-  const campos = definirCamposUnidade().filter((c) => {
-    const valor = existentes[c.chave];
-    return valor === undefined || valor === null || valor === "";
-  });
-
-  if (!campos.length) return { html: "", campos: [] };
-
-  const html = `
-    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 10px">${titulo}</h3>
-    <div class="grid-form">
-      ${campos.map((c) => {
-        const id = `${prefixo}_${c.chave}`;
-        const marcador = c.obrigatorio ? " *" : "";
-        if (c.tipo === "texto") {
-          return `<label>${c.rotulo}${marcador}<input type="text" id="${id}"></label>`;
-        }
-        const opcoesExtras = c.tipo === "select"
-          ? `<option value="">Selecione...</option>${c.opcoes.map((o) => `<option value="${o}">${o}</option>`).join("")}<option value="Outro">Outro</option>`
-          : `<option value="sem">${c.labelSem}</option><option value="outro">Outro</option>`;
-        return `
-          <div>
-            <label>${c.rotulo}${marcador}
-              <select id="${id}">${opcoesExtras}</select>
-            </label>
-            <div class="campo-outro" id="${id}OutroWrap" hidden>
-              <input type="text" id="${id}Outro" placeholder="Especifique">
-            </div>
-          </div>`;
-      }).join("")}
-    </div>
-  `;
-
-  return { html, campos };
-}
-
 function wireSecaoUnidade(prefixo, campos) {
   campos.forEach((c) => {
     if (c.tipo === "select") wireCampoOutro(`${prefixo}_${c.chave}`, `${prefixo}_${c.chave}OutroWrap`, "Outro");
