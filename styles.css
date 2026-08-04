@@ -178,7 +178,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   border-bottom: 3px solid var(--dourado);
   position: sticky;
   top: 0;
-  z-index: 101; /* Aumentado para ficar acima do drawer (que está em 100) */
+  z-index: 101;
 }
 
 .topbar-inner {
@@ -1020,7 +1020,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   position: fixed;
   inset: 0;
   background: rgba(16, 38, 61, 0.45);
-  z-index: 90;
+  z-index: 110;
 }
 
 .drawer {
@@ -1030,7 +1030,8 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   max-width: 92vw;
   background: var(--superficie);
   box-shadow: -8px 0 24px rgba(16,38,61,0.18);
-  z-index: 100;
+  z-index: 111; /* acima do topbar (101) — o proprio cabecalho do drawer
+                   nao pode ficar escondido atras da barra de navegacao */
   display: flex;
   flex-direction: column;
   animation: entrar-drawer 0.2s ease;
