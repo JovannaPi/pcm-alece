@@ -2383,18 +2383,22 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
     modalConclusaoEstado.checklist = CHECKLIST_PREVENTIVA.filter((_, i) => $(`#chkTarefa${i}`).checked);
     modalConclusaoEstado.avaliacaoEstrelas = Number(widget.dataset.valor) || 0;
 
-    let jaTemInfo = false;
+    let dadosExistentes = null;
     try {
       const snap = await getDoc(doc(db, "infoCondensadoras", item.id));
-      jaTemInfo = snap.exists();
+      if (snap.exists()) dadosExistentes = snap.data();
     } catch (err) {
-      console.error("Erro ao verificar info da condensadora:", err);
+      console.error("Erro ao verificar info técnica:", err);
     }
+    modalConclusaoEstado.dadosExistentes = dadosExistentes;
 
-    if (jaTemInfo) {
+    const secaoCond = renderSecaoUnidade("cond", "Condensadora (unidade externa)", dadosExistentes && dadosExistentes.condensadora);
+    const secaoEvap = renderSecaoUnidade("evap", "Evaporadora (unidade interna)", dadosExistentes && dadosExistentes.evaporadora);
+
+    if (!secaoCond.html && !secaoEvap.html) {
       await finalizarConclusao();
     } else {
-      renderPassoCondensadora();
+      renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes);
     }
   });
 
@@ -2402,82 +2406,106 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
   $("#modalConclusaoOverlay").hidden = false;
 }
 
-function renderPassoCondensadora() {
-  const { item } = modalConclusaoEstado;
-  $("#modalConclusaoTitulo").textContent = "Dados da condensadora (primeira vez)";
-  $("#modalConclusaoCorpo").innerHTML = `
-    <p class="muted">Primeira vez que essa máquina é registrada — preencha os dados dela. Da próxima vez que ela for concluída, isso não vai ser perguntado de novo.</p>
+// Define os campos técnicos de UMA unidade (condensadora ou evaporadora —
+// mesma estrutura pras duas). "semOutro" é tipo select com opção "sem" +
+// "outro" (texto livre); "select" tem opções fixas + "Outro" (texto livre).
+function definirCamposUnidade() {
+  return [
+    { chave: "numero", tipo: "texto", rotulo: "Nº", obrigatorio: true },
+    { chave: "tombo", tipo: "semOutro", rotulo: "Tombo", labelSem: "Sem tombo", obrigatorio: false },
+    { chave: "tag", tipo: "texto", rotulo: "Tag (se tiver)", obrigatorio: false },
+    { chave: "marca", tipo: "select", opcoes: MARCAS_CONDENSADORA, rotulo: "Marca", obrigatorio: true },
+    { chave: "modelo", tipo: "semOutro", rotulo: "Modelo", labelSem: "Sem modelo", obrigatorio: false },
+    { chave: "capacidade", tipo: "select", opcoes: CAPACIDADES_CONDENSADORA, rotulo: "Capacidade", obrigatorio: true },
+    { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
+  ];
+}
+
+// Monta o HTML só dos campos que AINDA NÃO existem nos dados salvos dessa
+// unidade — se a unidade já está 100% completa, retorna html vazio.
+function renderSecaoUnidade(prefixo, titulo, dadosExistentes) {
+  const existentes = dadosExistentes || {};
+  const campos = definirCamposUnidade().filter((c) => {
+    const valor = existentes[c.chave];
+    return valor === undefined || valor === null || valor === "";
+  });
+
+  if (!campos.length) return { html: "", campos: [] };
+
+  const html = `
+    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 10px">${titulo}</h3>
     <div class="grid-form">
-      <label>Informante *<input type="text" id="cInformante" placeholder="Seu nome"></label>
-      <label>Nº da Condensadora *<input type="text" id="cNumero"></label>
-
-      <div>
-        <label>Tombo
-          <select id="cTombo">
-            <option value="sem">Sem tombo</option>
-            <option value="outro">Outro</option>
-          </select>
-        </label>
-        <div class="campo-outro" id="cTomboOutroWrap" hidden>
-          <input type="text" id="cTomboOutro" placeholder="Número do tombo">
-        </div>
-      </div>
-
-      <label>Tag (se tiver)<input type="text" id="cTag" placeholder="Opcional"></label>
-
-      <div>
-        <label>Marca da Condensadora *
-          <select id="cMarca">
-            <option value="">Selecione...</option>
-            ${MARCAS_CONDENSADORA.map((m) => `<option value="${m}">${m}</option>`).join("")}
-            <option value="Outro">Outro</option>
-          </select>
-        </label>
-        <div class="campo-outro" id="cMarcaOutroWrap" hidden>
-          <input type="text" id="cMarcaOutro" placeholder="Especifique a marca">
-        </div>
-      </div>
-
-      <div>
-        <label>Modelo da Condensadora
-          <select id="cModelo">
-            <option value="sem">Sem modelo</option>
-            <option value="outro">Outro</option>
-          </select>
-        </label>
-        <div class="campo-outro" id="cModeloOutroWrap" hidden>
-          <input type="text" id="cModeloOutro" placeholder="Modelo">
-        </div>
-      </div>
-
-      <div>
-        <label>Capacidade da Máquina *
-          <select id="cCapacidade">
-            <option value="">Selecione...</option>
-            ${CAPACIDADES_CONDENSADORA.map((c) => `<option value="${c}">${c}</option>`).join("")}
-            <option value="Outro">Outro</option>
-          </select>
-        </label>
-        <div class="campo-outro" id="cCapacidadeOutroWrap" hidden>
-          <input type="text" id="cCapacidadeOutro" placeholder="Especifique a capacidade">
-        </div>
-      </div>
-
-      <div>
-        <label>Espessura do fio de alimentação *
-          <select id="cFio">
-            <option value="">Selecione...</option>
-            ${ESPESSURAS_FIO.map((e) => `<option value="${e}">${e}</option>`).join("")}
-            <option value="Outro">Outro</option>
-          </select>
-        </label>
-        <div class="campo-outro" id="cFioOutroWrap" hidden>
-          <input type="text" id="cFioOutro" placeholder="Especifique a espessura">
-        </div>
-      </div>
-
-      <label>Local da Condensadora<input type="text" value="${item.local || "SEDE"}" disabled></label>
+      ${campos.map((c) => {
+        const id = `${prefixo}_${c.chave}`;
+        const marcador = c.obrigatorio ? " *" : "";
+        if (c.tipo === "texto") {
+          return `<label>${c.rotulo}${marcador}<input type="text" id="${id}"></label>`;
+        }
+        const opcoesExtras = c.tipo === "select"
+          ? `<option value="">Selecione...</option>${c.opcoes.map((o) => `<option value="${o}">${o}</option>`).join("")}<option value="Outro">Outro</option>`
+          : `<option value="sem">${c.labelSem}</option><option value="outro">Outro</option>`;
+        return `
+          <div>
+            <label>${c.rotulo}${marcador}
+              <select id="${id}">${opcoesExtras}</select>
+            </label>
+            <div class="campo-outro" id="${id}OutroWrap" hidden>
+              <input type="text" id="${id}Outro" placeholder="Especifique">
+            </div>
+          </div>`;
+      }).join("")}
     </div>
+  `;
+
+  return { html, campos };
+}
+
+function wireSecaoUnidade(prefixo, campos) {
+  campos.forEach((c) => {
+    if (c.tipo === "select") wireCampoOutro(`${prefixo}_${c.chave}`, `${prefixo}_${c.chave}OutroWrap`, "Outro");
+    if (c.tipo === "semOutro") wireCampoOutro(`${prefixo}_${c.chave}`, `${prefixo}_${c.chave}OutroWrap`, "outro");
+  });
+}
+
+// Lê os valores digitados/selecionados e devolve o objeto da unidade já
+// mesclado com o que já existia antes (pra não perder o que não foi
+// perguntado de novo). faltouObrigatorio avisa se algo obrigatório ficou vazio.
+function lerSecaoUnidade(prefixo, campos, dadosExistentes) {
+  const resultado = { ...(dadosExistentes || {}) };
+  let faltouObrigatorio = false;
+
+  campos.forEach((c) => {
+    const id = `${prefixo}_${c.chave}`;
+    const el = $(`#${id}`);
+    if (!el) return;
+
+    let valorFinal;
+    if (c.tipo === "texto") {
+      valorFinal = el.value.trim();
+    } else if (c.tipo === "select") {
+      valorFinal = el.value === "Outro" ? $(`#${id}Outro`).value.trim() : el.value;
+    } else {
+      valorFinal = el.value === "outro" ? $(`#${id}Outro`).value.trim() : "";
+    }
+
+    if (c.obrigatorio && !valorFinal) faltouObrigatorio = true;
+    resultado[c.chave] = valorFinal;
+  });
+
+  return { resultado, faltouObrigatorio };
+}
+
+function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
+  const { item } = modalConclusaoEstado;
+  $("#modalConclusaoTitulo").textContent = "Dados técnicos da máquina";
+  $("#modalConclusaoCorpo").innerHTML = `
+    <p class="muted">Só está perguntando o que ainda não está registrado pra essa máquina. Da próxima vez, isso não é perguntado de novo.</p>
+    <div class="grid-form">
+      <label>Informante *<input type="text" id="infoInformante" placeholder="Seu nome"></label>
+      <label>Prédio<input type="text" value="${item.local || "SEDE"}" disabled></label>
+    </div>
+    ${secaoCond.html}
+    ${secaoEvap.html}
 
     <div style="display:flex;gap:12px;margin-top:24px">
       <button class="btn primary" id="btnModalConclusaoSalvar">Salvar e concluir</button>
@@ -2485,39 +2513,33 @@ function renderPassoCondensadora() {
     </div>
   `;
 
-  wireCampoOutro("cTombo", "cTomboOutroWrap", "outro");
-  wireCampoOutro("cModelo", "cModeloOutroWrap", "outro");
-  wireCampoOutro("cMarca", "cMarcaOutroWrap", "Outro");
-  wireCampoOutro("cCapacidade", "cCapacidadeOutroWrap", "Outro");
-  wireCampoOutro("cFio", "cFioOutroWrap", "Outro");
+  wireSecaoUnidade("cond", secaoCond.campos);
+  wireSecaoUnidade("evap", secaoEvap.campos);
 
   $("#btnModalConclusaoCancelar2").addEventListener("click", () => fecharModalConclusao(true));
 
   $("#btnModalConclusaoSalvar").addEventListener("click", async () => {
-    const informante = $("#cInformante").value.trim();
-    const numero = $("#cNumero").value.trim();
-    const marca = $("#cMarca").value;
-    const capacidade = $("#cCapacidade").value;
-    const fio = $("#cFio").value;
+    const informante = $("#infoInformante").value.trim();
+    if (!informante) {
+      toast("Preencha o informante.");
+      return;
+    }
 
-    if (!informante || !numero || !marca || !capacidade || !fio) {
+    const dadosCond = (dadosExistentes && dadosExistentes.condensadora) || {};
+    const dadosEvap = (dadosExistentes && dadosExistentes.evaporadora) || {};
+    const { resultado: condensadora, faltouObrigatorio: faltouCond } = lerSecaoUnidade("cond", secaoCond.campos, dadosCond);
+    const { resultado: evaporadora, faltouObrigatorio: faltouEvap } = lerSecaoUnidade("evap", secaoEvap.campos, dadosEvap);
+
+    if (faltouCond || faltouEvap) {
       toast("Preencha os campos obrigatórios (*).");
       return;
     }
 
-    const tomboSel = $("#cTombo").value;
-    const tombo = tomboSel === "outro" ? $("#cTomboOutro").value.trim() : "";
-    const modeloSel = $("#cModelo").value;
-    const modelo = modeloSel === "outro" ? $("#cModeloOutro").value.trim() : "Sem modelo";
-    const marcaFinal = marca === "Outro" ? $("#cMarcaOutro").value.trim() : marca;
-    const capacidadeFinal = capacidade === "Outro" ? $("#cCapacidadeOutro").value.trim() : capacidade;
-    const fioFinal = fio === "Outro" ? $("#cFioOutro").value.trim() : fio;
-    const tag = $("#cTag").value.trim();
-
-    modalConclusaoEstado.infoCondensadora = {
-      informante, numeroCondensadora: numero, tombo, tag,
-      marca: marcaFinal, modelo, capacidade: capacidadeFinal,
-      espessuraFio: fioFinal, localCondensadora: item.local || "SEDE",
+    modalConclusaoEstado.infoTecnica = {
+      informante,
+      condensadora,
+      evaporadora,
+      local: item.local || "SEDE",
     };
 
     await finalizarConclusao();
@@ -2525,7 +2547,7 @@ function renderPassoCondensadora() {
 }
 
 async function finalizarConclusao() {
-  const { item, checklist, avaliacaoEstrelas, infoCondensadora, statusAnterior, aoAtualizar } = modalConclusaoEstado;
+  const { item, checklist, avaliacaoEstrelas, infoTecnica, statusAnterior, aoAtualizar } = modalConclusaoEstado;
   const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
   if (btnSalvar) btnSalvar.disabled = true;
 
@@ -2538,8 +2560,8 @@ async function finalizarConclusao() {
     camposStatus.proximaPreventiva = proxima.data;
     camposStatus.proximaPreventivaDia = proxima.dia;
 
-    if (infoCondensadora && infoCondensadora.tombo) {
-      camposStatus.patrimonio = infoCondensadora.tombo;
+    if (infoTecnica && infoTecnica.condensadora && infoTecnica.condensadora.tombo) {
+      camposStatus.patrimonio = infoTecnica.condensadora.tombo;
     }
 
     await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
@@ -2550,13 +2572,13 @@ async function finalizarConclusao() {
       registrarOrdemServico(item, checklist, avaliacaoEstrelas),
     ];
 
-    if (infoCondensadora) {
+    if (infoTecnica) {
       promessas.push(setDoc(doc(db, "infoCondensadoras", item.id), {
-        ...infoCondensadora,
+        ...infoTecnica,
         equipamentoId: item.id,
         preenchidoPor: ESTADO.usuarioNome || "",
         preenchidoEm: new Date().toISOString(),
-      }));
+      }, { merge: true }));
     }
 
     await Promise.all(promessas);
@@ -2813,6 +2835,81 @@ const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
 if (btnAdicionarEquipamento) {
   btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
 }
+
+$("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
+  toast("Buscando dados técnicos...");
+  try {
+    const snap = await getDocs(collection(db, "infoCondensadoras"));
+    if (snap.empty) {
+      toast("Nenhuma máquina com dados técnicos preenchidos ainda.");
+      return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Condensadoras e Evaporadoras");
+    sheet.columns = [
+      { header: "Patrimônio (sistema)", key: "patrimonio", width: 18 },
+      { header: "Setor", key: "setor", width: 24 },
+      { header: "Ambiente", key: "ambiente", width: 24 },
+      { header: "Prédio", key: "local", width: 14 },
+      { header: "Informante", key: "informante", width: 20 },
+      { header: "Preenchido em", key: "preenchidoEm", width: 18 },
+      { header: "Cond. Nº", key: "condNumero", width: 12 },
+      { header: "Cond. Tombo", key: "condTombo", width: 14 },
+      { header: "Cond. Tag", key: "condTag", width: 14 },
+      { header: "Cond. Marca", key: "condMarca", width: 14 },
+      { header: "Cond. Modelo", key: "condModelo", width: 14 },
+      { header: "Cond. Capacidade", key: "condCapacidade", width: 16 },
+      { header: "Cond. Espessura Fio", key: "condFio", width: 16 },
+      { header: "Evap. Nº", key: "evapNumero", width: 12 },
+      { header: "Evap. Tombo", key: "evapTombo", width: 14 },
+      { header: "Evap. Tag", key: "evapTag", width: 14 },
+      { header: "Evap. Marca", key: "evapMarca", width: 14 },
+      { header: "Evap. Modelo", key: "evapModelo", width: 14 },
+      { header: "Evap. Capacidade", key: "evapCapacidade", width: 16 },
+      { header: "Evap. Espessura Fio", key: "evapFio", width: 16 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+
+    snap.docs.forEach((d) => {
+      const dados = d.data();
+      const item = ESTADO.equipamentos.find((e) => e.id === d.id) || {};
+      const cond = dados.condensadora || {};
+      const evap = dados.evaporadora || {};
+      sheet.addRow({
+        patrimonio: item.patrimonio || "-",
+        setor: item.setor || "-",
+        ambiente: item.ambiente || "-",
+        local: dados.local || item.local || "-",
+        informante: dados.informante || "-",
+        preenchidoEm: dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleString("pt-BR") : "-",
+        condNumero: cond.numero || "-", condTombo: cond.tombo || "-", condTag: cond.tag || "-",
+        condMarca: cond.marca || "-", condModelo: cond.modelo || "-",
+        condCapacidade: cond.capacidade || "-", condFio: cond.espessuraFio || "-",
+        evapNumero: evap.numero || "-", evapTombo: evap.tombo || "-", evapTag: evap.tag || "-",
+        evapMarca: evap.marca || "-", evapModelo: evap.modelo || "-",
+        evapCapacidade: evap.capacidade || "-", evapFio: evap.espessuraFio || "-",
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `condensadoras-pmok-${formatISO(new Date())}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("Planilha baixada!");
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao gerar planilha: " + err.message);
+  }
+});
 
 async function adicionarEquipamentoManual() {
   const patrimonio = $("#eqPatrimonio").value.trim();
@@ -3146,6 +3243,22 @@ async function abrirDrawerEquipamento(id) {
     `<div class="drawer-campo"><span class="rotulo">${c.dataFormatada || "-"}</span>
      <span class="valor">${c.solucionado || "-"} — ${c.descricaoProblema || c.pecaFaltante || "sem descrição"} (${c.equipe || "-"})</span></div>`;
 
+  let infoTecnica = null;
+  try {
+    const snapInfo = await getDoc(doc(db, "infoCondensadoras", id));
+    if (snapInfo.exists()) infoTecnica = snapInfo.data();
+  } catch (err) {
+    console.error("Erro ao buscar dados técnicos:", err);
+  }
+  const linhaInfoUnidade = (rotulo, dados) => {
+    if (!dados) return `<div class="drawer-campo"><span class="rotulo">${rotulo}</span><span class="valor">Ainda não preenchido</span></div>`;
+    return [
+      ["Nº", dados.numero], ["Tombo", dados.tombo], ["Tag", dados.tag],
+      ["Marca", dados.marca], ["Modelo", dados.modelo],
+      ["Capacidade", dados.capacidade], ["Espessura do fio", dados.espessuraFio],
+    ].map(([r, v]) => `<div class="drawer-campo"><span class="rotulo">${rotulo} — ${r}</span><span class="valor">${v || "-"}</span></div>`).join("");
+  };
+
   $("#drawerTitulo").textContent = item.patrimonio ? `Patrimônio ${item.patrimonio}` : item.ambiente;
 
   $("#drawerCorpo").innerHTML = `
@@ -3179,6 +3292,16 @@ async function abrirDrawerEquipamento(id) {
         <div style="margin-top:8px;font-size:11px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.03em">Prováveis (mesmo local, sem patrimônio no chamado)</div>
         ${aproximados.map(linhaChamado).join("")}
       ` : ""}
+    </details>
+
+    <details class="drawer-secao">
+      <summary>Dados técnicos</summary>
+      ${infoTecnica ? `
+        <div class="drawer-campo"><span class="rotulo">Informante</span><span class="valor">${infoTecnica.informante || "-"}</span></div>
+        <div class="drawer-campo"><span class="rotulo">Preenchido em</span><span class="valor">${infoTecnica.preenchidoEm ? new Date(infoTecnica.preenchidoEm).toLocaleString("pt-BR") : "-"}</span></div>
+        ${linhaInfoUnidade("Condensadora", infoTecnica.condensadora)}
+        ${linhaInfoUnidade("Evaporadora", infoTecnica.evaporadora)}
+      ` : '<div class="drawer-campo"><span class="rotulo">Status</span><span class="valor">Ainda não preenchido</span></div>'}
     </details>
 
     <details class="drawer-secao drawer-form">
