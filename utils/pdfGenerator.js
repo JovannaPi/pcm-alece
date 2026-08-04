@@ -46,6 +46,9 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
     <head>
       <meta charset="UTF-8">
       <style>
+        /* Reset para evitar margens fantasma */
+        * { box-sizing: border-box; }
+        
         body {
           font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
           margin: 30px;
@@ -53,44 +56,45 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           font-size: 11px;
           line-height: 1.4;
         }
+
+        /* CABEÇALHO: Float ao invés de Flexbox */
         .header {
+          width: 100%;
           border-bottom: 2px solid #2c3e50;
           padding-bottom: 15px;
           margin-bottom: 25px;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
+          overflow: hidden; /* Força o elemento a conter os floats */
         }
+        .header-left { float: left; width: 60%; }
+        .header-right { float: right; width: 40%; text-align: right; }
+        
         .header-left h1 {
           font-size: 18px;
           text-transform: uppercase;
           margin: 0 0 5px 0;
           color: #2c3e50;
         }
-        .header-left p {
-          margin: 0;
-          color: #555;
-          font-size: 11px;
-        }
-        .header-right {
-          text-align: right;
-          color: #555;
-        }
+        .header-left p { margin: 0; color: #555; font-size: 11px; }
+        .header-right p { margin: 0 0 4px 0; color: #555; }
+
+        /* KPI / RESUMO: Display Table ao invés de Flexbox */
         .summary-box {
+          width: 100%;
+          display: table;
           border: 1px solid #d2d6de;
           background-color: #fcfcfc;
-          padding: 15px;
           margin-bottom: 25px;
-          display: flex;
-          justify-content: space-between;
         }
         .summary-item {
+          display: table-cell;
+          width: 20%; /* 5 itens = 20% cada */
           text-align: center;
-          padding: 0 15px;
+          vertical-align: middle;
+          padding: 15px 10px;
           border-right: 1px solid #eee;
-          flex: 1;
         }
         .summary-item:last-child { border-right: none; }
+        
         .summary-label {
           font-size: 10px;
           color: #666;
@@ -103,6 +107,8 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           font-weight: bold;
           color: #2c3e50;
         }
+
+        /* TÍTULOS DE SEÇÃO */
         .section-title {
           font-size: 13px;
           font-weight: bold;
@@ -111,12 +117,15 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           border-bottom: 1px solid #d2d6de;
           padding-bottom: 5px;
           margin: 30px 0 15px 0;
-          page-break-after: avoid;
+          page-break-after: avoid; /* Evita quebra de página logo após o título */
         }
+
+        /* TABELAS COM LARGURA FIXA */
         table {
           width: 100%;
           border-collapse: collapse;
           margin-bottom: 20px;
+          table-layout: fixed; /* Impede que colunas longas espremam as curtas */
         }
         th {
           background-color: #f4f6f8;
@@ -125,23 +134,32 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           text-transform: uppercase;
           font-size: 10px;
           padding: 8px;
-          text-align: left;
           border-bottom: 2px solid #d2d6de;
         }
         td {
           padding: 8px;
           border-bottom: 1px solid #eee;
           font-size: 11px;
+          word-wrap: break-word;
         }
+        
+        /* ALINHAMENTOS UTILITÁRIOS */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+
+        /* ETIQUETAS DE STATUS */
         .status-badge {
           padding: 3px 6px;
           border-radius: 3px;
           font-size: 10px;
           font-weight: bold;
+          display: inline-block; /* Evita que a tag quebre de linha no meio */
         }
         .concluida { color: #1e7e34; background: #e8f5e9; }
         .andamento { color: #856404; background: #fff3cd; }
         .pendente { color: #c82333; background: #f8d7da; }
+        
         .delta-pos { color: #1e7e34; font-weight: bold; }
         .delta-neg { color: #c82333; font-weight: bold; }
         
@@ -151,8 +169,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           border-top: 1px solid #d2d6de;
           font-size: 9px;
           color: #777;
-          display: flex;
-          justify-content: space-between;
+          overflow: hidden;
         }
       </style>
     </head>
@@ -164,7 +181,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
         </div>
         <div class="header-right">
           <p><strong>Emissão:</strong> ${dataFormatada}</p>
-          <p><strong>Período de Análise:</strong> ${seteDiasAtras.toLocaleDateString('pt-BR')} a ${dataFormatada}</p>
+          <p><strong>Período:</strong> ${seteDiasAtras.toLocaleDateString('pt-BR')} a ${dataFormatada}</p>
         </div>
       </div>
 
@@ -186,7 +203,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           <div class="summary-value">${execucao}%</div>
         </div>
         <div class="summary-item">
-          <div class="summary-label">Produtividade (7 dias)</div>
+          <div class="summary-label">Avanço (7 dias)</div>
           <div class="summary-value">${concluidosSemana} OS</div>
           <div style="font-size: 9px; margin-top: 4px;" class="${deltaSemana > 0 ? 'delta-pos' : deltaSemana < 0 ? 'delta-neg' : ''}">
             ${deltaTexto} vs sem. anterior
@@ -198,12 +215,12 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
       <table>
         <thead>
           <tr>
-            <th>Setor PCM</th>
-            <th style="text-align: center;">Total</th>
-            <th style="text-align: center;">Concluídas</th>
-            <th style="text-align: center;">Em Andamento</th>
-            <th style="text-align: center;">Pendentes</th>
-            <th style="text-align: right;">Avanço</th>
+            <th style="width: 40%;" class="text-left">Setor PCM</th>
+            <th style="width: 12%;" class="text-center">Total</th>
+            <th style="width: 12%;" class="text-center">Concluídas</th>
+            <th style="width: 12%;" class="text-center">Andamento</th>
+            <th style="width: 12%;" class="text-center">Pendentes</th>
+            <th style="width: 12%;" class="text-right">Avanço</th>
           </tr>
         </thead>
         <tbody>
@@ -217,12 +234,12 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
     conteudoHTML += `
       <tr>
-        <td><strong>${setor}</strong></td>
-        <td style="text-align: center;">${itens.length}</td>
-        <td style="text-align: center;">${setorConcluidas}</td>
-        <td style="text-align: center;">${setorAndamento}</td>
-        <td style="text-align: center;">${setorPendentes}</td>
-        <td style="text-align: right;">${setorProgresso}%</td>
+        <td class="text-left"><strong>${setor}</strong></td>
+        <td class="text-center">${itens.length}</td>
+        <td class="text-center">${setorConcluidas}</td>
+        <td class="text-center">${setorAndamento}</td>
+        <td class="text-center">${setorPendentes}</td>
+        <td class="text-right">${setorProgresso}%</td>
       </tr>
     `;
   });
@@ -249,12 +266,12 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
       <table>
         <thead>
           <tr>
-            <th style="width: 15%;">Patrimônio</th>
-            <th style="width: 25%;">Setor</th>
-            <th style="width: 25%;">Ambiente</th>
-            <th style="width: 15%;">Equipe</th>
-            <th style="width: 10%;">Vencimento</th>
-            <th style="width: 10%;">Status</th>
+            <th style="width: 15%;" class="text-left">Patrimônio</th>
+            <th style="width: 25%;" class="text-left">Setor</th>
+            <th style="width: 25%;" class="text-left">Ambiente</th>
+            <th style="width: 12%;" class="text-left">Equipe</th>
+            <th style="width: 11%;" class="text-center">Prazo</th>
+            <th style="width: 12%;" class="text-center">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -269,12 +286,12 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
       conteudoHTML += `
         <tr>
-          <td>${eq.patrimonio || 'S/N'}</td>
-          <td>${eq.setor}</td>
-          <td>${eq.ambiente}</td>
-          <td>${eq.equipeResponsavel || '-'}</td>
-          <td>${dataFormatadaStr}</td>
-          <td><span class="status-badge ${classeStatus}">${eq.statusPreventiva}</span></td>
+          <td class="text-left">${eq.patrimonio || 'S/N'}</td>
+          <td class="text-left">${eq.setor}</td>
+          <td class="text-left">${eq.ambiente}</td>
+          <td class="text-left">${eq.equipeResponsavel || '-'}</td>
+          <td class="text-center">${dataFormatadaStr}</td>
+          <td class="text-center"><span class="status-badge ${classeStatus}">${eq.statusPreventiva}</span></td>
         </tr>
       `;
     });
@@ -289,26 +306,12 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
   conteudoHTML += `
       <div class="footer">
-        <div>Sistema de Manutenção Preventiva — Gerado automaticamente.</div>
-        <div>Página 1</div>
+        <div style="float: left;">Sistema de Manutenção Preventiva — Gerado automaticamente.</div>
+        <div style="float: right;">Página 1</div>
       </div>
     </body>
     </html>
   `;
 
   return conteudoHTML;
-}
-
-function baixarRelatorioPDF(equipamentos, cicloInfo, historico) {
-  const html = gerarRelatorioPDF(equipamentos, cicloInfo, historico);
-
-  const opt = {
-    margin: [10, 10, 10, 10], // Margens mais adequadas para ofício
-    filename: `Relatorio_PMOC_ALECE_${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-  };
-
-  html2pdf().set(opt).from(html).save();
 }
