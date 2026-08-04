@@ -24,8 +24,9 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
   const concluidosSemanaAnterior = historicoSeguro.filter(h =>
     h.statusNovo === 'Concluída' && h.registradoEm >= catorzeDiasAtrasISO && h.registradoEm < seteDiasAtrasISO
   ).length;
+  
   const deltaSemana = concluidosSemana - concluidosSemanaAnterior;
-  const deltaTexto = deltaSemana > 0 ? `+${deltaSemana}` : `${deltaSemana}`;
+  const deltaTexto = deltaSemana > 0 ? `▲ ${deltaSemana}` : deltaSemana < 0 ? `▼ ${Math.abs(deltaSemana)}` : `-`;
 
   const porSetor = {};
   equipamentos.forEach(e => {
@@ -46,90 +47,71 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
       <meta charset="UTF-8">
       <style>
         body {
-          font-family: Arial, sans-serif;
-          margin: 40px;
-          color: #333;
+          font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+          margin: 30px;
+          color: #1a1a1a;
+          font-size: 11px;
+          line-height: 1.4;
         }
-        .cabecalho {
-          border-bottom: 3px solid #1F4E78;
-          padding-bottom: 20px;
-          margin-bottom: 30px;
+        .header {
+          border-bottom: 2px solid #2c3e50;
+          padding-bottom: 15px;
+          margin-bottom: 25px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
         }
-        .titulo {
-          color: #1F4E78;
-          font-size: 24px;
-          font-weight: bold;
+        .header-left h1 {
+          font-size: 18px;
+          text-transform: uppercase;
+          margin: 0 0 5px 0;
+          color: #2c3e50;
+        }
+        .header-left p {
           margin: 0;
+          color: #555;
+          font-size: 11px;
         }
-        .data {
-          color: #666;
-          font-size: 12px;
-          margin-top: 5px;
+        .header-right {
+          text-align: right;
+          color: #555;
         }
-        .kpi-container {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 15px;
-          margin: 30px 0;
-        }
-        .kpi {
-          background: #f9f9f9;
-          border-left: 4px solid #1F4E78;
+        .summary-box {
+          border: 1px solid #d2d6de;
+          background-color: #fcfcfc;
           padding: 15px;
-          border-radius: 4px;
+          margin-bottom: 25px;
+          display: flex;
+          justify-content: space-between;
         }
-        .kpi-label {
-          font-size: 12px;
+        .summary-item {
+          text-align: center;
+          padding: 0 15px;
+          border-right: 1px solid #eee;
+          flex: 1;
+        }
+        .summary-item:last-child { border-right: none; }
+        .summary-label {
+          font-size: 10px;
           color: #666;
           text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
         }
-        .kpi-valor {
-          font-size: 28px;
+        .summary-value {
+          font-size: 20px;
           font-weight: bold;
-          color: #1F4E78;
-          margin-top: 10px;
+          color: #2c3e50;
         }
-        .semana-container {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 15px;
-          margin: 20px 0 30px;
-        }
-        .semana-card {
-          background: #f9f9f9;
-          border-left: 4px solid #C9A34E;
-          padding: 15px;
-          border-radius: 4px;
-        }
-        .semana-label {
-          font-size: 12px;
-          color: #666;
+        .section-title {
+          font-size: 13px;
+          font-weight: bold;
           text-transform: uppercase;
-        }
-        .semana-valor {
-          font-size: 22px;
-          font-weight: bold;
-          color: #1F4E78;
-          margin-top: 8px;
-        }
-        .semana-delta {
-          font-size: 12px;
-          margin-top: 4px;
-        }
-        .delta-positivo { color: #28A745; }
-        .delta-negativo { color: #DC3545; }
-        .delta-neutro { color: #666; }
-        .secao {
-          margin-top: 40px;
-          page-break-inside: avoid;
-        }
-        .secao-titulo {
-          color: #1F4E78;
-          font-size: 16px;
-          font-weight: bold;
-          border-bottom: 2px solid #1F4E78;
-          padding-bottom: 10px;
-          margin-bottom: 15px;
+          color: #2c3e50;
+          border-bottom: 1px solid #d2d6de;
+          padding-bottom: 5px;
+          margin: 30px 0 15px 0;
+          page-break-after: avoid;
         }
         table {
           width: 100%;
@@ -137,102 +119,94 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
           margin-bottom: 20px;
         }
         th {
-          background: #1F4E78;
-          color: white;
-          padding: 12px;
+          background-color: #f4f6f8;
+          color: #333;
+          font-weight: bold;
+          text-transform: uppercase;
+          font-size: 10px;
+          padding: 8px;
           text-align: left;
-          font-size: 12px;
+          border-bottom: 2px solid #d2d6de;
         }
         td {
-          padding: 10px 12px;
-          border-bottom: 1px solid #ddd;
-          font-size: 12px;
-        }
-        tr:nth-child(even) {
-          background: #f9f9f9;
-        }
-        .status-concluida {
-          color: #28A745;
-          font-weight: bold;
-        }
-        .status-andamento {
-          color: #FFC107;
-          font-weight: bold;
-        }
-        .status-pendente {
-          color: #DC3545;
-          font-weight: bold;
-        }
-        .rodape {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #ddd;
+          padding: 8px;
+          border-bottom: 1px solid #eee;
           font-size: 11px;
-          color: #666;
-          text-align: center;
+        }
+        .status-badge {
+          padding: 3px 6px;
+          border-radius: 3px;
+          font-size: 10px;
+          font-weight: bold;
+        }
+        .concluida { color: #1e7e34; background: #e8f5e9; }
+        .andamento { color: #856404; background: #fff3cd; }
+        .pendente { color: #c82333; background: #f8d7da; }
+        .delta-pos { color: #1e7e34; font-weight: bold; }
+        .delta-neg { color: #c82333; font-weight: bold; }
+        
+        .footer {
+          margin-top: 40px;
+          padding-top: 15px;
+          border-top: 1px solid #d2d6de;
+          font-size: 9px;
+          color: #777;
+          display: flex;
+          justify-content: space-between;
         }
       </style>
     </head>
     <body>
-      <div class="cabecalho">
-        <h1 class="titulo">PMOK ALECE - Relatório de Manutenção Preventiva</h1>
-        <div class="data">Gerado em ${dataFormatada} · Período da semana: ${seteDiasAtras.toLocaleDateString('pt-BR')} a ${dataFormatada}</div>
-      </div>
-
-      <div class="kpi-container">
-        <div class="kpi">
-          <div class="kpi-label">Total de Equipamentos</div>
-          <div class="kpi-valor">${equipamentos.length}</div>
+      <div class="header">
+        <div class="header-left">
+          <h1>Relatório de Manutenção PMOC</h1>
+          <p>Assembleia Legislativa do Estado do Ceará (ALECE)</p>
         </div>
-        <div class="kpi">
-          <div class="kpi-label">Concluídas</div>
-          <div class="kpi-valor">${concluidas}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Em Andamento</div>
-          <div class="kpi-valor">${andamento}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Pendentes</div>
-          <div class="kpi-valor">${pendentes}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Taxa de Execução</div>
-          <div class="kpi-valor">${execucao}%</div>
+        <div class="header-right">
+          <p><strong>Emissão:</strong> ${dataFormatada}</p>
+          <p><strong>Período de Análise:</strong> ${seteDiasAtras.toLocaleDateString('pt-BR')} a ${dataFormatada}</p>
         </div>
       </div>
 
-      <div class="secao">
-        <div class="secao-titulo">Progresso da Semana</div>
-        <div class="semana-container">
-          <div class="semana-card">
-            <div class="semana-label">Concluídos nos últimos 7 dias</div>
-            <div class="semana-valor">${concluidosSemana}</div>
-            <div class="semana-delta ${deltaSemana > 0 ? 'delta-positivo' : deltaSemana < 0 ? 'delta-negativo' : 'delta-neutro'}">
-              ${deltaTexto} em relação aos 7 dias anteriores (${concluidosSemanaAnterior})
-            </div>
-          </div>
-          <div class="semana-card">
-            <div class="semana-label">Atrasaram nesta semana</div>
-            <div class="semana-valor">${atrasaramSemana}</div>
+      <div class="summary-box">
+        <div class="summary-item">
+          <div class="summary-label">Total de Equip.</div>
+          <div class="summary-value">${equipamentos.length}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Concluídas</div>
+          <div class="summary-value">${concluidas}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Pendentes</div>
+          <div class="summary-value">${pendentes + andamento}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Execução</div>
+          <div class="summary-value">${execucao}%</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Produtividade (7 dias)</div>
+          <div class="summary-value">${concluidosSemana} OS</div>
+          <div style="font-size: 9px; margin-top: 4px;" class="${deltaSemana > 0 ? 'delta-pos' : deltaSemana < 0 ? 'delta-neg' : ''}">
+            ${deltaTexto} vs sem. anterior
           </div>
         </div>
       </div>
 
-      <div class="secao">
-        <div class="secao-titulo">Resumo por Setor</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Setor</th>
-              <th>Total</th>
-              <th>Concluídas</th>
-              <th>Em Andamento</th>
-              <th>Pendentes</th>
-              <th>Progresso</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div class="section-title">1. Resumo por Setor de Atuação</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Setor PCM</th>
+            <th style="text-align: center;">Total</th>
+            <th style="text-align: center;">Concluídas</th>
+            <th style="text-align: center;">Em Andamento</th>
+            <th style="text-align: center;">Pendentes</th>
+            <th style="text-align: right;">Avanço</th>
+          </tr>
+        </thead>
+        <tbody>
   `;
 
   Object.entries(porSetor).forEach(([setor, itens]) => {
@@ -243,63 +217,64 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
     conteudoHTML += `
       <tr>
-        <td>${setor}</td>
-        <td>${itens.length}</td>
-        <td>${setorConcluidas}</td>
-        <td>${setorAndamento}</td>
-        <td>${setorPendentes}</td>
-        <td>${setorProgresso}%</td>
+        <td><strong>${setor}</strong></td>
+        <td style="text-align: center;">${itens.length}</td>
+        <td style="text-align: center;">${setorConcluidas}</td>
+        <td style="text-align: center;">${setorAndamento}</td>
+        <td style="text-align: center;">${setorPendentes}</td>
+        <td style="text-align: right;">${setorProgresso}%</td>
       </tr>
     `;
   });
 
   conteudoHTML += `
-          </tbody>
-        </table>
-      </div>
+        </tbody>
+      </table>
 
-      <div class="secao">
-        <div class="secao-titulo">Equipamentos em Atraso</div>
+      <div class="section-title">2. Equipamentos com Vencimento Expirado</div>
   `;
 
   if (atrasados.length > 0) {
     const porEquipe = {};
     atrasados.forEach(e => {
-      const equipe = e.equipeResponsavel || 'Sem equipe definida';
+      const equipe = e.equipeResponsavel || 'Não alocada';
       porEquipe[equipe] = (porEquipe[equipe] || 0) + 1;
     });
 
     conteudoHTML += `
-      <p style="font-size:12px;color:#666;margin-bottom:10px">Atrasados por equipe: ${
-        Object.entries(porEquipe).map(([equipe, qtd]) => `${equipe} (${qtd})`).join(' · ')
+      <p style="font-size: 10px; color: #555; margin-bottom: 15px;">
+        <strong>Distribuição do passivo:</strong> ${
+        Object.entries(porEquipe).map(([equipe, qtd]) => `${equipe} (${qtd})`).join(' | ')
       }</p>
       <table>
         <thead>
           <tr>
-            <th>Patrimônio</th>
-            <th>Setor</th>
-            <th>Ambiente</th>
-            <th>Equipe</th>
-            <th>Data Agendada</th>
-            <th>Status</th>
+            <th style="width: 15%;">Patrimônio</th>
+            <th style="width: 25%;">Setor</th>
+            <th style="width: 25%;">Ambiente</th>
+            <th style="width: 15%;">Equipe</th>
+            <th style="width: 10%;">Vencimento</th>
+            <th style="width: 10%;">Status</th>
           </tr>
         </thead>
         <tbody>
     `;
 
     atrasados.forEach(eq => {
-      const classeStatus = eq.statusPreventiva === 'Concluída' ? 'status-concluida'
-        : eq.statusPreventiva === 'Em andamento' ? 'status-andamento'
-        : 'status-pendente';
+      const classeStatus = eq.statusPreventiva === 'Concluída' ? 'concluida'
+        : eq.statusPreventiva === 'Em andamento' ? 'andamento'
+        : 'pendente';
+
+      const dataFormatadaStr = eq.dataAgendada ? eq.dataAgendada.split('-').reverse().join('/') : '-';
 
       conteudoHTML += `
         <tr>
-          <td>${eq.patrimonio || '-'}</td>
+          <td>${eq.patrimonio || 'S/N'}</td>
           <td>${eq.setor}</td>
           <td>${eq.ambiente}</td>
           <td>${eq.equipeResponsavel || '-'}</td>
-          <td>${eq.dataAgendada}</td>
-          <td><span class="${classeStatus}">${eq.statusPreventiva}</span></td>
+          <td>${dataFormatadaStr}</td>
+          <td><span class="status-badge ${classeStatus}">${eq.statusPreventiva}</span></td>
         </tr>
       `;
     });
@@ -309,15 +284,13 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
       </table>
     `;
   } else {
-    conteudoHTML += '<p>Nenhum equipamento atrasado no momento.</p>';
+    conteudoHTML += '<p style="font-style: italic; color: #1e7e34;">Nenhuma não-conformidade de prazo detectada neste ciclo.</p>';
   }
 
   conteudoHTML += `
-      </div>
-
-      <div class="rodape">
-        <p>PMOK ALECE - Sistema de Manutenção Preventiva</p>
-        <p>Assembleia Legislativa do Estado do Ceará</p>
+      <div class="footer">
+        <div>Sistema de Manutenção Preventiva — Gerado automaticamente.</div>
+        <div>Página 1</div>
       </div>
     </body>
     </html>
@@ -330,10 +303,10 @@ function baixarRelatorioPDF(equipamentos, cicloInfo, historico) {
   const html = gerarRelatorioPDF(equipamentos, cicloInfo, historico);
 
   const opt = {
-    margin: 10,
-    filename: `relatorio-pmok-${new Date().toISOString().split('T')[0]}.pdf`,
+    margin: [10, 10, 10, 10], // Margens mais adequadas para ofício
+    filename: `Relatorio_PMOC_ALECE_${new Date().toISOString().split('T')[0]}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
   };
 
