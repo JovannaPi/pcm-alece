@@ -1883,9 +1883,6 @@ function renderCapacidadesPorPredio() {
             
             painelAvancado = `
               <div style="width:100%; margin-top:12px; padding:12px; background:var(--azul-50); border:1px solid var(--borda); border-radius:var(--raio-pequeno);">
-                <label style="display:flex; align-items:center; gap:6px; margin-bottom: 10px; color: var(--azul-900);">
-                  <input type="checkbox" id="chkRodizioAtivo_${slug}" data-local="${local}" class="toggle-rodizio-ativo" ${isRodizioAtivo ? "checked" : ""}>
-                  Revezar entre várias equipes (desmarque para usar apenas uma equipe fixa)
                 </label>
                 <span style="font-size:11px; color:var(--texto-suave); font-weight:600; text-transform:uppercase;">
                   ${isRodizioAtivo ? "Equipes que participam do revezamento:" : "Equipe fixa responsável por todas as vagas:"}
