@@ -387,6 +387,11 @@ function renderSeletorLocal(containerId) {
       renderEquipamentosCadastro();
       renderOrdens();
       renderHistorico();
+
+      // O painel de "dia selecionado" não escuta o filtro sozinho — se
+      // tiver um dia aberto, teria que atualizar ele também, senão fica
+      // mostrando os itens do prédio antigo até a pessoa clicar de novo.
+      if (ESTADO.diaSelecionado) selecionarDia(ESTADO.diaSelecionado);
     });
   });
 }
