@@ -795,6 +795,7 @@ async function gerarCronograma() {
 
       let dataCursor = new Date(primeiraDataUtilGlobal);
       let contador = 0;
+      let diasUteisAgendados = 0; // <--- A ROLETA QUE CONTA OS DIAS
       let grupoAmbienteAtual = null;
       let indiceGrupo = -1;
       let ordem = 0;
@@ -805,7 +806,23 @@ async function gerarCronograma() {
           grupoAmbienteAtual = chaveAmbiente;
           indiceGrupo++;
         }
-        item.equipeResponsavel = nomeEquipePorVaga(local, indiceGrupo, cap.nEquipes);
+
+        // --- A MÁGICA DA ROLETA DIÁRIA ---
+        const nVagas = cap.nEquipes || 1;
+        const slotDaSala = indiceGrupo % nVagas; // Prende a equipe à Vaga do dia (0 ou 1)
+
+        if (cap.modoRodizio && cap.equipesAtivas && cap.equipesAtivas.length > 0) {
+            const pool = cap.equipesAtivas;
+            // Avança no pool 1,2 -> 3,4 -> 5,6 conforme o dia muda
+            const indiceNoPool = (diasUteisAgendados * nVagas + slotDaSala) % pool.length;
+            item.equipeResponsavel = pool[indiceNoPool];
+        } else {
+            // Se o rodízio estiver desligado, usa o comportamento clássico
+            const ordemEquipe = slotDaSala + 1;
+            const encontrada = ESTADO.equipes.find((e) => e.predio === local && e.ordem === ordemEquipe);
+            item.equipeResponsavel = encontrada ? encontrada.nome : `Equipe ${ordemEquipe}`;
+        }
+        // ---------------------------------
 
         ordem++;
         item.ordemExecucao = ordem;
@@ -823,6 +840,7 @@ async function gerarCronograma() {
         contador++;
         if (contador >= capacidadeDia) {
           contador = 0;
+          diasUteisAgendados++; // <--- O DIA ACABOU! A roleta gira para amanhã.
           do { dataCursor.setDate(dataCursor.getDate() + 1); } while (!ehDiaUtil(dataCursor));
         }
       });
