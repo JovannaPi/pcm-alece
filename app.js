@@ -27,7 +27,7 @@ const PRIORIDADE = {
 const NOMES_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const STATUS_VALIDOS = ["Pendente", "Em andamento", "Concluída"];
 const ROTULOS_PERMISSAO = { admin: "Administrador", padrao: "Padrão", trabalhador: "Trabalhador" };
-const CHAVE_VERIFICACAO_ATRASADOS = "pmokVerificacaoAtrasados";
+const CHAVE_VERIFICACAO_ATRASADOS = "PMOCVerificacaoAtrasados";
 
 const CHECKLIST_PREVENTIVA = [
   "Limpeza do filtro de ar",
