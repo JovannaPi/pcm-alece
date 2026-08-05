@@ -1576,42 +1576,19 @@ function iniciarSincronizacaoEquipes() {
 }
 
 function nomeEquipePorVaga(predio, vaga, nEquipesFallback) {
-  // Pega a configuração de rodízio atualizada do prédio
   const cap = (ESTADO.config && ESTADO.config.capacidades && ESTADO.config.capacidades[predio]);
   
-  if (cap && cap.equipesAtivas && cap.equipesAtivas.length > 0) {
-    // A mágica do rodízio: distribui as vagas na ordem das equipes marcadas
+  // MODO NOVO: Se marcou "Definir equipes por nome", usa a lista selecionada
+  if (cap && cap.modoRodizio && cap.equipesAtivas && cap.equipesAtivas.length > 0) {
     const index = vaga % cap.equipesAtivas.length;
     return cap.equipesAtivas[index];
   }
 
-  // Backup de segurança para cronogramas antigos não quebrarem
+  // MODO ANTIGO: Segue puxando pelo número ("Equipes: 2") e a ordem de cadastro
   const ordem = (vaga % (nEquipesFallback || 1)) + 1;
   const encontrada = ESTADO.equipes.find((e) => e.predio === predio && e.ordem === ordem);
   return encontrada ? encontrada.nome : `Equipe ${ordem}`;
 }
-
-// Time atribuído em equipamentos é uma cópia do nome, não uma referência —
-// então renomear a equipe não reflete sozinho no calendário/dashboard.
-// Isso propaga o nome novo pra tudo que já está agendado no ciclo atual.
-async function propagarRenomeacaoEquipe(nomeAntigo, nomeNovo) {
-  if (!ESTADO.cicloAtual) return;
-  const afetados = ESTADO.equipamentos.filter((e) => e.equipeResponsavel === nomeAntigo);
-  if (!afetados.length) return;
-
-  const TAMANHO_LOTE = 400;
-  for (let inicio = 0; inicio < afetados.length; inicio += TAMANHO_LOTE) {
-    const pedaco = afetados.slice(inicio, inicio + TAMANHO_LOTE);
-    const batch = writeBatch(db);
-    pedaco.forEach((item) => {
-      batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), {
-        equipeResponsavel: nomeNovo,
-      });
-    });
-    await batch.commit();
-  }
-}
-
 // Quando duas equipes trocam de posição (extra ↔ rotina), o trabalho que já
 // estava no calendário também troca de dono — não só as vagas futuras.
 async function propagarTrocaDeEquipes(nomeA, nomeB) {
@@ -1849,76 +1826,107 @@ function renderCapacidadesPorPredio() {
 
   container.innerHTML = locais.map((local) => {
     const slug = slugLocal(local);
-    const cap = capacidadesAtuais[local] || { aparelhosDia: 2, rodizio: true, equipesAtivas: [] };
+    const cap = capacidadesAtuais[local] || { nEquipes: 2, aparelhosDia: 2, modoRodizio: false, rodizioAtivo: true, equipesAtivas: [] };
     
-    // Pega as equipes reais cadastradas para este prédio
-    const equipesDoPredio = ESTADO.equipes.filter(e => e.predio === local).sort((a, b) => a.ordem - b.ordem);
+    const modoRodizio = cap.modoRodizio === true;
+    let painelAvancado = "";
     
-    // Se não tem equipe cadastrada no prédio, avisa
-    if (equipesDoPredio.length === 0) {
-      return `
-        <div class="capacidade-linha" style="flex-direction:column; align-items:flex-start; padding: 16px 0; border-bottom: 1px solid var(--borda);">
-          <span class="capacidade-nome" style="font-size:15px;">${local}</span>
-          <span class="muted" style="color: var(--vermelho);">Nenhuma equipe cadastrada. Vá na aba "Configurações > Equipes" primeiro.</span>
-        </div>`;
-    }
-
-    const isRodizio = cap.rodizio !== false; // Padrão é true
-    const ativas = cap.equipesAtivas && cap.equipesAtivas.length > 0 ? cap.equipesAtivas : equipesDoPredio.map(e => e.nome);
-
-    let htmlEquipes = "";
-    if (isRodizio) {
-       htmlEquipes = `<div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
-         ${equipesDoPredio.map(e => `
-           <label style="display:flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
-             <input type="checkbox" class="chk-equipe-${slug}" value="${e.nome}" ${ativas.includes(e.nome) ? "checked" : ""}>
-             ${e.nome}
-           </label>
-         `).join("")}
-       </div>`;
-    } else {
-       htmlEquipes = `<select id="selEquipe_${slug}" style="margin-top:8px; width:100%; max-width:300px;">
-         ${equipesDoPredio.map(e => `
-           <option value="${e.nome}" ${ativas.includes(e.nome) ? "selected" : ""}>${e.nome}</option>
-         `).join("")}
-       </select>`;
+    if (modoRodizio) {
+        const equipesDoPredio = ESTADO.equipes.filter(e => e.predio === local).sort((a, b) => a.ordem - b.ordem);
+        
+        if (equipesDoPredio.length === 0) {
+            painelAvancado = `<div style="width:100%; margin-top:10px; color:var(--vermelho);">Nenhuma equipe cadastrada neste prédio. Vá na aba "Configurações > Equipes".</div>`;
+        } else {
+            const isRodizioAtivo = cap.rodizioAtivo !== false;
+            const ativas = cap.equipesAtivas && cap.equipesAtivas.length > 0 ? cap.equipesAtivas : equipesDoPredio.map(e => e.nome);
+            
+            let htmlEquipes = "";
+            if (isRodizioAtivo) {
+                htmlEquipes = `<div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+                  ${equipesDoPredio.map(e => `
+                    <label style="display:flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+                      <input type="checkbox" class="chk-equipe-${slug}" value="${e.nome}" ${ativas.includes(e.nome) ? "checked" : ""}>
+                      ${e.nome}
+                    </label>
+                  `).join("")}
+                </div>`;
+            } else {
+                htmlEquipes = `<select id="selEquipe_${slug}" style="margin-top:8px; width:100%; max-width:300px;">
+                  ${equipesDoPredio.map(e => `
+                    <option value="${e.nome}" ${ativas.includes(e.nome) ? "selected" : ""}>${e.nome}</option>
+                  `).join("")}
+                </select>`;
+            }
+            
+            painelAvancado = `
+              <div style="width:100%; margin-top:12px; padding:12px; background:var(--azul-50); border:1px solid var(--borda); border-radius:var(--raio-pequeno);">
+                <label style="display:flex; align-items:center; gap:6px; margin-bottom: 10px; color: var(--azul-900);">
+                  <input type="checkbox" id="chkRodizioAtivo_${slug}" data-local="${local}" class="toggle-rodizio-ativo" ${isRodizioAtivo ? "checked" : ""}>
+                  Fazer rodízio entre as equipes selecionadas
+                </label>
+                <span style="font-size:11px; color:var(--texto-suave); font-weight:600; text-transform:uppercase;">
+                  ${isRodizioAtivo ? "Equipes que participam do revezamento:" : "Equipe fixa responsável por todas as vagas:"}
+                </span>
+                ${htmlEquipes}
+              </div>
+            `;
+        }
     }
 
     return `
       <div class="capacidade-linha" style="display:flex; flex-direction:column; align-items:flex-start; padding: 16px 0; border-bottom: 1px solid var(--borda);">
-        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-          <span class="capacidade-nome" style="font-size:15px;">${local}</span>
-          <label style="display:flex; align-items:center; gap:6px;">
-            <input type="checkbox" id="chkRodizio_${slug}" data-local="${local}" class="toggle-rodizio" ${isRodizio ? "checked" : ""}>
-            Fazer rodízio de equipes
+        <div style="display:flex; align-items:center; gap: 16px; width: 100%; flex-wrap: wrap;">
+          <span class="capacidade-nome" style="font-size:14px; min-width: 100px;">${local}</span>
+          
+          <label>Vagas por dia (Capacidade)
+            <input type="number" min="1" id="nEquipes_${slug}" data-local="${local}" class="input-capacidade-equipes" value="${cap.nEquipes}" title="Quantas equipes trabalham simultaneamente por dia neste prédio">
+          </label>
+          
+          <label>Aparelhos/vaga/dia
+            <input type="number" min="1" id="aparelhosDia_${slug}" data-local="${local}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia}">
+          </label>
+          
+          <label style="margin-left: auto; display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="chkModoRodizio_${slug}" data-local="${local}" class="toggle-modo-rodizio" ${modoRodizio ? "checked" : ""}>
+            Definir equipes por nome
           </label>
         </div>
-        
-        <div style="width:100%; margin-top: 10px;">
-          <span style="font-size:11px; color:var(--texto-suave); font-weight:600; text-transform:uppercase;">
-            ${isRodizio ? "Equipes participantes do rodízio:" : "Equipe fixa responsável:"}
-          </span>
-          ${htmlEquipes}
-        </div>
-
-        <div style="margin-top: 16px;">
-          <label style="display:flex; align-items:center; gap:8px;">
-            Aparelhos por equipe por dia:
-            <input type="number" min="1" id="aparelhosDia_${slug}" data-local="${local}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia || 2}" style="width:70px;">
-          </label>
-        </div>
-      </div>`;
+        ${painelAvancado}
+      </div>
+    `;
   }).join("");
 
-  container.querySelectorAll(".toggle-rodizio").forEach(chk => {
+  container.querySelectorAll(".toggle-modo-rodizio").forEach(chk => {
     chk.addEventListener("change", () => {
       const local = chk.dataset.local;
-      const capTemporaria = lerCapacidadesDaTela();
+      const capTemporaria = lerCapacidadesDaTela(); // Salva o número digitado antes de re-renderizar
       if(!ESTADO.config) ESTADO.config = {};
       if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
       
       ESTADO.config.capacidades[local] = capTemporaria[local];
-      ESTADO.config.capacidades[local].rodizio = chk.checked;
+      ESTADO.config.capacidades[local].modoRodizio = chk.checked;
+      renderCapacidadesPorPredio();
+    });
+  });
+
+  container.querySelectorAll(".toggle-rodizio-ativo").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const local = chk.dataset.local;
+      const capTemporaria = lerCapacidadesDaTela();
+      ESTADO.config.capacidades[local] = capTemporaria[local];
+      ESTADO.config.capacidades[local].rodizioAtivo = chk.checked;
+      renderCapacidadesPorPredio();
+    });
+  });
+}
+
+  // Controla o botão "Fazer rodízio / Equipe única" lá dentro
+  container.querySelectorAll(".toggle-rodizio-ativo").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const local = chk.dataset.local;
+      const capTemporaria = lerCapacidadesDaTela();
+      ESTADO.config.capacidades[local] = capTemporaria[local];
+      ESTADO.config.capacidades[local].rodizioAtivo = chk.checked;
       renderCapacidadesPorPredio();
     });
   });
@@ -1931,26 +1939,36 @@ function lerCapacidadesDaTela() {
   locais.forEach((local) => {
     const slug = slugLocal(local);
     const aparInput = $(`#aparelhosDia_${slug}`);
-    const chkRodizio = $(`#chkRodizio_${slug}`);
+    const eqInput = $(`#nEquipes_${slug}`);
+    if (!aparInput || !eqInput) return; 
     
-    // Se o input não existe, pula esse prédio (ex: sem equipes cadastradas)
-    if (!aparInput) return; 
-
-    const rodizio = chkRodizio ? chkRodizio.checked : true;
+    // Agora o número que manda na capacidade diária é SEMPRE o campo de Vagas/Equipes
+    const nEquipesFixas = Math.max(1, parseInt(eqInput.value, 10) || 1);
+    
+    const chkModoRodizio = $(`#chkModoRodizio_${slug}`);
+    const modoRodizio = chkModoRodizio ? chkModoRodizio.checked : false;
+    
+    let rodizioAtivo = true;
     let equipesAtivas = [];
 
-    if (rodizio) {
-       $all(`.chk-equipe-${slug}:checked`).forEach(chk => equipesAtivas.push(chk.value));
-    } else {
-       const sel = $(`#selEquipe_${slug}`);
-       if (sel) equipesAtivas.push(sel.value);
-    }
+    if (modoRodizio) {
+        const chkRodizioAtivo = $(`#chkRodizioAtivo_${slug}`);
+        rodizioAtivo = chkRodizioAtivo ? chkRodizioAtivo.checked : true;
+        
+        if (rodizioAtivo) {
+            $all(`.chk-equipe-${slug}:checked`).forEach(chk => equipesAtivas.push(chk.value));
+        } else {
+            const sel = $(`#selEquipe_${slug}`);
+            if (sel) equipesAtivas.push(sel.value);
+        }
+    } 
 
     capacidades[local] = {
       aparelhosDia: Math.max(1, parseInt(aparInput.value, 10) || 1),
-      rodizio: rodizio,
-      equipesAtivas: equipesAtivas,
-      nEquipes: Math.max(1, equipesAtivas.length) 
+      nEquipes: nEquipesFixas, // A capacidade de trabalho diária fica intacta!
+      modoRodizio: modoRodizio,
+      rodizioAtivo: rodizioAtivo,
+      equipesAtivas: equipesAtivas
     };
   });
   
