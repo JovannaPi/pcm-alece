@@ -1626,11 +1626,9 @@ function renderEquipesPorPredio() {
     const maiorOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0);
     const totalVagas = Math.max(nEquipes, maiorOrdem);
 
-    // Variáveis do sistema novo
     const modoRodizio = cap.modoRodizio === true;
     const ativasPorNome = cap.equipesAtivas && cap.equipesAtivas.length > 0 ? cap.equipesAtivas : equipesDoPredio.map(e => e.nome);
 
-    // Arrays para montar os menus de opções
     const vagasAtivasVazias = [];
     const equipesAcima = [];
     for (let o = 1; o <= nEquipes; o++) {
@@ -1647,22 +1645,24 @@ function renderEquipesPorPredio() {
 
       let badgeHtml = "";
       if (existente) {
-          // Lógica NOVA: Decide as etiquetas ("No rodízio", "Equipe Fixa", "Fora da operação")
           if (modoRodizio) {
               if (ativasPorNome.includes(existente.nome)) {
                   badgeHtml = cap.rodizioAtivo
-                      ? '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px; cursor:default;">No rodízio</span>'
+                      // AZUL para o Rodízio
+                      ? '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: var(--azul-700); color: white;">No rodízio</span>'
+                      // VERDE para Fixa
                       : '<span class="status-select concluido" style="font-size: 10px; padding: 2px 6px; cursor:default;">Equipe fixa</span>';
               } else {
-                  badgeHtml = '<span class="status-select pendente" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave);">Fora da operação</span>';
+                  // CINZA CENTRALIZADO para fora da operação
+                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave); text-align:center; justify-content:center; min-width:115px;">Fora da operação</span>';
               }
-          } 
-          // Lógica ANTIGA (Fallback se o painel avançado estiver desligado)
-          else {
+          } else {
               if (!ehAbaixoDoLimite) {
+                  // AMARELO para o modo de Rotina original
                   badgeHtml = '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px; cursor:default;">Na rotina</span>';
               } else {
-                  badgeHtml = '<span class="status-select pendente" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave);">Reserva</span>';
+                  // CINZA CENTRALIZADO para Reserva
+                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave); text-align:center; justify-content:center; min-width:115px;">Reserva</span>';
               }
           }
       }
@@ -1691,7 +1691,6 @@ function renderEquipesPorPredio() {
         </div>`;
     }
 
-    // Título inteligente para mostrar o modo atual de trabalho no card do prédio
     const subtitulo = modoRodizio 
         ? (cap.rodizioAtivo ? "Sistema de rodízio" : "Equipe fixa única")
         : `${nEquipes} vagas por dia`;
@@ -1709,7 +1708,7 @@ function renderEquipesPorPredio() {
       </div>`;
   }).join("");
 
-  // Re-atachando os eventos (exatamente como já era)
+  // Re-atachando os eventos originais
   container.querySelectorAll(".btn-adicionar-vaga").forEach((btn) => {
     btn.addEventListener("click", () => {
       const predio = btn.dataset.predio;
@@ -1886,7 +1885,7 @@ function renderCapacidadesPorPredio() {
               <div style="width:100%; margin-top:12px; padding:12px; background:var(--azul-50); border:1px solid var(--borda); border-radius:var(--raio-pequeno);">
                 <label style="display:flex; align-items:center; gap:6px; margin-bottom: 10px; color: var(--azul-900);">
                   <input type="checkbox" id="chkRodizioAtivo_${slug}" data-local="${local}" class="toggle-rodizio-ativo" ${isRodizioAtivo ? "checked" : ""}>
-                  Fazer rodízio entre as equipes selecionadas
+                  Revezar entre várias equipes (desmarque para usar apenas uma equipe fixa)
                 </label>
                 <span style="font-size:11px; color:var(--texto-suave); font-weight:600; text-transform:uppercase;">
                   ${isRodizioAtivo ? "Equipes que participam do revezamento:" : "Equipe fixa responsável por todas as vagas:"}
@@ -1912,7 +1911,7 @@ function renderCapacidadesPorPredio() {
           
           <label style="margin-left: auto; display:flex; align-items:center; gap:6px; cursor:pointer;">
             <input type="checkbox" id="chkModoRodizio_${slug}" data-local="${local}" class="toggle-modo-rodizio" ${modoRodizio ? "checked" : ""}>
-            Definir equipes por nome
+            Fazer rodízio
           </label>
         </div>
         ${painelAvancado}
@@ -1923,7 +1922,7 @@ function renderCapacidadesPorPredio() {
   container.querySelectorAll(".toggle-modo-rodizio").forEach(chk => {
     chk.addEventListener("change", () => {
       const local = chk.dataset.local;
-      const capTemporaria = lerCapacidadesDaTela(); // Salva o número digitado antes de re-renderizar
+      const capTemporaria = lerCapacidadesDaTela();
       if(!ESTADO.config) ESTADO.config = {};
       if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
       
