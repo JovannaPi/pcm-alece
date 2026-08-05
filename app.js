@@ -1932,11 +1932,37 @@ function renderCapacidadesPorPredio() {
     });
   });
 
+  container.querySelectorAll(".toggle-modo-rodizio").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const local = chk.dataset.local;
+      const capTemporaria = lerCapacidadesDaTela();
+      
+      if(!ESTADO.config) ESTADO.config = {};
+      if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
+      
+      // REDE DE SEGURANÇA: Se retornar vazio, cria uma configuração padrão
+      ESTADO.config.capacidades[local] = capTemporaria[local] || { 
+          nEquipes: 2, aparelhosDia: 2, modoRodizio: false, rodizioAtivo: true, equipesAtivas: [] 
+      };
+      
+      ESTADO.config.capacidades[local].modoRodizio = chk.checked;
+      renderCapacidadesPorPredio();
+    });
+  });
+
   container.querySelectorAll(".toggle-rodizio-ativo").forEach(chk => {
     chk.addEventListener("change", () => {
       const local = chk.dataset.local;
       const capTemporaria = lerCapacidadesDaTela();
-      ESTADO.config.capacidades[local] = capTemporaria[local];
+      
+      if(!ESTADO.config) ESTADO.config = {};
+      if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
+
+      // REDE DE SEGURANÇA AQUI TAMBÉM
+      ESTADO.config.capacidades[local] = capTemporaria[local] || { 
+          nEquipes: 2, aparelhosDia: 2, modoRodizio: true, rodizioAtivo: true, equipesAtivas: [] 
+      };
+      
       ESTADO.config.capacidades[local].rodizioAtivo = chk.checked;
       renderCapacidadesPorPredio();
     });
