@@ -4291,25 +4291,76 @@ function gerarPDFPMOC(ordem) {
       <head>
         <title>OS PMOC - Patrimônio ${idEquip}</title>
         <style>
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4; margin: 15mm; }
           * { box-sizing: border-box; }
-          body { font-family: "Segoe UI", Roboto, sans-serif; color: #1C2530; margin: 0; background: #fff; font-size: 12px; }
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            color: #1e293b; 
+            margin: 0; 
+            background: #fff; 
+            font-size: 11.5px; 
+            line-height: 1.4;
+          }
           .os-page { max-width: 800px; margin: 0 auto; }
-          .os-topline { display: flex; justify-content: space-between; border-bottom: 2px solid #1C2530; padding-bottom: 8px; margin-bottom: 10px; }
-          .org { font-family: Georgia, serif; font-size: 15px; font-weight: bold; }
-          .dept { font-size: 10px; color: #5B6B7A; }
+          
+          /* Topo limpo com linha fina */
+          .os-topline { 
+            display: flex; 
+            justify-content: space-between; 
+            border-bottom: 1px solid #cbd5e1; 
+            padding-bottom: 12px; 
+            margin-bottom: 15px; 
+          }
+          .org { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; }
+          .dept { font-size: 10px; color: #64748b; margin-top: 2px; }
           .title-block { text-align: right; }
-          .doc-type { font-family: Georgia, serif; font-size: 12px; font-style: italic; color: #5B6B7A; }
-          .chamado-id { font-family: Consolas, monospace; font-size: 15px; font-weight: bold; color: #163A5B; }
-          .os-band { background: #EEF3F8; padding: 6px 10px; font-weight: bold; margin-bottom: 12px; font-size: 12px; }
-          .section-title { font-family: Georgia, serif; font-size: 13px; font-weight: bold; border-bottom: 1px solid #DCE3EA; padding-bottom: 3px; margin: 14px 0 8px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-          .item { border-bottom: 1px dotted #DCE3EA; padding-bottom: 3px; }
-          .lbl { display: block; font-size: 9px; text-transform: uppercase; color: #5B6B7A; }
-          .val { font-size: 13px; font-weight: 500; }
-          .checklist { width: 100%; border-collapse: collapse; margin-top: 6px; }
-          .checklist th, .checklist td { border: 1px solid #DCE3EA; padding: 4px 8px; font-size: 11.5px; text-align: left; }
-          .checkbox-box { width: 16px; height: 16px; border: 1px solid #1C2530; display: inline-block; }
+          .doc-type { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; }
+          .chamado-id { font-family: monospace; font-size: 14px; font-weight: bold; color: #0f172a; }
+        
+          /* Faixa discreta sem cor de IA espalhafatosa */
+          .os-band { 
+            background: #f8fafc; 
+            border-left: 3px solid #0f172a;
+            padding: 8px 12px; 
+            font-weight: 600; 
+            margin-bottom: 15px; 
+            font-size: 11px;
+            color: #334155;
+          }
+        
+          /* Títulos de seção limpos */
+          .section-title { 
+            font-size: 12px; 
+            font-weight: 700; 
+            text-transform: uppercase;
+            color: #475569;
+            border-bottom: 1px solid #f1f5f9; 
+            padding-bottom: 4px; 
+            margin: 18px 0 10px; 
+            letter-spacing: 0.3px;
+          }
+        
+          /* Grid de informações */
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+          .item { background: #fafafa; padding: 6px 8px; border-radius: 4px; border: 1px solid #f1f5f9; }
+          .lbl { display: block; font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 600; }
+          .val { font-size: 12px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+        
+          /* Tabela de checklist elegante */
+          .checklist { width: 100%; border-collapse: collapse; margin-top: 5px; }
+          .checklist th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 10.5px; text-transform: uppercase; }
+          .checklist th, .checklist td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
+          
+          /* Área de assinatura e rodapé */
+          .footer-box {
+            margin-top: 30px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #475569;
+          }
         </style>
       </head>
       <body>
