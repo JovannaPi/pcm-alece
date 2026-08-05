@@ -1920,18 +1920,6 @@ function renderCapacidadesPorPredio() {
   });
 }
 
-  // Controla o botão "Fazer rodízio / Equipe única" lá dentro
-  container.querySelectorAll(".toggle-rodizio-ativo").forEach(chk => {
-    chk.addEventListener("change", () => {
-      const local = chk.dataset.local;
-      const capTemporaria = lerCapacidadesDaTela();
-      ESTADO.config.capacidades[local] = capTemporaria[local];
-      ESTADO.config.capacidades[local].rodizioAtivo = chk.checked;
-      renderCapacidadesPorPredio();
-    });
-  });
-}
-
 function lerCapacidadesDaTela() {
   const capacidades = {};
   const locais = locaisParaConfigurar();
