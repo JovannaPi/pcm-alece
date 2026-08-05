@@ -1575,8 +1575,18 @@ function iniciarSincronizacaoEquipes() {
   }, (err) => console.error("Erro ao ler equipes:", err));
 }
 
-function nomeEquipePorVaga(predio, vaga, nEquipes) {
-  const ordem = (vaga % nEquipes) + 1;
+function nomeEquipePorVaga(predio, vaga, nEquipesFallback) {
+  // Pega a configuração de rodízio atualizada do prédio
+  const cap = (ESTADO.config && ESTADO.config.capacidades && ESTADO.config.capacidades[predio]);
+  
+  if (cap && cap.equipesAtivas && cap.equipesAtivas.length > 0) {
+    // A mágica do rodízio: distribui as vagas na ordem das equipes marcadas
+    const index = vaga % cap.equipesAtivas.length;
+    return cap.equipesAtivas[index];
+  }
+
+  // Backup de segurança para cronogramas antigos não quebrarem
+  const ordem = (vaga % (nEquipesFallback || 1)) + 1;
   const encontrada = ESTADO.equipes.find((e) => e.predio === predio && e.ordem === ordem);
   return encontrada ? encontrada.nome : `Equipe ${ordem}`;
 }
@@ -1839,26 +1849,111 @@ function renderCapacidadesPorPredio() {
 
   container.innerHTML = locais.map((local) => {
     const slug = slugLocal(local);
-    const cap = capacidadesAtuais[local] || { nEquipes: 2, aparelhosDia: 2 };
+    const cap = capacidadesAtuais[local] || { aparelhosDia: 2, rodizio: true, equipesAtivas: [] };
+    
+    // Pega as equipes reais cadastradas para este prédio
+    const equipesDoPredio = ESTADO.equipes.filter(e => e.predio === local).sort((a, b) => a.ordem - b.ordem);
+    
+    // Se não tem equipe cadastrada no prédio, avisa
+    if (equipesDoPredio.length === 0) {
+      return `
+        <div class="capacidade-linha" style="flex-direction:column; align-items:flex-start; padding: 16px 0; border-bottom: 1px solid var(--borda);">
+          <span class="capacidade-nome" style="font-size:15px;">${local}</span>
+          <span class="muted" style="color: var(--vermelho);">Nenhuma equipe cadastrada. Vá na aba "Configurações > Equipes" primeiro.</span>
+        </div>`;
+    }
+
+    const isRodizio = cap.rodizio !== false; // Padrão é true
+    const ativas = cap.equipesAtivas && cap.equipesAtivas.length > 0 ? cap.equipesAtivas : equipesDoPredio.map(e => e.nome);
+
+    let htmlEquipes = "";
+    if (isRodizio) {
+       htmlEquipes = `<div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+         ${equipesDoPredio.map(e => `
+           <label style="display:flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+             <input type="checkbox" class="chk-equipe-${slug}" value="${e.nome}" ${ativas.includes(e.nome) ? "checked" : ""}>
+             ${e.nome}
+           </label>
+         `).join("")}
+       </div>`;
+    } else {
+       htmlEquipes = `<select id="selEquipe_${slug}" style="margin-top:8px; width:100%; max-width:300px;">
+         ${equipesDoPredio.map(e => `
+           <option value="${e.nome}" ${ativas.includes(e.nome) ? "selected" : ""}>${e.nome}</option>
+         `).join("")}
+       </select>`;
+    }
+
     return `
-      <div class="capacidade-linha">
-        <span class="capacidade-nome">${local}</span>
-        <label>Equipes<input type="number" min="1" id="nEquipes_${slug}" data-local="${local}" class="input-capacidade-equipes" value="${cap.nEquipes}"></label>
-        <label>Aparelhos/equipe/dia<input type="number" min="1" id="aparelhosDia_${slug}" data-local="${local}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia}"></label>
+      <div class="capacidade-linha" style="display:flex; flex-direction:column; align-items:flex-start; padding: 16px 0; border-bottom: 1px solid var(--borda);">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+          <span class="capacidade-nome" style="font-size:15px;">${local}</span>
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="chkRodizio_${slug}" data-local="${local}" class="toggle-rodizio" ${isRodizio ? "checked" : ""}>
+            Fazer rodízio de equipes
+          </label>
+        </div>
+        
+        <div style="width:100%; margin-top: 10px;">
+          <span style="font-size:11px; color:var(--texto-suave); font-weight:600; text-transform:uppercase;">
+            ${isRodizio ? "Equipes participantes do rodízio:" : "Equipe fixa responsável:"}
+          </span>
+          ${htmlEquipes}
+        </div>
+
+        <div style="margin-top: 16px;">
+          <label style="display:flex; align-items:center; gap:8px;">
+            Aparelhos por equipe por dia:
+            <input type="number" min="1" id="aparelhosDia_${slug}" data-local="${local}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia || 2}" style="width:70px;">
+          </label>
+        </div>
       </div>`;
   }).join("");
+
+  container.querySelectorAll(".toggle-rodizio").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const local = chk.dataset.local;
+      const capTemporaria = lerCapacidadesDaTela();
+      if(!ESTADO.config) ESTADO.config = {};
+      if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
+      
+      ESTADO.config.capacidades[local] = capTemporaria[local];
+      ESTADO.config.capacidades[local].rodizio = chk.checked;
+      renderCapacidadesPorPredio();
+    });
+  });
 }
 
 function lerCapacidadesDaTela() {
   const capacidades = {};
-  $all(".input-capacidade-equipes").forEach((input) => {
-    const local = input.dataset.local;
-    const aparInput = $(`#aparelhosDia_${slugLocal(local)}`);
+  const locais = locaisParaConfigurar();
+  
+  locais.forEach((local) => {
+    const slug = slugLocal(local);
+    const aparInput = $(`#aparelhosDia_${slug}`);
+    const chkRodizio = $(`#chkRodizio_${slug}`);
+    
+    // Se o input não existe, pula esse prédio (ex: sem equipes cadastradas)
+    if (!aparInput) return; 
+
+    const rodizio = chkRodizio ? chkRodizio.checked : true;
+    let equipesAtivas = [];
+
+    if (rodizio) {
+       $all(`.chk-equipe-${slug}:checked`).forEach(chk => equipesAtivas.push(chk.value));
+    } else {
+       const sel = $(`#selEquipe_${slug}`);
+       if (sel) equipesAtivas.push(sel.value);
+    }
+
     capacidades[local] = {
-      nEquipes: Math.max(1, parseInt(input.value, 10) || 1),
-      aparelhosDia: Math.max(1, parseInt(aparInput?.value, 10) || 1),
+      aparelhosDia: Math.max(1, parseInt(aparInput.value, 10) || 1),
+      rodizio: rodizio,
+      equipesAtivas: equipesAtivas,
+      nEquipes: Math.max(1, equipesAtivas.length) 
     };
   });
+  
   return capacidades;
 }
 
