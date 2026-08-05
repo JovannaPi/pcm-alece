@@ -2289,7 +2289,7 @@ async function registrarAuditoria(acao, detalhes) {
   }
 }
 
-async function registrarOrdemServico(item, checklist, avaliacaoEstrelas) {
+async function registrarOrdemServico(item, checklist, avaliacaoEstrelas, tecnico) {
   const agora = new Date();
 
   // Só apaga ordens duplicadas DENTRO do ciclo atual — ordens de ciclos
@@ -2316,6 +2316,7 @@ async function registrarOrdemServico(item, checklist, avaliacaoEstrelas) {
     registradoEm: agora.toISOString(),
     checklist: checklist || [],
     avaliacaoEstrelas: avaliacaoEstrelas || 0,
+    tecnico: tecnico || "",
   });
 }
 
@@ -2362,7 +2363,9 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
 
   $("#modalConclusaoTitulo").textContent = `Concluir preventiva — ${item.patrimonio || item.ambiente}`;
   $("#modalConclusaoCorpo").innerHTML = `
-    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">O que foi feito na máquina</h3>
+    <label>Técnico responsável *<input type="text" id="tecnicoConclusao" placeholder="Seu nome"></label>
+
+    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 10px">O que foi feito na máquina</h3>
     <div id="checklistPreventiva">
       ${CHECKLIST_PREVENTIVA.map((tarefa, i) => `
         <label class="checklist-item">
@@ -2397,6 +2400,12 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
   $("#btnModalConclusaoCancelar").addEventListener("click", () => fecharModalConclusao(true));
 
   $("#btnModalConclusaoContinuar").addEventListener("click", async () => {
+    const tecnico = $("#tecnicoConclusao").value.trim();
+    if (!tecnico) {
+      toast("Preencha o nome do técnico responsável.");
+      return;
+    }
+    modalConclusaoEstado.tecnico = tecnico;
     modalConclusaoEstado.checklist = CHECKLIST_PREVENTIVA.filter((_, i) => $(`#chkTarefa${i}`).checked);
     modalConclusaoEstado.avaliacaoEstrelas = Number(widget.dataset.valor) || 0;
 
@@ -2539,7 +2548,7 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
   $("#modalConclusaoCorpo").innerHTML = `
     <p class="muted">Só está perguntando o que ainda não está registrado pra essa máquina. Da próxima vez, isso não é perguntado de novo.</p>
     <div class="grid-form">
-      <label>Informante *<input type="text" id="infoInformante" placeholder="Seu nome"></label>
+      <label>Informante<input type="text" value="${modalConclusaoEstado.tecnico}" disabled></label>
       <label>Prédio<input type="text" value="${item.local || "SEDE"}" disabled></label>
     </div>
     ${secaoCond.html}
@@ -2557,11 +2566,7 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
   $("#btnModalConclusaoCancelar2").addEventListener("click", () => fecharModalConclusao(true));
 
   $("#btnModalConclusaoSalvar").addEventListener("click", async () => {
-    const informante = $("#infoInformante").value.trim();
-    if (!informante) {
-      toast("Preencha o informante.");
-      return;
-    }
+    const informante = modalConclusaoEstado.tecnico;
 
     const dadosCond = dadosExistentes.condensadora;
     const dadosEvap = dadosExistentes.evaporadora;
@@ -2585,7 +2590,7 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
 }
 
 async function finalizarConclusao() {
-  const { item, checklist, avaliacaoEstrelas, infoTecnica, statusAnterior, aoAtualizar } = modalConclusaoEstado;
+  const { item, checklist, avaliacaoEstrelas, tecnico, infoTecnica, statusAnterior, aoAtualizar } = modalConclusaoEstado;
   const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
   if (btnSalvar) btnSalvar.disabled = true;
 
@@ -2607,7 +2612,7 @@ async function finalizarConclusao() {
 
     const promessas = [
       registrarHistorico(item, statusAnterior, "Concluída"),
-      registrarOrdemServico(item, checklist, avaliacaoEstrelas),
+      registrarOrdemServico(item, checklist, avaliacaoEstrelas, tecnico),
     ];
 
     if (infoTecnica) {
@@ -2848,6 +2853,33 @@ $("#btnExcluirSelecionadosOrdens")?.addEventListener("click", async () => {
       }
     }
     ESTADO.selecaoOrdens.clear();
+    toast(`${chaves.length} registro(s) excluído(s).`);
+  } catch (err) {
+    console.error(err);
+    toast("Erro ao excluir: " + err.message);
+  }
+});
+
+$("#btnExcluirSelecionadosHistorico")?.addEventListener("click", async () => {
+  const chaves = [...ESTADO.selecaoHistorico];
+  if (!chaves.length) return;
+  const ok = window.confirm(`Excluir ${chaves.length} registro(s) de histórico selecionado(s)?`);
+  if (!ok) return;
+  try {
+    const porCiclo = {};
+    chaves.forEach((ch) => {
+      const [cicloId, id] = ch.split("::");
+      (porCiclo[cicloId] ||= []).push(id);
+    });
+    const TAMANHO_LOTE = 400;
+    for (const [cicloId, ids] of Object.entries(porCiclo)) {
+      for (let inicio = 0; inicio < ids.length; inicio += TAMANHO_LOTE) {
+        const batch = writeBatch(db);
+        ids.slice(inicio, inicio + TAMANHO_LOTE).forEach((id) => batch.delete(doc(db, "ciclos", cicloId, "historico", id)));
+        await batch.commit();
+      }
+    }
+    ESTADO.selecaoHistorico.clear();
     toast(`${chaves.length} registro(s) excluído(s).`);
   } catch (err) {
     console.error(err);
@@ -4237,8 +4269,17 @@ function gerarPDFPMOC(ordem) {
   const ambiente = eqFull.ambiente || ordem.ambiente || "-";
   const prioridade = eqFull.prioridadeSetor || "-";
   const equipe = ordem.equipe || eqFull.equipeResponsavel || "-";
+  const tecnico = ordem.tecnico || "";
 
-  const dataExecucao = ordem.dataAgendada ? ordem.dataAgendada.split("-").reverse().join("/") : "____/____/20___";
+  const dataExecucao = ordem.registradoEm
+    ? new Date(ordem.registradoEm).toLocaleDateString("pt-BR")
+    : (ordem.dataAgendada ? ordem.dataAgendada.split("-").reverse().join("/") : "____/____/20___");
+
+  const checklistFeito = new Set(ordem.checklist || []);
+  const nota = Number(ordem.avaliacaoEstrelas) || 0;
+  const estrelasHtml = [1, 2, 3, 4, 5]
+    .map((n) => `<span style="color:${n <= nota ? "#163A5B" : "#DCE3EA"}">★</span>`)
+    .join("");
 
   const htmlDoc = `
     <html>
@@ -4286,22 +4327,29 @@ function gerarPDFPMOC(ordem) {
             <div class="item"><span class="lbl">Ambiente</span><span class="val">${ambiente}</span></div>
             <div class="item"><span class="lbl">Prioridade do Setor</span><span class="val">${prioridade}</span></div>
             <div class="item"><span class="lbl">Equipe Responsável</span><span class="val">${equipe}</span></div>
+            <div class="item"><span class="lbl">Técnico responsável</span><span class="val">${tecnico || "Não informado"}</span></div>
+            <div class="item"><span class="lbl">Data de conclusão</span><span class="val">${dataExecucao}</span></div>
           </div>
 
-          <div class="section-title">2. Rotina de Manutenção PMOC</div>
+          <div class="section-title">2. Rotina de Manutenção PMOC — o que foi feito</div>
           <table class="checklist">
             <tr><th style="width: 50px; text-align:center;">OK</th><th>Descrição da Tarefa</th></tr>
-            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Limpeza dos filtros de ar e grelhas.</td></tr>
-            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Higienização da bandeja e desobstrução de dreno.</td></tr>
-            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Verificação de ruídos e vibrações.</td></tr>
-            <tr><td style="text-align:center;"><span class="checkbox-box"></span></td><td>Medição de temperatura de insuflamento e retorno.</td></tr>
+            ${CHECKLIST_PREVENTIVA.map((tarefa) => `
+              <tr>
+                <td style="text-align:center;">${checklistFeito.has(tarefa) ? "✔" : ""}</td>
+                <td>${tarefa}</td>
+              </tr>
+            `).join("")}
           </table>
 
-          <div class="section-title" style="margin-top: 40px;">3. Observações e Peças Pendentes</div>
+          <div class="section-title" style="margin-top: 30px;">3. Avaliação do estado da máquina</div>
+          <div style="font-size: 22px; letter-spacing: 4px;">${estrelasHtml}</div>
+
+          <div class="section-title" style="margin-top: 30px;">4. Observações e Peças Pendentes</div>
           <div style="border: 1px solid #DCE3EA; height: 120px; background: #F6F8FA;"></div>
 
           <div style="margin-top: 40px; font-size: 14px; text-align: right; color: #5B6B7A;">
-            Data: ${dataExecucao} &nbsp;&nbsp;&nbsp; Técnico(a): _______________________
+            Técnico(a): ${tecnico || "_______________________"} &nbsp;&nbsp;&nbsp; Assinatura: _______________________
           </div>
 
         </div>
