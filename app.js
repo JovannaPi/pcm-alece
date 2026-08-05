@@ -2627,8 +2627,13 @@ async function finalizarConclusao() {
     camposStatus.proximaPreventiva = proxima.data;
     camposStatus.proximaPreventivaDia = proxima.dia;
 
-    if (infoTecnica && infoTecnica.condensadora && infoTecnica.condensadora.tombo) {
-      camposStatus.patrimonio = infoTecnica.condensadora.tombo;
+    // O patrimônio do equipamento tem que vir do tombo da EVAPORADORA
+    // (é essa etiqueta que vale como patrimônio oficial) — só cai pro
+    // tombo da condensadora se a evaporadora não tiver um informado.
+    const tomboInformado = (infoTecnica && infoTecnica.evaporadora && infoTecnica.evaporadora.tombo)
+      || (infoTecnica && infoTecnica.condensadora && infoTecnica.condensadora.tombo);
+    if (tomboInformado) {
+      camposStatus.patrimonio = tomboInformado;
     }
 
     await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
