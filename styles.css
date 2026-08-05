@@ -1428,6 +1428,21 @@ body.modo-trabalhador .status-select {
   align-items: center;
 }
 
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--fundo); 
+}
+::-webkit-scrollbar-thumb {
+  background: var(--borda-forte); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--azul-700); 
+}
+
 .eq-predio-titulo .badge-capacidade {
   font-family: var(--fonte-corpo);
   font-size: 11px;
