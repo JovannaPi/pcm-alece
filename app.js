@@ -4316,7 +4316,10 @@ function gerarPDFPMOC(ordem) {
       <head>
         <title>OS PMOC - Patrimônio ${idEquip}</title>
         <style>
-          @page { size: A4; margin: 15mm; }
+          @page { 
+            size: A4; 
+            margin: 10mm; /* Força o navegador a ignorar margens extras onde aparecem os rodapés */
+          }
           * { box-sizing: border-box; }
           body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -4326,9 +4329,12 @@ function gerarPDFPMOC(ordem) {
             font-size: 11.5px; 
             line-height: 1.4;
           }
-          .os-page { max-width: 800px; margin: 0 auto; }
+          .os-page { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 5mm; /* Respiro interno para o conteúdo não colar nas bordas da folha */
+          }
           
-          /* Topo limpo com linha fina */
           .os-topline { 
             display: flex; 
             justify-content: space-between; 
@@ -4342,7 +4348,6 @@ function gerarPDFPMOC(ordem) {
           .doc-type { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; }
           .chamado-id { font-family: monospace; font-size: 14px; font-weight: bold; color: #0f172a; }
         
-          /* Faixa discreta sem cor de IA espalhafatosa */
           .os-band { 
             background: #f8fafc; 
             border-left: 3px solid #0f172a;
@@ -4353,7 +4358,6 @@ function gerarPDFPMOC(ordem) {
             color: #334155;
           }
         
-          /* Títulos de seção limpos */
           .section-title { 
             font-size: 12px; 
             font-weight: 700; 
@@ -4365,18 +4369,15 @@ function gerarPDFPMOC(ordem) {
             letter-spacing: 0.3px;
           }
         
-          /* Grid de informações */
           .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
           .item { background: #fafafa; padding: 6px 8px; border-radius: 4px; border: 1px solid #f1f5f9; }
           .lbl { display: block; font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 600; }
           .val { font-size: 12px; font-weight: 600; color: #0f172a; margin-top: 2px; }
         
-          /* Tabela de checklist elegante */
           .checklist { width: 100%; border-collapse: collapse; margin-top: 5px; }
           .checklist th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 10.5px; text-transform: uppercase; }
           .checklist th, .checklist td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
           
-          /* Área de assinatura e rodapé */
           .footer-box {
             margin-top: 30px;
             border-top: 1px solid #e2e8f0;
@@ -4401,8 +4402,6 @@ function gerarPDFPMOC(ordem) {
               <div class="chamado-id">Patrimônio: ${idEquip}</div>
             </div>
           </div>
-
-          <div class="os-band">Rotina PMOC Mensal — ${setor}</div>
 
           <div class="section-title">1. Dados do Equipamento e Localização</div>
           <div class="grid">
