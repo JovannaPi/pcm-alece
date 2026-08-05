@@ -1654,7 +1654,7 @@ function renderEquipesPorPredio() {
                       : '<span class="status-select concluido" style="font-size: 10px; padding: 2px 6px; cursor:default;">Equipe fixa</span>';
               } else {
                   // CINZA CENTRALIZADO para fora da operação
-                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave); text-align:center; justify-content:center; min-width:115px;">Fora da operação</span>';
+                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave); text-align:center; justify-content:center; min-width:115px;">Corretivas</span>';
               }
           } else {
               if (!ehAbaixoDoLimite) {
