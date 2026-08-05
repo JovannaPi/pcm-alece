@@ -387,6 +387,11 @@ function renderSeletorLocal(containerId) {
       renderEquipamentosCadastro();
       renderOrdens();
       renderHistorico();
+
+      // O painel de "dia selecionado" não escuta o filtro sozinho — se
+      // tiver um dia aberto, teria que atualizar ele também, senão fica
+      // mostrando os itens do prédio antigo até a pessoa clicar de novo.
+      if (ESTADO.diaSelecionado) selecionarDia(ESTADO.diaSelecionado);
     });
   });
 }
@@ -4286,22 +4291,24 @@ function gerarPDFPMOC(ordem) {
       <head>
         <title>OS PMOC - Patrimônio ${idEquip}</title>
         <style>
-          body { font-family: "Segoe UI", Roboto, sans-serif; color: #1C2530; margin: 0; background: #fff; }
-          .os-page { padding: 20mm; max-width: 800px; margin: 0 auto; }
-          .os-topline { display: flex; justify-content: space-between; border-bottom: 2px solid #1C2530; padding-bottom: 15px; margin-bottom: 20px; }
-          .org { font-family: Georgia, serif; font-size: 18px; font-weight: bold; }
-          .dept { font-size: 11px; color: #5B6B7A; }
+          @page { size: A4; margin: 10mm; }
+          * { box-sizing: border-box; }
+          body { font-family: "Segoe UI", Roboto, sans-serif; color: #1C2530; margin: 0; background: #fff; font-size: 12px; }
+          .os-page { max-width: 800px; margin: 0 auto; }
+          .os-topline { display: flex; justify-content: space-between; border-bottom: 2px solid #1C2530; padding-bottom: 8px; margin-bottom: 10px; }
+          .org { font-family: Georgia, serif; font-size: 15px; font-weight: bold; }
+          .dept { font-size: 10px; color: #5B6B7A; }
           .title-block { text-align: right; }
-          .doc-type { font-family: Georgia, serif; font-size: 14px; font-style: italic; color: #5B6B7A; }
-          .chamado-id { font-family: Consolas, monospace; font-size: 18px; font-weight: bold; color: #163A5B; }
-          .os-band { background: #EEF3F8; padding: 12px 16px; font-weight: bold; margin-bottom: 25px; }
-          .section-title { font-family: Georgia, serif; font-size: 15px; font-weight: bold; border-bottom: 1px solid #DCE3EA; padding-bottom: 5px; margin: 25px 0 15px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-          .item { border-bottom: 1px dotted #DCE3EA; padding-bottom: 5px; }
-          .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #5B6B7A; }
-          .val { font-size: 15px; font-weight: 500; }
-          .checklist { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          .checklist th, .checklist td { border: 1px solid #DCE3EA; padding: 10px; font-size: 13px; text-align: left; }
+          .doc-type { font-family: Georgia, serif; font-size: 12px; font-style: italic; color: #5B6B7A; }
+          .chamado-id { font-family: Consolas, monospace; font-size: 15px; font-weight: bold; color: #163A5B; }
+          .os-band { background: #EEF3F8; padding: 6px 10px; font-weight: bold; margin-bottom: 12px; font-size: 12px; }
+          .section-title { font-family: Georgia, serif; font-size: 13px; font-weight: bold; border-bottom: 1px solid #DCE3EA; padding-bottom: 3px; margin: 14px 0 8px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          .item { border-bottom: 1px dotted #DCE3EA; padding-bottom: 3px; }
+          .lbl { display: block; font-size: 9px; text-transform: uppercase; color: #5B6B7A; }
+          .val { font-size: 13px; font-weight: 500; }
+          .checklist { width: 100%; border-collapse: collapse; margin-top: 6px; }
+          .checklist th, .checklist td { border: 1px solid #DCE3EA; padding: 4px 8px; font-size: 11.5px; text-align: left; }
           .checkbox-box { width: 16px; height: 16px; border: 1px solid #1C2530; display: inline-block; }
         </style>
       </head>
@@ -4342,13 +4349,13 @@ function gerarPDFPMOC(ordem) {
             `).join("")}
           </table>
 
-          <div class="section-title" style="margin-top: 30px;">3. Avaliação do estado da máquina</div>
-          <div style="font-size: 22px; letter-spacing: 4px;">${estrelasHtml}</div>
+          <div class="section-title">3. Avaliação do estado da máquina</div>
+          <div style="font-size: 18px; letter-spacing: 3px;">${estrelasHtml}</div>
 
-          <div class="section-title" style="margin-top: 30px;">4. Observações e Peças Pendentes</div>
-          <div style="border: 1px solid #DCE3EA; height: 120px; background: #F6F8FA;"></div>
+          <div class="section-title">4. Observações e Peças Pendentes</div>
+          <div style="border: 1px solid #DCE3EA; height: 50px; background: #F6F8FA;"></div>
 
-          <div style="margin-top: 40px; font-size: 14px; text-align: right; color: #5B6B7A;">
+          <div style="margin-top: 18px; font-size: 12px; text-align: right; color: #5B6B7A;">
             Técnico(a): ${tecnico || "_______________________"} &nbsp;&nbsp;&nbsp; Assinatura: _______________________
           </div>
 
