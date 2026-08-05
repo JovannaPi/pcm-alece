@@ -436,9 +436,11 @@ function atualizarBannerAtrasados() {
 
   if (jaFechadoHoje) {
     // Aviso já foi fechado no X hoje — some o aviso, mas deixa a opção
-    // acessível no calendário.
+    // acessível no calendário (só pra admin — reagendar é uma ação de
+    // escrita, e esse botão não era coberto pelo travamento visual do
+    // modo padrão/trabalhador por não ser um .btn.primary).
     banner.hidden = true;
-    if (btnCal) btnCal.hidden = false;
+    if (btnCal) btnCal.hidden = ESTADO.permissao !== "admin";
     return;
   }
 
@@ -1777,6 +1779,22 @@ function renderEquipesPorPredio() {
       const existente = ESTADO.equipes.find((e) => e.id === btn.dataset.id);
       if (!existente) return;
       const destino = btn.dataset.destino;
+
+      // Mover pra outro prédio não é a mesma coisa que renomear/trocar —
+      // os equipamentos que já estavam com essa equipe no prédio antigo
+      // continuam com o nome dela "grudado", mesmo ela não trabalhando
+      // mais lá. Avisa antes, do mesmo jeito que já avisa ao remover um
+      // prédio da lista.
+      const equipamentosPresos = ESTADO.equipamentos.filter(
+        (e) => (e.local || "SEDE") === existente.predio && e.equipeResponsavel === existente.nome
+      );
+      if (equipamentosPresos.length) {
+        const ok = window.confirm(
+          `"${existente.nome}" tem ${equipamentosPresos.length} equipamento(s) agendado(s) em ${existente.predio}. Ao mover pra ${destino}, esses equipamentos vão continuar mostrando "${existente.nome}" como responsável, mesmo ela não trabalhando mais em ${existente.predio}. Quer continuar mesmo assim?`
+        );
+        if (!ok) return;
+      }
+
       const equipesDoDestino = ESTADO.equipes.filter((e) => e.predio === destino);
       const novaOrdem = equipesDoDestino.reduce((max, e) => Math.max(max, e.ordem), 0) + 1;
       try {
@@ -1792,11 +1810,18 @@ function renderEquipesPorPredio() {
 
   container.querySelectorAll(".eq-excluir").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const ok = window.confirm("Excluir essa equipe?");
+      const existente = ESTADO.equipes.find((e) => e.id === btn.dataset.id);
+      const equipamentosPresos = existente
+        ? ESTADO.equipamentos.filter((e) => e.equipeResponsavel === existente.nome)
+        : [];
+      const aviso = equipamentosPresos.length
+        ? `Excluir "${existente.nome}"? Ela tem ${equipamentosPresos.length} equipamento(s) que vão continuar mostrando essa equipe como responsável, mesmo depois de excluída.`
+        : "Excluir essa equipe?";
+      const ok = window.confirm(aviso);
       if (!ok) return;
       try {
         await deleteDoc(doc(db, "equipes", btn.dataset.id));
-        await registrarAuditoria("Excluir equipe", btn.dataset.id);
+        await registrarAuditoria("Excluir equipe", existente ? existente.nome : btn.dataset.id);
         toast("Equipe excluída.");
       } catch (err) {
         console.error(err);
@@ -3245,7 +3270,7 @@ function renderEquipamentosCadastro() {
   const origemFiltro = $("#filtroOrigem")?.value || "";
   const filtrados = aplicarFiltroLocal(ESTADO.equipamentos).filter((item) => {
     if (termo) {
-      const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""}`.toLowerCase();
+      const alvo = `${item.patrimonio || ""} ${item.setor || ""} ${item.ambiente || ""} ${item.setorPCM || ""} ${item.equipeResponsavel || ""}`.toLowerCase();
       if (!alvo.includes(termo)) return false;
     }
     if (statusFiltro) {
