@@ -48,6 +48,7 @@ const CAPACIDADES_CONDENSADORA = [
   "56.000 BTU/h", "60.000 BTU/h",
 ];
 const ESPESSURAS_FIO = ["2.5mm", "4mm", "6mm"];
+const MODELOS_CONDENSADORA = ["Split Hi-Wall", "Split Inverter", "Cassete", "Piso-Teto"];
 const MESES_CICLO = 4;
 
 async function calcularProximaData(item) {
@@ -632,10 +633,18 @@ function classificar(rows) {
     console.log(`${linhasCorrigidas} linha(s) tinham Setor em branco (célula mesclada) e foram corrigidas.`);
   }
 
+  // Conta quantas vezes cada patrimônio já apareceu nesta planilha, pra
+  // desempatar duplicatas reais sem depender da posição da linha — assim
+  // o ID de cada máquina fica estável entre reimportações (o que muda é
+  // só o próprio número de patrimônio), e os dados técnicos já
+  // preenchidos (infoCondensadoras) não se desconectam da máquina só
+  // porque uma linha foi inserida/removida em outro lugar da planilha.
+  const contagemPorPatrimonio = {};
+
   const itens = rows.map((row, idx) => {
     const setor = row[colSetor];
     const ambiente = row[colAmbiente];
-    
+
     // Limpador de valores (Transforma "X" e "-" em vazio)
     const limparValor = (v) => {
       const str = String(v || "").trim();
@@ -646,13 +655,23 @@ function classificar(rows) {
     const patrimonio = colPatrimonio ? limparValor(row[colPatrimonio]) : "";
     const marca = colMarca ? limparValor(row[colMarca]) : "";
     const modelo = colModelo ? limparValor(row[colModelo]) : "";
-    
+
     let capacidade = colPotencia ? limparValor(row[colPotencia]) : "";
-    if (capacidade && !capacidade.toLowerCase().includes("btu")) capacidade += " BTU/h"; 
+    if (capacidade && !capacidade.toLowerCase().includes("btu")) capacidade += " BTU/h";
 
     const setorPCM = identificarSetor(setor, ambiente);
+
+    let id;
+    if (patrimonio) {
+      const base = patrimonio.replace(/[\s/\\"']/g, "_");
+      contagemPorPatrimonio[base] = (contagemPorPatrimonio[base] || 0) + 1;
+      id = contagemPorPatrimonio[base] > 1 ? `${base}_${contagemPorPatrimonio[base]}` : base;
+    } else {
+      id = `item_${idx}`;
+    }
+
     return {
-      id: patrimonio ? `${patrimonio.replace(/[\s/\\"']/g, "_")}_${idx}` : `item_${idx}`,
+      id,
       patrimonio,
       marca,          // <--- Salva no Firebase
       modelo,         // <--- Salva no Firebase
@@ -2467,7 +2486,7 @@ function definirCamposUnidade(tipoUnidade) {
     { chave: "tombo", tipo: "semOutro", rotulo: "Tombo/Patrimônio", labelSem: "Sem tombo", obrigatorio: false },
     { chave: "tag", tipo: "texto", rotulo: "Tag (se tiver)", obrigatorio: false },
     { chave: "marca", tipo: "select", opcoes: MARCAS_CONDENSADORA, rotulo: "Marca", obrigatorio: true },
-    { chave: "modelo", tipo: "semOutro", rotulo: "Modelo", labelSem: "Sem modelo", obrigatorio: false },
+    { chave: "modelo", tipo: "select", opcoes: MODELOS_CONDENSADORA, rotulo: "Modelo", obrigatorio: true },
     { chave: "capacidade", tipo: "select", opcoes: CAPACIDADES_CONDENSADORA, rotulo: "Capacidade", obrigatorio: true },
     { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
   ];
@@ -3456,6 +3475,9 @@ async function abrirDrawerEquipamento(id) {
             `<option value="${l}" ${(item.local || ESTADO.configSite.predios[0]) === l ? "selected" : ""}>${l}</option>`).join("")}
         </select>
       </label>
+      <label>Marca<input type="text" id="drawerMarca" value="${item.marca || ""}" placeholder="Vem da planilha, se tiver"></label>
+      <label>Modelo<input type="text" id="drawerModelo" value="${item.modelo || ""}" placeholder="Vem da planilha, se tiver"></label>
+      <label>Capacidade<input type="text" id="drawerCapacidade" value="${item.capacidade || ""}" placeholder="Vem da planilha, se tiver"></label>
       <div class="drawer-acoes">
         <button class="btn primary" id="drawerSalvarCadastro">Salvar cadastro</button>
       </div>
@@ -3482,6 +3504,9 @@ async function abrirDrawerEquipamento(id) {
     const setor = $("#drawerSetor").value.trim();
     const ambiente = $("#drawerAmbiente").value.trim();
     const local = $("#drawerLocal").value;
+    const marca = $("#drawerMarca").value.trim();
+    const modelo = $("#drawerModelo").value.trim();
+    const capacidade = $("#drawerCapacidade").value.trim();
     if (!setor || !ambiente) {
       toast("Preencha pelo menos Setor e Ambiente.");
       return;
@@ -3489,7 +3514,7 @@ async function abrirDrawerEquipamento(id) {
     const setorPCM = identificarSetor(setor, ambiente);
     try {
       await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
-        patrimonio, setor, ambiente, local, setorPCM,
+        patrimonio, setor, ambiente, local, setorPCM, marca, modelo, capacidade,
         prioridadeSetor: PRIORIDADE[setorPCM] || 7,
         pisoPCM: descobrirPiso(setor),
       });
