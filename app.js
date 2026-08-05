@@ -1620,58 +1620,87 @@ function renderEquipesPorPredio() {
   const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
 
   container.innerHTML = predios.map((predio) => {
-    const nEquipes = (capacidades[predio] && capacidades[predio].nEquipes) || 2;
+    const cap = capacidades[predio] || { nEquipes: 2, modoRodizio: false, rodizioAtivo: true, equipesAtivas: [] };
+    const nEquipes = cap.nEquipes || 2;
     const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === predio).sort((a, b) => a.ordem - b.ordem);
     const maiorOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0);
     const totalVagas = Math.max(nEquipes, maiorOrdem);
 
-    // Usa a MESMA seleção "uma por ordem" (.find) da lista principal em vez
-    // de .filter — assim, se sobrar algum documento duplicado na mesma vaga
-    // (ordem repetida), o menu de trocar não mostra uma equipe "fantasma"
-    // que já sumiu da lista visível.
+    // Variáveis do sistema novo
+    const modoRodizio = cap.modoRodizio === true;
+    const ativasPorNome = cap.equipesAtivas && cap.equipesAtivas.length > 0 ? cap.equipesAtivas : equipesDoPredio.map(e => e.nome);
+
+    // Arrays para montar os menus de opções
     const vagasAtivasVazias = [];
-    const equipesNaRotina = [];
+    const equipesAcima = [];
     for (let o = 1; o <= nEquipes; o++) {
       const eq = equipesDoPredio.find((e) => e.ordem === o);
-      if (eq) equipesNaRotina.push(eq);
+      if (eq) equipesAcima.push(eq);
       else vagasAtivasVazias.push(o);
     }
 
     let linhas = "";
     for (let ordem = 1; ordem <= totalVagas; ordem++) {
       const existente = equipesDoPredio.find((e) => e.ordem === ordem);
-      const ehExtra = ordem > nEquipes;
+      const ehAbaixoDoLimite = ordem > nEquipes;
       const outrosPredios = predios.filter((p) => p !== predio);
+
+      let badgeHtml = "";
+      if (existente) {
+          // Lógica NOVA: Decide as etiquetas ("No rodízio", "Equipe Fixa", "Fora da operação")
+          if (modoRodizio) {
+              if (ativasPorNome.includes(existente.nome)) {
+                  badgeHtml = cap.rodizioAtivo
+                      ? '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px; cursor:default;">No rodízio</span>'
+                      : '<span class="status-select concluido" style="font-size: 10px; padding: 2px 6px; cursor:default;">Equipe fixa</span>';
+              } else {
+                  badgeHtml = '<span class="status-select pendente" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave);">Fora da operação</span>';
+              }
+          } 
+          // Lógica ANTIGA (Fallback se o painel avançado estiver desligado)
+          else {
+              if (!ehAbaixoDoLimite) {
+                  badgeHtml = '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px; cursor:default;">Na rotina</span>';
+              } else {
+                  badgeHtml = '<span class="status-select pendente" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave);">Reserva</span>';
+              }
+          }
+      }
 
       linhas += `
         <div class="eq-linha">
-          <span style="color: var(--borda-forte); cursor: grab; font-size: 14px;" title="Mover ou Reordenar">⋮⋮</span>
+          <span style="color: var(--borda-forte); font-size: 14px; margin-right: 4px;" title="Ordem/Vaga ${ordem}">⋮⋮</span>
           <input type="text" data-predio="${predio}" data-ordem="${ordem}" class="eq-nome-input"
             value="${existente ? existente.nome : ""}" placeholder="Nome da equipe ${ordem}...">
-          ${ehExtra ? '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px;">Extra</span>' : ""}
+          ${badgeHtml}
           <details class="menu-linha">
             <summary>⋯</summary>
             <div class="menu-linha-opcoes">
-              ${existente && ehExtra ? equipesNaRotina.map((ativa) =>
-                `<button class="menu-linha-item eq-promover-btn" data-id="${existente.id}" data-id-destino="${ativa.id}">Trocar com "${ativa.nome}" (rotina)</button>`
+              ${existente && ehAbaixoDoLimite ? equipesAcima.map((ativa) =>
+                `<button class="menu-linha-item eq-promover-btn" data-id="${existente.id}" data-id-destino="${ativa.id}">Trocar posição com "${ativa.nome}"</button>`
               ).join("") : ""}
-              ${existente && ehExtra ? vagasAtivasVazias.map((vaga) =>
-                `<button class="menu-linha-item eq-promover-vaga-btn" data-id="${existente.id}" data-vaga="${vaga}">Mover para vaga ${vaga} da rotina (vazia)</button>`
+              ${existente && ehAbaixoDoLimite ? vagasAtivasVazias.map((vaga) =>
+                `<button class="menu-linha-item eq-promover-vaga-btn" data-id="${existente.id}" data-vaga="${vaga}">Mover para vaga ${vaga} (vazia)</button>`
               ).join("") : ""}
               ${existente ? outrosPredios.map((p) =>
                 `<button class="menu-linha-item eq-mover-btn" data-id="${existente.id}" data-destino="${p}">Mover para ${p}</button>`
               ).join("") : ""}
-              ${existente ? `<button class="menu-linha-item menu-linha-excluir eq-excluir" data-id="${existente.id}">Excluir</button>` : ""}
+              ${existente ? `<button class="menu-linha-item menu-linha-excluir eq-excluir" data-id="${existente.id}">Excluir equipe</button>` : ""}
             </div>
           </details>
         </div>`;
     }
 
+    // Título inteligente para mostrar o modo atual de trabalho no card do prédio
+    const subtitulo = modoRodizio 
+        ? (cap.rodizioAtivo ? "Sistema de rodízio" : "Equipe fixa única")
+        : `${nEquipes} vagas por dia`;
+
     return `
       <div class="eq-predio-card">
         <div class="eq-predio-titulo">
           ${predio}
-          <span class="badge-capacidade">${nEquipes} na rotina</span>
+          <span class="badge-capacidade">${subtitulo}</span>
         </div>
         <div style="margin-bottom: 12px; display: flex; flex-direction: column; flex: 1;">
           ${linhas}
@@ -1680,7 +1709,7 @@ function renderEquipesPorPredio() {
       </div>`;
   }).join("");
 
-  // Re-atachando os eventos (idêntico ao seu original)
+  // Re-atachando os eventos (exatamente como já era)
   container.querySelectorAll(".btn-adicionar-vaga").forEach((btn) => {
     btn.addEventListener("click", () => {
       const predio = btn.dataset.predio;
@@ -1735,7 +1764,7 @@ function renderEquipesPorPredio() {
         await batch.commit();
         await propagarTrocaDeEquipes(extra.nome, ativa.nome);
         await registrarAuditoria("Trocar posição de equipe", `${extra.nome} ↔ ${ativa.nome} — ${extra.predio}`);
-        toast(`"${extra.nome}" agora está na rotina de preventivas, e o calendário foi atualizado.`);
+        toast(`Posições trocadas com sucesso.`);
       } catch (err) {
         console.error(err);
         toast("Erro ao trocar: " + err.message);
@@ -1752,8 +1781,8 @@ function renderEquipesPorPredio() {
       try {
         await updateDoc(doc(db, "equipes", extra.id), { ordem: novaOrdem });
         await propagarRenomeacaoEquipe(nomeVagaFallback, extra.nome);
-        await registrarAuditoria("Promover equipe para a rotina", `${extra.nome} — ${extra.predio}`);
-        toast(`"${extra.nome}" agora está na rotina de preventivas, e o calendário foi atualizado.`);
+        await registrarAuditoria("Mover equipe para vaga vazia", `${extra.nome} — ${extra.predio}`);
+        toast(`Posição alterada com sucesso.`);
       } catch (err) {
         console.error(err);
         toast("Erro ao promover: " + err.message);
@@ -1767,17 +1796,12 @@ function renderEquipesPorPredio() {
       if (!existente) return;
       const destino = btn.dataset.destino;
 
-      // Mover pra outro prédio não é a mesma coisa que renomear/trocar —
-      // os equipamentos que já estavam com essa equipe no prédio antigo
-      // continuam com o nome dela "grudado", mesmo ela não trabalhando
-      // mais lá. Avisa antes, do mesmo jeito que já avisa ao remover um
-      // prédio da lista.
       const equipamentosPresos = ESTADO.equipamentos.filter(
         (e) => (e.local || "SEDE") === existente.predio && e.equipeResponsavel === existente.nome
       );
       if (equipamentosPresos.length) {
         const ok = window.confirm(
-          `"${existente.nome}" tem ${equipamentosPresos.length} equipamento(s) agendado(s) em ${existente.predio}. Ao mover pra ${destino}, esses equipamentos vão continuar mostrando "${existente.nome}" como responsável, mesmo ela não trabalhando mais em ${existente.predio}. Quer continuar mesmo assim?`
+          `"${existente.nome}" tem ${equipamentosPresos.length} equipamento(s) agendado(s) em ${existente.predio}. Ao mover pra ${destino}, esses equipamentos vão continuar mostrando "${existente.nome}" como responsável. Quer continuar mesmo assim?`
         );
         if (!ok) return;
       }
@@ -1802,7 +1826,7 @@ function renderEquipesPorPredio() {
         ? ESTADO.equipamentos.filter((e) => e.equipeResponsavel === existente.nome)
         : [];
       const aviso = equipamentosPresos.length
-        ? `Excluir "${existente.nome}"? Ela tem ${equipamentosPresos.length} equipamento(s) que vão continuar mostrando essa equipe como responsável, mesmo depois de excluída.`
+        ? `Excluir "${existente.nome}"? Ela tem ${equipamentosPresos.length} equipamento(s) que vão continuar mostrando essa equipe como responsável.`
         : "Excluir essa equipe?";
       const ok = window.confirm(aviso);
       if (!ok) return;
