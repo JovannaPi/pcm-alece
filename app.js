@@ -48,7 +48,7 @@ const CAPACIDADES_CONDENSADORA = [
   "56.000 BTU/h", "60.000 BTU/h",
 ];
 const ESPESSURAS_FIO = ["2.5mm", "4mm", "6mm"];
-const MODELOS_CONDENSADORA = ["Split Hi-Wall", "Split Inverter", "Cassete", "Piso-Teto"];
+const MODELOS_EVAPORADORA = ["Split Hi-Wall", "Split Inverter", "Cassete", "Piso-Teto"];
 const MESES_CICLO = 4;
 
 async function calcularProximaData(item) {
@@ -2486,10 +2486,18 @@ function definirCamposUnidade(tipoUnidade) {
     { chave: "tombo", tipo: "semOutro", rotulo: "Tombo/Patrimônio", labelSem: "Sem tombo", obrigatorio: false },
     { chave: "tag", tipo: "texto", rotulo: "Tag (se tiver)", obrigatorio: false },
     { chave: "marca", tipo: "select", opcoes: MARCAS_CONDENSADORA, rotulo: "Marca", obrigatorio: true },
-    { chave: "modelo", tipo: "select", opcoes: MODELOS_CONDENSADORA, rotulo: "Modelo", obrigatorio: true },
     { chave: "capacidade", tipo: "select", opcoes: CAPACIDADES_CONDENSADORA, rotulo: "Capacidade", obrigatorio: true },
     { chave: "espessuraFio", tipo: "select", opcoes: ESPESSURAS_FIO, rotulo: "Espessura do fio de alimentação", obrigatorio: true },
   ];
+
+  // "Modelo" só tem lista fixa (Split Hi-Wall/Inverter/Cassete/Piso-Teto)
+  // pra evaporadora — são formatos de unidade interna. Na condensadora
+  // continua texto livre, como sempre foi.
+  if (tipoUnidade === "evap") {
+    camposBase.push({ chave: "modelo", tipo: "select", opcoes: MODELOS_EVAPORADORA, rotulo: "Modelo", obrigatorio: true });
+  } else {
+    camposBase.push({ chave: "modelo", tipo: "semOutro", rotulo: "Modelo", labelSem: "Sem modelo", obrigatorio: false });
+  }
 
   if (tipoUnidade === "cond") {
     camposBase.unshift({ chave: "numero", tipo: "texto", rotulo: "Nº (Condensadora)", obrigatorio: true });
