@@ -1607,6 +1607,27 @@ function nomeEquipePorVaga(predio, vaga, nEquipesFallback) {
   const encontrada = ESTADO.equipes.find((e) => e.predio === predio && e.ordem === ordem);
   return encontrada ? encontrada.nome : `Equipe ${ordem}`;
 }
+// Time atribuído em equipamentos é uma cópia do nome, não uma referência —
+// então renomear a equipe não reflete sozinho no calendário/dashboard.
+// Isso propaga o nome novo pra tudo que já está agendado no ciclo atual.
+async function propagarRenomeacaoEquipe(nomeAntigo, nomeNovo) {
+  if (!ESTADO.cicloAtual) return;
+  const afetados = ESTADO.equipamentos.filter((e) => e.equipeResponsavel === nomeAntigo);
+  if (!afetados.length) return;
+
+  const TAMANHO_LOTE = 400;
+  for (let inicio = 0; inicio < afetados.length; inicio += TAMANHO_LOTE) {
+    const pedaco = afetados.slice(inicio, inicio + TAMANHO_LOTE);
+    const batch = writeBatch(db);
+    pedaco.forEach((item) => {
+      batch.update(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), {
+        equipeResponsavel: nomeNovo,
+      });
+    });
+    await batch.commit();
+  }
+}
+
 // Quando duas equipes trocam de posição (extra ↔ rotina), o trabalho que já
 // estava no calendário também troca de dono — não só as vagas futuras.
 async function propagarTrocaDeEquipes(nomeA, nomeB) {
@@ -1689,10 +1710,13 @@ function renderEquipesPorPredio() {
           <details class="menu-linha">
             <summary>⋯</summary>
             <div class="menu-linha-opcoes">
-              ${existente && ehAbaixoDoLimite ? equipesAcima.map((ativa) =>
+              ${existente && modoRodizio && !ativasPorNome.includes(existente.nome) ? ativasPorNome.map((nomeAtivo) =>
+                `<button class="menu-linha-item eq-trocar-rodizio-btn" data-predio="${predio}" data-entra="${existente.nome}" data-sai="${nomeAtivo}">Trocar com "${nomeAtivo}" (está no rodízio)</button>`
+              ).join("") : ""}
+              ${existente && !modoRodizio && ehAbaixoDoLimite ? equipesAcima.map((ativa) =>
                 `<button class="menu-linha-item eq-promover-btn" data-id="${existente.id}" data-id-destino="${ativa.id}">Trocar posição com "${ativa.nome}"</button>`
               ).join("") : ""}
-              ${existente && ehAbaixoDoLimite ? vagasAtivasVazias.map((vaga) =>
+              ${existente && !modoRodizio && ehAbaixoDoLimite ? vagasAtivasVazias.map((vaga) =>
                 `<button class="menu-linha-item eq-promover-vaga-btn" data-id="${existente.id}" data-vaga="${vaga}">Mover para vaga ${vaga} (vazia)</button>`
               ).join("") : ""}
               ${existente ? outrosPredios.map((p) =>
@@ -1758,6 +1782,33 @@ function renderEquipesPorPredio() {
       } catch (err) {
         console.error(err);
         toast("Erro ao salvar: " + err.message);
+      }
+    });
+  });
+
+  container.querySelectorAll(".eq-trocar-rodizio-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const predio = btn.dataset.predio;
+      const entra = btn.dataset.entra;
+      const sai = btn.dataset.sai;
+      try {
+        if (!ESTADO.config) ESTADO.config = {};
+        if (!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
+        const cap = ESTADO.config.capacidades[predio] || { nEquipes: 2, aparelhosDia: 2, modoRodizio: true, equipesAtivas: [] };
+        const lista = [...(cap.equipesAtivas || [])];
+        const idx = lista.indexOf(sai);
+        if (idx !== -1) lista[idx] = entra; else lista.push(entra);
+        cap.equipesAtivas = lista;
+        ESTADO.config.capacidades[predio] = cap;
+
+        await setDoc(doc(db, "config", "cronograma"), ESTADO.config);
+        await propagarRenomeacaoEquipe(sai, entra);
+        await registrarAuditoria("Trocar equipe no rodízio", `${sai} → ${entra} — ${predio}`);
+        toast(`"${entra}" entrou no rodízio no lugar de "${sai}".`);
+        renderEquipesPorPredio();
+      } catch (err) {
+        console.error(err);
+        toast("Erro ao trocar: " + err.message);
       }
     });
   });
@@ -3077,7 +3128,21 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
   toast("Buscando dados técnicos...");
   try {
     const snap = await getDocs(collection(db, "infoCondensadoras"));
-    if (snap.empty) {
+    const infoPorId = new Map();
+    snap.docs.forEach((d) => infoPorId.set(d.id, d.data()));
+
+    // Além das máquinas que já passaram pelo formulário de conclusão, inclui
+    // as que já vieram completas da planilha (Marca/Modelo/Capacidade) mas
+    // nunca foram concluídas — senão elas nunca apareciam nesse relatório,
+    // mesmo já tendo o dado técnico disponível.
+    const idsParaExportar = new Set(infoPorId.keys());
+    ESTADO.equipamentos.forEach((item) => {
+      if (!infoPorId.has(item.id) && (item.marca || item.modelo || item.capacidade)) {
+        idsParaExportar.add(item.id);
+      }
+    });
+
+    if (!idsParaExportar.size) {
       toast("Nenhuma máquina com dados técnicos preenchidos ainda.");
       return;
     }
@@ -3159,19 +3224,24 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     });
 
     // Inserindo os Dados
-    snap.docs.forEach((d, index) => {
-      const dados = d.data();
-      const item = ESTADO.equipamentos.find((e) => e.id === d.id) || {};
-      const cond = dados.condensadora || {};
-      const evap = dados.evaporadora || {};
-      
+    [...idsParaExportar].forEach((id, index) => {
+      const dados = infoPorId.get(id) || null;
+      const item = ESTADO.equipamentos.find((e) => e.id === id) || {};
+
+      // Quando a máquina nunca passou pelo formulário (sem "dados"), usa o
+      // que já veio da planilha pros dois lados — não dá pra saber se é da
+      // condensadora ou da evaporadora, então mostra nos dois.
+      const infoPlanilha = { marca: item.marca || "", modelo: item.modelo || "", capacidade: item.capacidade || "" };
+      const cond = dados ? (dados.condensadora || {}) : infoPlanilha;
+      const evap = dados ? (dados.evaporadora || {}) : infoPlanilha;
+
       const row = sheet.addRow({
         patrimonio: item.patrimonio || evap.tombo || "-", // Usa o tombo da evap se não tiver no item principal
         setor: item.setor || "-",
         ambiente: item.ambiente || "-",
-        local: dados.local || item.local || "-",
-        informante: dados.informante || "-",
-        preenchidoEm: dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleDateString("pt-BR") : "-",
+        local: (dados && dados.local) || item.local || "-",
+        informante: dados ? (dados.informante || "-") : "Planilha (levantamento)",
+        preenchidoEm: dados && dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleDateString("pt-BR") : "-",
         condNumero: cond.numero || "-", condTombo: cond.tombo || "-", condTag: cond.tag || "-",
         condMarca: cond.marca || "-", condModelo: cond.modelo || "-",
         condCapacidade: cond.capacidade || "-", condFio: cond.espessuraFio || "-",
@@ -3285,8 +3355,24 @@ async function adicionarEquipamentoManual() {
     const itensDoMesmoLocal = ESTADO.equipamentos.filter((e) => (e.local || "SEDE") === local);
     const maiorOrdem = itensDoMesmoLocal.reduce((max, e) => Math.max(max, e.ordemExecucao || 0), 0);
     const ordemExecucao = maiorOrdem + 1;
-    const capLocal = (ESTADO.config && ESTADO.config.capacidades && ESTADO.config.capacidades[local]) || { nEquipes: 2 };
-    const equipeResponsavel = nomeEquipePorVaga(local, ordemExecucao - 1, capLocal.nEquipes);
+    const capLocal = (ESTADO.config && ESTADO.config.capacidades && ESTADO.config.capacidades[local]) || { nEquipes: 2, aparelhosDia: 2 };
+
+    // Mesma fórmula da "roleta" usada em gerarCronograma() — aproxima em qual
+    // dia esse item cairia (pelo tanto de itens que já existem nesse prédio)
+    // pra escolher a equipe do rodízio de forma consistente com o resto do
+    // cronograma, em vez de uma conta mais simples que ignorava o rodízio.
+    let equipeResponsavel;
+    if (capLocal.modoRodizio && capLocal.equipesAtivas && capLocal.equipesAtivas.length > 0) {
+      const nVagas = Math.max(1, capLocal.nEquipes || 1);
+      const capacidadeDia = nVagas * Math.max(1, capLocal.aparelhosDia || 1);
+      const diasUteisJaUsados = Math.floor(itensDoMesmoLocal.length / capacidadeDia);
+      const slotDaSala = (ordemExecucao - 1) % nVagas;
+      const pool = capLocal.equipesAtivas;
+      const indiceNoPool = (diasUteisJaUsados * nVagas + slotDaSala) % pool.length;
+      equipeResponsavel = pool[indiceNoPool];
+    } else {
+      equipeResponsavel = nomeEquipePorVaga(local, ordemExecucao - 1, capLocal.nEquipes);
+    }
 
     const item = {
       id, patrimonio, setor, ambiente,
@@ -3406,13 +3492,14 @@ function renderEquipamentosCadastro() {
   table.innerHTML = `<thead><tr>
       <th style="width:30px"><input type="checkbox" id="checkTodosEquipamentos"></th>
       <th>Patrimônio</th><th>Setor</th><th>Ambiente</th><th>Prédio</th><th>Setor PCM</th>
-      <th>Status</th><th>Origem</th>
+      <th>Status</th><th>Origem</th><th>Marca/Modelo/Capacidade</th>
       <th id="thCorretivas" style="cursor:pointer" title="Clique para ordenar">Corretivas${setaOrdenacao}</th>
       <th></th>
     </tr></thead><tbody></tbody>`;
   const tbody = table.querySelector("tbody");
 
   itensComCorretivas.forEach(({ item, totalCorretivas }) => {
+    const dadosTecnicos = [item.marca, item.modelo, item.capacidade].filter(Boolean).join(" • ") || "-";
     const tr = document.createElement("tr");
     tr.innerHTML = `<td></td><td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
       <td>${item.local || "SEDE"}</td>
@@ -3422,6 +3509,7 @@ function renderEquipamentosCadastro() {
         ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}
       </td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>
+      <td style="font-size:12px">${dadosTecnicos}</td>
       <td style="text-align:center">${totalCorretivas > 0 ? `<strong>${totalCorretivas}</strong>` : "-"}</td>`;
 
     const tdCheck = tr.children[0];
