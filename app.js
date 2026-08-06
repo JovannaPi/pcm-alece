@@ -1638,7 +1638,7 @@ function renderEquipesPorPredio() {
   const capacidades = (ESTADO.config && ESTADO.config.capacidades) || {};
 
   container.innerHTML = predios.map((predio) => {
-    const cap = capacidades[predio] || { nEquipes: 2, modoRodizio: false, rodizioAtivo: true, equipesAtivas: [] };
+    const cap = capacidades[predio] || { nEquipes: 2, modoRodizio: false, equipesAtivas: [] };
     const nEquipes = cap.nEquipes || 2;
     const equipesDoPredio = ESTADO.equipes.filter((e) => e.predio === predio).sort((a, b) => a.ordem - b.ordem);
     const maiorOrdem = equipesDoPredio.reduce((max, e) => Math.max(max, e.ordem), 0);
@@ -1664,16 +1664,11 @@ function renderEquipesPorPredio() {
       let badgeHtml = "";
       if (existente) {
           if (modoRodizio) {
-              if (ativasPorNome.includes(existente.nome)) {
-                  badgeHtml = cap.rodizioAtivo
-                      // AZUL para o Rodízio
-                      ? '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: var(--azul-700); color: white;">No rodízio</span>'
-                      // VERDE para Fixa
-                      : '<span class="status-select concluido" style="font-size: 10px; padding: 2px 6px; cursor:default;">Equipe fixa</span>';
-              } else {
-                  // CINZA CENTRALIZADO para fora da operação
-                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: #ea580c; color: white;">Corretivas</span>';
-              }
+              badgeHtml = ativasPorNome.includes(existente.nome)
+                  // AZUL para quem está no rodízio
+                  ? '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: var(--azul-700); color: white;">No rodízio</span>'
+                  // LARANJA para quem está cadastrada mas não participa agora
+                  : '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: #ea580c; color: white;">Fora do rodízio</span>';
           } else {
               if (!ehAbaixoDoLimite) {
                   // AMARELO para o modo de Rotina original
@@ -1709,9 +1704,7 @@ function renderEquipesPorPredio() {
         </div>`;
     }
 
-    const subtitulo = modoRodizio 
-        ? (cap.rodizioAtivo ? "Sistema de rodízio" : "Equipe fixa única")
-        : `${nEquipes} vagas por dia`;
+    const subtitulo = modoRodizio ? "Sistema de rodízio" : `${nEquipes} vagas por dia`;
 
     return `
       <div class="eq-predio-card">
@@ -1867,43 +1860,32 @@ function renderCapacidadesPorPredio() {
 
   container.innerHTML = locais.map((local) => {
     const slug = slugLocal(local);
-    const cap = capacidadesAtuais[local] || { nEquipes: 2, aparelhosDia: 2, modoRodizio: false, rodizioAtivo: true, equipesAtivas: [] };
+    const cap = capacidadesAtuais[local] || { nEquipes: 2, aparelhosDia: 2, modoRodizio: false, equipesAtivas: [] };
     
     const modoRodizio = cap.modoRodizio === true;
     let painelAvancado = "";
     
     if (modoRodizio) {
         const equipesDoPredio = ESTADO.equipes.filter(e => e.predio === local).sort((a, b) => a.ordem - b.ordem);
-        
+
         if (equipesDoPredio.length === 0) {
             painelAvancado = `<div style="width:100%; margin-top:10px; color:var(--vermelho);">Nenhuma equipe cadastrada neste prédio. Vá na aba "Configurações > Equipes".</div>`;
         } else {
-            const isRodizioAtivo = cap.rodizioAtivo !== false;
             const ativas = cap.equipesAtivas && cap.equipesAtivas.length > 0 ? cap.equipesAtivas : equipesDoPredio.map(e => e.nome);
-            
-            let htmlEquipes = "";
-            if (isRodizioAtivo) {
-                htmlEquipes = `<div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
-                  ${equipesDoPredio.map(e => `
-                    <label style="display:flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
-                      <input type="checkbox" class="chk-equipe-${slug}" value="${e.nome}" ${ativas.includes(e.nome) ? "checked" : ""}>
-                      ${e.nome}
-                    </label>
-                  `).join("")}
-                </div>`;
-            } else {
-                htmlEquipes = `<select id="selEquipe_${slug}" style="margin-top:8px; width:100%; max-width:300px;">
-                  ${equipesDoPredio.map(e => `
-                    <option value="${e.nome}" ${ativas.includes(e.nome) ? "selected" : ""}>${e.nome}</option>
-                  `).join("")}
-                </select>`;
-            }
-            
+
+            const htmlEquipes = `<div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+              ${equipesDoPredio.map(e => `
+                <label style="display:flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+                  <input type="checkbox" class="chk-equipe-${slug}" value="${e.nome}" ${ativas.includes(e.nome) ? "checked" : ""}>
+                  ${e.nome}
+                </label>
+              `).join("")}
+            </div>`;
+
             painelAvancado = `
               <div style="width:100%; margin-top:12px; padding:12px; background:var(--azul-50); border:1px solid var(--borda); border-radius:var(--raio-pequeno);">
-                </label>
                 <span style="font-size:11px; color:var(--texto-suave); font-weight:600; text-transform:uppercase;">
-                  ${isRodizioAtivo ? "Equipes que participam do revezamento:" : "Equipe fixa responsável por todas as vagas:"}
+                  Equipes que participam do revezamento:
                 </span>
                 ${htmlEquipes}
               </div>
@@ -1938,47 +1920,16 @@ function renderCapacidadesPorPredio() {
     chk.addEventListener("change", () => {
       const local = chk.dataset.local;
       const capTemporaria = lerCapacidadesDaTela();
-      if(!ESTADO.config) ESTADO.config = {};
-      if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
-      
-      ESTADO.config.capacidades[local] = capTemporaria[local];
-      ESTADO.config.capacidades[local].modoRodizio = chk.checked;
-      renderCapacidadesPorPredio();
-    });
-  });
 
-  container.querySelectorAll(".toggle-modo-rodizio").forEach(chk => {
-    chk.addEventListener("change", () => {
-      const local = chk.dataset.local;
-      const capTemporaria = lerCapacidadesDaTela();
-      
-      if(!ESTADO.config) ESTADO.config = {};
-      if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
-      
-      // REDE DE SEGURANÇA: Se retornar vazio, cria uma configuração padrão
-      ESTADO.config.capacidades[local] = capTemporaria[local] || { 
-          nEquipes: 2, aparelhosDia: 2, modoRodizio: false, rodizioAtivo: true, equipesAtivas: [] 
+      if (!ESTADO.config) ESTADO.config = {};
+      if (!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
+
+      // Rede de segurança: se retornar vazio, cria uma configuração padrão
+      ESTADO.config.capacidades[local] = capTemporaria[local] || {
+          nEquipes: 2, aparelhosDia: 2, modoRodizio: false, equipesAtivas: []
       };
-      
+
       ESTADO.config.capacidades[local].modoRodizio = chk.checked;
-      renderCapacidadesPorPredio();
-    });
-  });
-
-  container.querySelectorAll(".toggle-rodizio-ativo").forEach(chk => {
-    chk.addEventListener("change", () => {
-      const local = chk.dataset.local;
-      const capTemporaria = lerCapacidadesDaTela();
-      
-      if(!ESTADO.config) ESTADO.config = {};
-      if(!ESTADO.config.capacidades) ESTADO.config.capacidades = {};
-
-      // REDE DE SEGURANÇA AQUI TAMBÉM
-      ESTADO.config.capacidades[local] = capTemporaria[local] || { 
-          nEquipes: 2, aparelhosDia: 2, modoRodizio: true, rodizioAtivo: true, equipesAtivas: [] 
-      };
-      
-      ESTADO.config.capacidades[local].rodizioAtivo = chk.checked;
       renderCapacidadesPorPredio();
     });
   });
@@ -1999,27 +1950,16 @@ function lerCapacidadesDaTela() {
     
     const chkModoRodizio = $(`#chkModoRodizio_${slug}`);
     const modoRodizio = chkModoRodizio ? chkModoRodizio.checked : false;
-    
-    let rodizioAtivo = true;
-    let equipesAtivas = [];
 
+    const equipesAtivas = [];
     if (modoRodizio) {
-        const chkRodizioAtivo = $(`#chkRodizioAtivo_${slug}`);
-        rodizioAtivo = chkRodizioAtivo ? chkRodizioAtivo.checked : true;
-        
-        if (rodizioAtivo) {
-            $all(`.chk-equipe-${slug}:checked`).forEach(chk => equipesAtivas.push(chk.value));
-        } else {
-            const sel = $(`#selEquipe_${slug}`);
-            if (sel) equipesAtivas.push(sel.value);
-        }
-    } 
+        $all(`.chk-equipe-${slug}:checked`).forEach(chk => equipesAtivas.push(chk.value));
+    }
 
     capacidades[local] = {
       aparelhosDia: Math.max(1, parseInt(aparInput.value, 10) || 1),
       nEquipes: nEquipesFixas, // A capacidade de trabalho diária fica intacta!
       modoRodizio: modoRodizio,
-      rodizioAtivo: rodizioAtivo,
       equipesAtivas: equipesAtivas
     };
   });
