@@ -1689,7 +1689,7 @@ function renderEquipesPorPredio() {
                   // AZUL para quem está no rodízio
                   ? '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: var(--azul-700); color: white;">No rodízio</span>'
                   // LARANJA para quem está cadastrada mas não participa agora
-                  : '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: #ea580c; color: white;">Fora do rodízio</span>';
+                  : '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: #ea580c; color: white;">Corretiva</span>';
           } else {
               if (!ehAbaixoDoLimite) {
                   // AMARELO para o modo de Rotina original
@@ -2009,7 +2009,7 @@ function lerCapacidadesDaTela() {
 
     capacidades[local] = {
       aparelhosDia: Math.max(1, parseInt(aparInput.value, 10) || 1),
-      nEquipes: nEquipesFixas, // A capacidade de trabalho diária fica intacta!
+      nEquipes: nEquipesFixas, 
       modoRodizio: modoRodizio,
       equipesAtivas: equipesAtivas
     };
