@@ -235,7 +235,7 @@ async function carregarChamadosCorretivos(forcar) {
         .find((v) => String(v || "").trim()) || "";
       const dataObj = converterDataCorretiva(linha[COL_CORRETIVA.DATA]);
       return {
-        data: dataObj ? dataObj.toISOString() : "", // formato que ordena certo
+        data: dataObj ? dataObj.toISOString() : "", // formato que ordena cer
         dataFormatada: formatarDataHoraCorretiva(dataObj), // formato que aparece na tela
         equipe: linha[COL_CORRETIVA.EQUIPE] || "",
         chamado: linha[COL_CORRETIVA.CHAMADO] || "",
