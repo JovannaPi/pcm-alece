@@ -1687,16 +1687,16 @@ function renderEquipesPorPredio() {
           if (modoRodizio) {
               badgeHtml = ativasPorNome.includes(existente.nome)
                   // AZUL para quem está no rodízio
-                  ? '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: var(--azul-700); color: white;">No rodízio</span>'
+                  ? '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; flex-shrink:0; white-space:nowrap; background: var(--azul-700); color: white;">No rodízio</span>'
                   // LARANJA para quem está cadastrada mas não participa agora
-                  : '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background: #ea580c; color: white;">Fora do rodízio</span>';
+                  : '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; flex-shrink:0; white-space:nowrap; background: #ea580c; color: white;">Reserva</span>';
           } else {
               if (!ehAbaixoDoLimite) {
                   // AMARELO para o modo de Rotina original
-                  badgeHtml = '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px; cursor:default;">Na rotina</span>';
+                  badgeHtml = '<span class="status-select andamento" style="font-size: 10px; padding: 2px 6px; cursor:default; flex-shrink:0; white-space:nowrap;">Na rotina</span>';
               } else {
                   // CINZA CENTRALIZADO para Reserva
-                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; background:var(--borda); color:var(--texto-suave); text-align:center; justify-content:center; min-width:115px;">Reserva</span>';
+                  badgeHtml = '<span class="status-select" style="font-size: 10px; padding: 2px 6px; cursor:default; flex-shrink:0; white-space:nowrap; background:var(--borda); color:var(--texto-suave); text-align:center; justify-content:center;">Reserva</span>';
               }
           }
       }

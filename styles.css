@@ -1146,7 +1146,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 .drawer-acoes .btn { width: 100%; }
 
 /* Menu de contexto "⋯" nas linhas de tabela */
-.menu-linha { position: relative; display: inline-block; }
+.menu-linha { position: relative; display: inline-block; flex-shrink: 0; }
 .menu-linha summary {
   list-style: none;
   cursor: pointer;
@@ -1474,6 +1474,7 @@ body.modo-trabalhador .status-select {
 
 .eq-nome-input {
   flex: 1;
+  min-width: 0;
   background: transparent !important;
   border: none !important;
   font-size: 13px !important;
