@@ -572,7 +572,6 @@ function processarArquivo(file) {
 
       if (!todasAsLinhas.length) throw new Error("Planilha vazia.");
 
-      // --- O PULO DO GATO ---
       // 1. Limpamos o estado atual para não mostrar dados velhos
       ESTADO.equipamentos = []; 
       ESTADO.ordens = [];
@@ -675,9 +674,9 @@ function classificar(rows) {
     return {
       id,
       patrimonio,
-      marca,          // <--- Salva no Firebase
-      modelo,         // <--- Salva no Firebase
-      capacidade,     // <--- Salva no Firebase
+      marca,         
+      modelo,        
+      capacidade,     
       setor, ambiente,
       local: row.__local || "SEDE",
       statusCondicao: colStatus ? row[colStatus] : "",
@@ -807,7 +806,7 @@ async function gerarCronograma() {
           indiceGrupo++;
         }
 
-        // --- A MÁGICA DA ROLETA DIÁRIA ---
+      
         const nVagas = cap.nEquipes || 1;
         const slotDaSala = indiceGrupo % nVagas; // Prende a equipe à Vaga do dia (0 ou 1)
 
@@ -822,7 +821,7 @@ async function gerarCronograma() {
             const encontrada = ESTADO.equipes.find((e) => e.predio === local && e.ordem === ordemEquipe);
             item.equipeResponsavel = encontrada ? encontrada.nome : `Equipe ${ordemEquipe}`;
         }
-        // ---------------------------------
+    
 
         ordem++;
         item.ordemExecucao = ordem;
@@ -840,7 +839,7 @@ async function gerarCronograma() {
         contador++;
         if (contador >= capacidadeDia) {
           contador = 0;
-          diasUteisAgendados++; // <--- O DIA ACABOU! A roleta gira para amanhã.
+          diasUteisAgendados++; 
           do { dataCursor.setDate(dataCursor.getDate() + 1); } while (!ehDiaUtil(dataCursor));
         }
       });
@@ -927,7 +926,7 @@ async function reagendarTudo(permitirRecuo = false) {
     const pendentes = itensDoPredio
       .filter((e) =>
         (e.statusPreventiva === "Pendente" || (e.statusPreventiva === "Em andamento" && estaAtrasado(e))) &&
-        e.fixadoManualmente !== true // <--- A correção principal está aqui
+        e.fixadoManualmente !== true 
       )
       .sort((a, b) => (a.ordemExecucao || 0) - (b.ordemExecucao || 0));
 
@@ -950,7 +949,6 @@ async function reagendarTudo(permitirRecuo = false) {
         dataCursor = new Date(aA, parseInt(mA, 10) - 1, dA, 12, 0, 0);
       }
 
-      // Continua com a lógica padrão: se o dia não for útil ou estiver cheio, empurra para frente.
       while (!ehDiaUtilLocal(dataCursor) || (ocupacao[formatISO(dataCursor)] || 0) >= capacidadeDia) {
         dataCursor.setDate(dataCursor.getDate() + 1);
       }
@@ -1055,9 +1053,6 @@ $("#btnCancelarEdicaoCfg")?.addEventListener("click", () => {
   preencherFormularioConfigSite(); // Volta os inputs pro valor original se a pessoa desistir
 });
 
-// Prédio é referenciado por nome (texto puro) em equipamentos.local,
-// config.capacidades e equipes.predio — renomear/apagar na lista de
-// prédios sem cascatear deixa tudo isso órfão silenciosamente.
 async function propagarRenomeacaoPredios(renomeacoes) {
   for (const { antigo, novo } of renomeacoes) {
     const afetados = ESTADO.equipamentos.filter((e) => (e.local || "SEDE") === antigo);
@@ -1145,7 +1140,6 @@ $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
     toast("Configurações salvas com sucesso!");
     carregarChamadosCorretivos(true);
 
-    // Sucesso! Volta para o Modo Leitura automaticamente
     $("#btnCancelarEdicaoCfg").click();
 
   } catch (err) {
