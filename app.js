@@ -235,7 +235,7 @@ async function carregarChamadosCorretivos(forcar) {
         .find((v) => String(v || "").trim()) || "";
       const dataObj = converterDataCorretiva(linha[COL_CORRETIVA.DATA]);
       return {
-        data: dataObj ? dataObj.toISOString() : "", // formato que ordena certo
+        data: dataObj ? dataObj.toISOString() : "", // formato que ordena cer
         dataFormatada: formatarDataHoraCorretiva(dataObj), // formato que aparece na tela
         equipe: linha[COL_CORRETIVA.EQUIPE] || "",
         chamado: linha[COL_CORRETIVA.CHAMADO] || "",
@@ -2009,7 +2009,7 @@ function lerCapacidadesDaTela() {
 
     capacidades[local] = {
       aparelhosDia: Math.max(1, parseInt(aparInput.value, 10) || 1),
-      nEquipes: nEquipesFixas, // A capacidade de trabalho diária fica intacta!
+      nEquipes: nEquipesFixas, 
       modoRodizio: modoRodizio,
       equipesAtivas: equipesAtivas
     };
