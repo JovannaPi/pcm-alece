@@ -3597,6 +3597,14 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") fecharDrawer();
 });
 
+// Fecha qualquer menu "⋯" (details.menu-linha) aberto ao clicar fora dele —
+// antes só fechava clicando de novo nos "⋯", o que confundia.
+document.addEventListener("click", (e) => {
+  document.querySelectorAll("details.menu-linha[open]").forEach((det) => {
+    if (!det.contains(e.target)) det.open = false;
+  });
+});
+
 async function abrirDrawerEquipamento(id) {
   await carregarChamadosCorretivos();
   const item = ESTADO.equipamentos.find((e) => e.id === id);
