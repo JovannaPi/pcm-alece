@@ -39,6 +39,7 @@ function base64UrlTexto(texto) {
 
 async function importarChavePrivada(pem) {
   const corpo = pem
+    .replace(/\\n/g, "\n") // caso a quebra de linha tenha vindo como texto "\n" em vez de quebra de linha de verdade
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
     .replace(/\s/g, "");
