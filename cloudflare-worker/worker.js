@@ -41,7 +41,7 @@ async function sha1Hex(texto) {
   return [...new Uint8Array(hashBuffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Confere o token de login do Firebase e devolve o UID, ou null se inválido/expirado.
+// Confere o token de login do Firebase e devolve o UID, ou { erro } se inválido/expirado.
 async function verificarLogin(idToken, env) {
   const resp = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_WEB_API_KEY}`,
@@ -51,9 +51,13 @@ async function verificarLogin(idToken, env) {
       body: JSON.stringify({ idToken }),
     }
   );
-  if (!resp.ok) return null;
-  const dados = await resp.json();
-  return dados.users?.[0]?.localId || null;
+  const dados = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    return { erro: dados.error?.message || `HTTP ${resp.status} do Firebase` };
+  }
+  const uid = dados.users?.[0]?.localId;
+  if (!uid) return { erro: "Token válido mas sem usuário associado." };
+  return { uid };
 }
 
 // Confere se a conta não está bloqueada — mesma regra que o resto do app já
@@ -82,8 +86,9 @@ export default {
     const idToken = cabecalhoAuth.replace(/^Bearer\s+/i, "");
     if (!idToken) return respostaJson({ erro: "Faça login primeiro." }, 401);
 
-    const uid = await verificarLogin(idToken, env);
-    if (!uid) return respostaJson({ erro: "Sessão inválida ou expirada. Faça login de novo." }, 401);
+    const resultadoLogin = await verificarLogin(idToken, env);
+    if (resultadoLogin.erro) return respostaJson({ erro: "Falha no login: " + resultadoLogin.erro }, 401);
+    const uid = resultadoLogin.uid;
 
     const podeEnviar = await naoEstaBloqueado(uid, idToken, env);
     if (!podeEnviar) return respostaJson({ erro: "Conta bloqueada." }, 403);
