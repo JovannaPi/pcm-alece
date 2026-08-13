@@ -25,7 +25,10 @@
 // E precisa estar COMPARTILHADA (botão "Compartilhar" na planilha) com o
 // e-mail da conta de serviço, com permissão de Editor.
 
-const ESCOPOS_GOOGLE = "https://www.googleapis.com/auth/datastore.readonly https://www.googleapis.com/auth/spreadsheets";
+// Escopo "datastore" (não ".readonly") porque a API do Firestore precisa
+// dele mesmo só pra ler -- quem realmente impede escrita é o papel "Cloud
+// Datastore Viewer" dado à conta de serviço no IAM, não o escopo em si.
+const ESCOPOS_GOOGLE = "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/spreadsheets";
 
 function base64Url(bytes) {
   let binario = "";
