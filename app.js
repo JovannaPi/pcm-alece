@@ -141,6 +141,74 @@ function estaAtrasado(item) {
   return item.dataAgendada < formatISO(new Date());
 }
 
+// Assina/envia fotos via um Worker da Cloudflare (não pelo Firebase Storage —
+// exigiria plano pago só pra habilitar). O Worker confere se quem está
+// pedindo está de verdade logado e não bloqueado antes de autorizar o envio;
+// a "senha" do Cloudinary nunca fica exposta no navegador. Troque a URL
+// abaixo pela do seu Worker depois de publicá-lo.
+const URL_UPLOAD_FOTO = "https://pmoc-fotos.SEU-SUBDOMINIO.workers.dev";
+
+// Redimensiona/comprime a foto no navegador ANTES de enviar — senão uma
+// foto de celular (4-8MB) come a cota gratuita rapidinho.
+function comprimirImagem(file, larguraMax = 1280, qualidade = 0.75) {
+  return new Promise((resolve, reject) => {
+    const imagem = new Image();
+    const urlTemp = URL.createObjectURL(file);
+    imagem.onload = () => {
+      const escala = Math.min(1, larguraMax / imagem.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(imagem.width * escala);
+      canvas.height = Math.round(imagem.height * escala);
+      canvas.getContext("2d").drawImage(imagem, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(urlTemp);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Falha ao comprimir a imagem."))),
+        "image/jpeg",
+        qualidade
+      );
+    };
+    imagem.onerror = () => { URL.revokeObjectURL(urlTemp); reject(new Error("Não consegui ler essa imagem.")); };
+    imagem.src = urlTemp;
+  });
+}
+
+// Pede uma assinatura autorizada ao Worker e envia a foto (já comprimida)
+// direto pro Cloudinary. `destino` é { folder } para o histórico de
+// preventivas, ou { publicId, overwrite: true } pra sobrescrever a foto
+// fixa do equipamento.
+async function enviarFoto(file, destino) {
+  const blobComprimido = await comprimirImagem(file);
+  const idToken = await auth.currentUser.getIdToken();
+
+  const respAssinatura = await fetch(URL_UPLOAD_FOTO, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + idToken, "Content-Type": "application/json" },
+    body: JSON.stringify(destino || {}),
+  });
+  if (!respAssinatura.ok) {
+    const erro = await respAssinatura.json().catch(() => ({}));
+    throw new Error(erro.erro || "Não autorizado a enviar foto.");
+  }
+  const assinatura = await respAssinatura.json();
+
+  const formData = new FormData();
+  formData.append("file", blobComprimido, "foto.jpg");
+  formData.append("api_key", assinatura.apiKey);
+  formData.append("timestamp", assinatura.timestamp);
+  formData.append("signature", assinatura.signature);
+  if (assinatura.folder) formData.append("folder", assinatura.folder);
+  if (assinatura.publicId) formData.append("public_id", assinatura.publicId);
+  if (assinatura.overwrite) formData.append("overwrite", assinatura.overwrite);
+
+  const respUpload = await fetch(`https://api.cloudinary.com/v1_1/${assinatura.cloudName}/image/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!respUpload.ok) throw new Error("Falha ao enviar a foto.");
+  const dados = await respUpload.json();
+  return dados.secure_url;
+}
+
 const ESTADO = {
   meta: null,
   itensCarregados: [],
@@ -152,7 +220,7 @@ const ESTADO = {
   chamadosCorretivos: [],
   usuarioNome: null,
   permissao: "padrao",
-configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: "", predios: ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"] },
+configSite: { mesesCiclo: MESES_CICLO, urlCorretivas: "", predios: ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"], fotoObrigatoria: false },
   selecaoEquipamentos: new Set(),
   selecaoHistorico: new Set(),
   equipes: [],
@@ -1015,6 +1083,7 @@ async function carregarConfigSite() {
         mesesCiclo: dados.mesesCiclo || MESES_CICLO,
         urlCorretivas: dados.urlCorretivas || URL_CHAMADOS_CORRETIVOS,
         predios: (dados.predios && dados.predios.length) ? dados.predios : ["SEDE", "ANEXO 1", "ANEXO 2", "ANEXO 3", "ANEXO 4"],
+        fotoObrigatoria: dados.fotoObrigatoria === true,
       };
     }
     preencherFormularioConfigSite();
@@ -1028,11 +1097,13 @@ function preencherFormularioConfigSite() {
   if ($("#cfgMesesCiclo")) $("#cfgMesesCiclo").value = ESTADO.configSite.mesesCiclo;
   if ($("#cfgUrlCorretivas")) $("#cfgUrlCorretivas").value = ESTADO.configSite.urlCorretivas;
   if ($("#cfgPredios")) $("#cfgPredios").value = ESTADO.configSite.predios.join("\n");
+  if ($("#cfgFotoObrigatoria")) $("#cfgFotoObrigatoria").checked = ESTADO.configSite.fotoObrigatoria === true;
 
   // Preenche os textos visuais (Modo Leitura)
   if ($("#txtCfgMeses")) $("#txtCfgMeses").textContent = ESTADO.configSite.mesesCiclo + " meses";
   if ($("#txtCfgUrl")) $("#txtCfgUrl").textContent = ESTADO.configSite.urlCorretivas || "Nenhum link configurado";
   if ($("#txtCfgPredios")) $("#txtCfgPredios").textContent = ESTADO.configSite.predios.join(" · ");
+  if ($("#txtCfgFoto")) $("#txtCfgFoto").textContent = ESTADO.configSite.fotoObrigatoria ? "Obrigatória" : "Opcional";
 
   // CORREÇÃO: Preenche automaticamente as opções de Prédio no cadastro de equipamentos
   const selectEqLocal = $("#eqLocal");
@@ -1101,6 +1172,7 @@ $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
   const mesesCiclo = Math.max(1, parseInt($("#cfgMesesCiclo").value, 10) || 4);
   const urlCorretivas = $("#cfgUrlCorretivas").value.trim();
   const predios = $("#cfgPredios").value.split("\n").map((p) => p.trim()).filter(Boolean);
+  const fotoObrigatoria = $("#cfgFotoObrigatoria")?.checked === true;
 
   if (!predios.length) {
     toast("Coloca pelo menos um prédio na lista.");
@@ -1132,7 +1204,7 @@ $("#btnSalvarConfigSite")?.addEventListener("click", async () => {
     }
   }
 
-  const novaConfig = { mesesCiclo, urlCorretivas, predios };
+  const novaConfig = { mesesCiclo, urlCorretivas, predios, fotoObrigatoria };
   try {
     await setDoc(doc(db, "config", "site"), novaConfig);
     ESTADO.configSite = novaConfig;
@@ -2464,7 +2536,7 @@ function renderDashboard() {
   renderVisaoGerencial();
 }
 
-async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva") {
+async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Preventiva", fotoUrl = "") {
   const agora = new Date();
   await addDoc(collection(     db,     "ciclos",     ESTADO.cicloAtual,     "historico" ), {
     equipamentoId: item.id,
@@ -2477,6 +2549,7 @@ async function registrarHistorico(item, statusAnterior, statusNovo, tipo = "Prev
     tipo,
     statusAnterior: statusAnterior || "-",
     statusNovo: statusNovo,
+    fotoUrl: fotoUrl || "",
     registradoEm: agora.toISOString()
   });
 }
@@ -2585,6 +2658,8 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
       ${[1, 2, 3, 4, 5].map((n) => `<span class="estrela" data-valor="${n}">★</span>`).join("")}
     </div>
 
+    <label>Foto da máquina${ESTADO.configSite.fotoObrigatoria ? " *" : " (opcional)"}<input type="file" accept="image/*" capture="environment" id="fotoConclusaoInput"></label>
+
     <div style="display:flex;gap:12px;margin-top:24px">
       <button class="btn primary" id="btnModalConclusaoContinuar">Continuar</button>
       <button class="btn ghost" id="btnModalConclusaoCancelar">Cancelar</button>
@@ -2610,7 +2685,13 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
       toast("Preencha o nome do técnico responsável.");
       return;
     }
+    const arquivoFoto = $("#fotoConclusaoInput")?.files?.[0] || null;
+    if (ESTADO.configSite.fotoObrigatoria && !arquivoFoto) {
+      toast("Tire uma foto da máquina pra concluir (obrigatório).");
+      return;
+    }
     modalConclusaoEstado.tecnico = tecnico;
+    modalConclusaoEstado.fotoFile = arquivoFoto;
     modalConclusaoEstado.checklist = CHECKLIST_PREVENTIVA.filter((_, i) => $(`#chkTarefa${i}`).checked);
     modalConclusaoEstado.avaliacaoEstrelas = Number(widget.dataset.valor) || 0;
 
@@ -2803,7 +2884,7 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
 }
 
 async function finalizarConclusao() {
-  const { item, checklist, avaliacaoEstrelas, tecnico, infoTecnica, statusAnterior, aoAtualizar } = modalConclusaoEstado;
+  const { item, checklist, avaliacaoEstrelas, tecnico, infoTecnica, statusAnterior, aoAtualizar, fotoFile } = modalConclusaoEstado;
   const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
   if (btnSalvar) btnSalvar.disabled = true;
 
@@ -2825,11 +2906,17 @@ async function finalizarConclusao() {
       camposStatus.patrimonio = tomboInformado;
     }
 
+    let fotoUrl = "";
+    if (fotoFile) {
+      toast("Enviando foto...");
+      fotoUrl = await enviarFoto(fotoFile, { folder: `equipamentos/${item.id}/preventivas` });
+    }
+
     await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", item.id), camposStatus);
     Object.assign(item, camposStatus);
 
     const promessas = [
-      registrarHistorico(item, statusAnterior, "Concluída"),
+      registrarHistorico(item, statusAnterior, "Concluída", "Preventiva", fotoUrl),
       registrarOrdemServico(item, checklist, avaliacaoEstrelas, tecnico),
     ];
 
@@ -3637,6 +3724,7 @@ async function abrirDrawerEquipamento(id) {
     : "Nunca registrada";
 
   const totalPreventivas = conclusoes.length;
+  const fotosPreventivas = conclusoes.filter((c) => c.fotoUrl);
   const { exatos, aproximados } = chamadosDoEquipamento(item);
   const linhaChamado = (c) =>
     `<div class="drawer-campo"><span class="rotulo">${c.dataFormatada || "-"}</span>
@@ -3671,6 +3759,29 @@ async function abrirDrawerEquipamento(id) {
       <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${item.equipeResponsavel || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Última preventiva concluída</span><span class="valor">${ultimaPreventiva}</span></div>
       <div class="drawer-campo"><span class="rotulo">Total de preventivas feitas</span><span class="valor">${totalPreventivas}</span></div>
+    </details>
+
+    <details class="drawer-secao" open>
+      <summary>Fotos</summary>
+      <div class="drawer-campo" style="flex-direction:column; align-items:flex-start; gap:8px;">
+        <span class="rotulo">Foto atual do equipamento</span>
+        ${item.fotoUrl
+          ? `<img src="${item.fotoUrl}" alt="Foto do equipamento" style="width:100%; border-radius:var(--raio-pequeno); border:1px solid var(--borda);">`
+          : '<span class="valor" style="color:var(--texto-suave)">Nenhuma foto cadastrada ainda.</span>'}
+      </div>
+      ${fotosPreventivas.length ? `
+        <div style="padding:0 var(--sp-4) var(--sp-3);">
+          <div style="font-size:11px; color:var(--texto-suave); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">Histórico por preventiva</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px;">
+            ${fotosPreventivas.map((f) => `
+              <a href="${f.fotoUrl}" target="_blank" rel="noopener" title="${new Date(f.registradoEm).toLocaleDateString("pt-BR")}">
+                <img src="${f.fotoUrl}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--raio-pequeno); border:1px solid var(--borda);">
+                <div style="font-size:10px; text-align:center; color:var(--texto-suave); margin-top:2px;">${new Date(f.registradoEm).toLocaleDateString("pt-BR")}</div>
+              </a>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
     </details>
 
     <details class="drawer-secao">
@@ -3720,6 +3831,10 @@ async function abrirDrawerEquipamento(id) {
       <div class="drawer-acoes">
         <button class="btn primary" id="drawerSalvarCadastro">Salvar cadastro</button>
       </div>
+      <label>Foto do equipamento<input type="file" accept="image/*" capture="environment" id="drawerFotoInput"></label>
+      <div class="drawer-acoes">
+        <button class="btn ghost" id="drawerEnviarFoto">Enviar foto</button>
+      </div>
     </details>
 
     <details class="drawer-secao drawer-form">
@@ -3766,6 +3881,26 @@ async function abrirDrawerEquipamento(id) {
     } catch (err) {
       console.error(err);
       toast("Erro ao salvar: " + err.message);
+    }
+  });
+
+  $("#drawerEnviarFoto")?.addEventListener("click", async () => {
+    const arquivo = $("#drawerFotoInput")?.files?.[0];
+    if (!arquivo) { toast("Escolha uma foto primeiro."); return; }
+    const btn = $("#drawerEnviarFoto");
+    btn.disabled = true;
+    btn.textContent = "Enviando...";
+    try {
+      const fotoUrl = await enviarFoto(arquivo, { publicId: `equipamentos/${id}/foto`, overwrite: true });
+      await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), { fotoUrl });
+      item.fotoUrl = fotoUrl;
+      toast("Foto salva.");
+      abrirDrawerEquipamento(id);
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao enviar foto: " + err.message);
+      btn.disabled = false;
+      btn.textContent = "Enviar foto";
     }
   });
 
