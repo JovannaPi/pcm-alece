@@ -406,13 +406,18 @@
           <div id="cfgModoLeitura" style="margin-top: 10px;">
             <div class="drawer-campo" style="padding: 12px 0;"><span class="rotulo">Duração do Ciclo</span><span class="valor" id="txtCfgMeses">...</span></div>
             <div class="drawer-campo" style="padding: 12px 0;"><span class="rotulo">Prédios Ativos</span><span class="valor" id="txtCfgPredios">...</span></div>
-            <div class="drawer-campo" style="padding: 12px 0; border-bottom: none;"><span class="rotulo">Planilha Corretivas (CSV)</span><span class="valor" id="txtCfgUrl" style="word-break: break-all; max-width: 60%; color: var(--azul-700);">...</span></div>
+            <div class="drawer-campo" style="padding: 12px 0;"><span class="rotulo">Planilha Corretivas (CSV)</span><span class="valor" id="txtCfgUrl" style="word-break: break-all; max-width: 60%; color: var(--azul-700);">...</span></div>
+            <div class="drawer-campo" style="padding: 12px 0; border-bottom: none;"><span class="rotulo">Foto na conclusão da preventiva</span><span class="valor" id="txtCfgFoto">...</span></div>
           </div>
           <div id="cfgModoEdicao" hidden style="margin-top: 16px; padding-top: 20px; border-top: 1px dashed var(--borda);">
             <div class="grid-form">
               <label>Duração do ciclo (meses)<input type="number" id="cfgMesesCiclo" min="1" max="24"></label>
               <label>Link da planilha de corretivas (CSV)<input type="text" id="cfgUrlCorretivas"></label>
             </div>
+            <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
+              <input type="checkbox" id="cfgFotoObrigatoria">
+              Exigir foto para concluir uma preventiva
+            </label>
             <label style="display:block; font-size:12px; font-weight:600; color:var(--texto-suave); text-transform:uppercase; margin-top:16px;">Prédios Gerenciados (Um por linha)</label>
             <textarea id="cfgPredios" rows="5" style="width:100%; padding:9px 11px; border:1px solid var(--borda-forte); border-radius:var(--raio-pequeno); font-family:var(--fonte-dado); font-size:13px; margin-top:4px;"></textarea>
             <div style="display: flex; gap: 12px; margin-top: 20px;">
