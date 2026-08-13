@@ -3375,6 +3375,7 @@ async function adicionarEquipamentoManual() {
   const patrimonio = $("#eqPatrimonio").value.trim();
   const setor = $("#eqSetor").value.trim();
   const ambiente = $("#eqAmbiente").value.trim();
+  const arquivoFoto = $("#eqFotoInput")?.files?.[0] || null;
 
   if (!setor || !ambiente) {
     toast("Preencha pelo menos Setor e Ambiente.");
@@ -3407,6 +3408,10 @@ async function adicionarEquipamentoManual() {
     const podeReagendar = localMudou && itemOriginal.statusPreventiva === "Pendente";
     try {
       const camposAtualizados = { patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM };
+      if (arquivoFoto) {
+        toast("Enviando foto...");
+        camposAtualizados.fotoUrl = await enviarFoto(arquivoFoto, { publicId: `equipamentos/${idEquipamentoEmEdicao}/foto`, overwrite: true });
+      }
       if (podeReagendar) {
         // Equipe e data eram do prédio antigo — ficariam presas lá se não
         // limpar aqui, já que reagendarTudo() não mexe em quem já tem data.
@@ -3479,6 +3484,10 @@ async function adicionarEquipamentoManual() {
     };
 
     try {
+      if (arquivoFoto) {
+        toast("Enviando foto...");
+        item.fotoUrl = await enviarFoto(arquivoFoto, { publicId: `equipamentos/${id}/foto`, overwrite: true });
+      }
       await setDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), item);
       ESTADO.equipamentos.push(item);
       await registrarHistorico(item, "-", "Cadastrado", "Cadastro");
@@ -3494,6 +3503,7 @@ async function adicionarEquipamentoManual() {
   $("#eqPatrimonio").value = "";
   $("#eqSetor").value = "";
   $("#eqAmbiente").value = "";
+  if ($("#eqFotoInput")) $("#eqFotoInput").value = "";
 }
 
 async function removerEquipamento(id, descricao) {
