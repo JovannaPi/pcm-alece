@@ -146,7 +146,7 @@ function estaAtrasado(item) {
 // pedindo está de verdade logado e não bloqueado antes de autorizar o envio;
 // a "senha" do Cloudinary nunca fica exposta no navegador. Troque a URL
 // abaixo pela do seu Worker depois de publicá-lo.
-const URL_UPLOAD_FOTO = "https://pmoc-fotos.SEU-SUBDOMINIO.workers.dev";
+const URL_UPLOAD_FOTO = "https://pmoc-fotos.jovannapinheiro.workers.dev";
 
 // Redimensiona/comprime a foto no navegador ANTES de enviar — senão uma
 // foto de celular (4-8MB) come a cota gratuita rapidinho.
