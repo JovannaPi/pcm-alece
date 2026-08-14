@@ -282,6 +282,47 @@ function formatarDataHoraCorretiva(dataObj) {
   return `${dia}/${mes}/${ano} ${hora}:${min}`;
 }
 
+// Parser de CSV simples, sem depender do XLSX (que tenta "adivinhar" tipo de
+// célula e converte datas assumindo formato americano mês/dia, bagunçando as
+// datas em dd/mm/aaaa da planilha de corretivos). Trata campos entre aspas
+// (podem conter vírgula) e aspas duplicadas ("") como aspas literais.
+function parseCSV(texto) {
+  const linhas = [];
+  let linha = [];
+  let campo = "";
+  let dentroDeAspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (dentroDeAspas) {
+      if (c === '"') {
+        if (texto[i + 1] === '"') { campo += '"'; i++; }
+        else dentroDeAspas = false;
+      } else {
+        campo += c;
+      }
+    } else if (c === '"') {
+      dentroDeAspas = true;
+    } else if (c === ",") {
+      linha.push(campo);
+      campo = "";
+    } else if (c === "\r") {
+      // ignora — a quebra de linha real é tratada no \n
+    } else if (c === "\n") {
+      linha.push(campo);
+      linhas.push(linha);
+      linha = [];
+      campo = "";
+    } else {
+      campo += c;
+    }
+  }
+  if (campo !== "" || linha.length) {
+    linha.push(campo);
+    linhas.push(linha);
+  }
+  return linhas;
+}
+
 async function carregarChamadosCorretivos(forcar) {
   const agora = Date.now();
   if (!forcar && ESTADO.chamadosCorretivosCarregadosEm &&
@@ -292,9 +333,7 @@ async function carregarChamadosCorretivos(forcar) {
     const resp = await fetch(ESTADO.configSite.urlCorretivas || URL_CHAMADOS_CORRETIVOS, { cache: "no-store" });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const texto = await resp.text();
-    const wb = XLSX.read(texto, { type: "string" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    const linhas = parseCSV(texto);
     const dados = linhas.slice(1);
 
     ESTADO.chamadosCorretivos = dados.map((linha) => {
