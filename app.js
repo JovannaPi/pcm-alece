@@ -362,6 +362,90 @@ function chamadosDoEquipamento(item) {
   return { exatos: exatos.sort(porData), aproximados: aproximados.sort(porData) };
 }
 
+// Mesma lógica de casamento de chamadosDoEquipamento(), só que ao contrário:
+// pra cada chamado, confere se ALGUM equipamento já cadastrado bate com ele.
+// O que sobra são chamados de aparelhos que provavelmente ainda não foram
+// registrados no sistema.
+function chamadosSemEquipamento() {
+  return ESTADO.chamadosCorretivos.filter((c) => {
+    const tomboTag = normalizarTexto(c.tombo) || normalizarTexto(c.tag);
+    const anexoChamado = normalizarTexto(c.anexo);
+    const poolLocal = normalizarTexto(`${c.gabinete} ${c.sala} ${c.nomeSetor} ${c.salaSetor} ${c.localAdicional}`);
+    const numerosChamado = poolLocal.match(/[0-9]+/g) || [];
+
+    const temEquipamento = ESTADO.equipamentos.some((item) => {
+      const patrimonio = normalizarTexto(item.patrimonio);
+      if (patrimonio && tomboTag && tomboTag === patrimonio) return true;
+
+      const localItem = normalizarTexto(item.local);
+      if (localItem && anexoChamado && (anexoChamado === localItem || localItem.includes(anexoChamado) || anexoChamado.includes(localItem))) {
+        const setorAmbiente = normalizarTexto(`${item.setor} ${item.ambiente}`);
+        const numerosItem = (setorAmbiente.match(/[0-9]+/g) || []).filter((n) => n.length >= 2);
+        if (numerosItem.length && numerosItem.some((n) => numerosChamado.includes(n))) return true;
+      }
+      return false;
+    });
+
+    return !temEquipamento;
+  });
+}
+
+// Preenche o formulário de cadastro manual com o que dá pra aproveitar do
+// chamado (prédio, sala/gabinete, tombo) -- a pessoa só confere e confirma.
+function prepararCadastroDoChamado(c) {
+  if ($("#eqPatrimonio")) $("#eqPatrimonio").value = c.tombo || c.tag || "";
+
+  const anexoNormalizado = normalizarTexto(c.anexo);
+  const predioCorrespondente = ESTADO.configSite.predios.find((p) => {
+    const pNorm = normalizarTexto(p);
+    return pNorm === anexoNormalizado || pNorm.includes(anexoNormalizado) || anexoNormalizado.includes(pNorm);
+  });
+  if ($("#eqLocal") && predioCorrespondente) $("#eqLocal").value = predioCorrespondente;
+
+  if ($("#eqSetor")) $("#eqSetor").value = [c.nomeSetor, c.gabinete].filter(Boolean).join(" - ") || c.anexo || "";
+  if ($("#eqAmbiente")) $("#eqAmbiente").value = c.salaSetor || c.sala || "";
+
+  toast("Formulário preenchido com os dados do chamado — confira e clique em Adicionar.");
+  $("#eqPatrimonio")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function renderChamadosOrfaos() {
+  const card = $("#cardChamadosOrfaos");
+  const table = $("#chamadosOrfaosTable");
+  if (!card || !table) return;
+
+  const orfaos = chamadosSemEquipamento();
+  card.hidden = orfaos.length === 0;
+  if (!orfaos.length) return;
+
+  $("#chamadosOrfaosCount").textContent = `${orfaos.length}`;
+  table.innerHTML = `<thead><tr>
+      <th>Data</th><th>Anexo</th><th>Sala/Gabinete</th><th>Chamado</th><th>Descrição</th><th></th>
+    </tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+
+  orfaos.forEach((c) => {
+    const tr = document.createElement("tr");
+    const salaGabinete = [c.gabinete, c.sala, c.nomeSetor, c.salaSetor].filter(Boolean).join(" / ") || "-";
+    tr.innerHTML = `
+      <td>${c.dataFormatada || "-"}</td>
+      <td>${c.anexo || "-"}</td>
+      <td>${salaGabinete}</td>
+      <td>${c.chamado || "-"}</td>
+      <td>${c.descricaoProblema || c.pecaFaltante || "-"}</td>`;
+    const tdBtn = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.className = "btn ghost";
+    btn.style.fontSize = "12px";
+    btn.style.padding = "6px 12px";
+    btn.textContent = "Cadastrar equipamento";
+    btn.addEventListener("click", () => prepararCadastroDoChamado(c));
+    tdBtn.appendChild(btn);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
+
 function toast(msg) {
   const el = $("#toast");
   el.textContent = msg;
@@ -3657,6 +3741,7 @@ function renderEquipamentosCadastro() {
   }
 
   atualizarBarraSelecao("selecaoEquipamentos", "selecaoEquipamentos", "selecaoEquipamentosTexto");
+  renderChamadosOrfaos();
 }
 
 $("#btnExcluirSelecionadosEquipamentos")?.addEventListener("click", async () => {
