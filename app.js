@@ -3680,8 +3680,9 @@ function renderEquipamentosCadastro() {
       <td>${item.local || "SEDE"}</td>
       <td>${item.setorPCM}</td>
       <td>
-        <span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
-        ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}
+        ${estaAtrasado(item)
+          ? '<span class="status-select atrasado" style="cursor:default">Atrasado</span>'
+          : `<span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>`}
       </td>
       <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>
       <td style="font-size:12px">${dadosTecnicos}</td>
@@ -3841,8 +3842,9 @@ async function abrirDrawerEquipamento(id) {
     <details class="drawer-secao" open>
       <summary>Situação</summary>
       <div class="drawer-campo"><span class="rotulo">Status</span>
-        <span class="valor"><span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>
-        ${estaAtrasado(item) ? '<span class="status-select atrasado" style="margin-left:6px;cursor:default">Atrasado</span>' : ""}</span></div>
+        <span class="valor">${estaAtrasado(item)
+          ? '<span class="status-select atrasado" style="cursor:default">Atrasado</span>'
+          : `<span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>`}</span></div>
       <div class="drawer-campo"><span class="rotulo">${item.statusPreventiva === "Concluída" ? "Próximo ciclo previsto" : "Próxima preventiva"}</span><span class="valor">${formatarDataBR(item.statusPreventiva === "Concluída" ? item.proximaPreventiva : item.dataAgendada)} ${(item.statusPreventiva === "Concluída" ? item.proximaPreventivaDia : item.diaPlanejado) ? "(" + (item.statusPreventiva === "Concluída" ? item.proximaPreventivaDia : item.diaPlanejado) + ")" : ""}</span></div>
       <div class="drawer-campo"><span class="rotulo">Semana planejada</span><span class="valor">${item.semanaPlanejada || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${item.equipeResponsavel || "-"}</span></div>
