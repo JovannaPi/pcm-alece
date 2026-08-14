@@ -298,16 +298,6 @@
         </div>
         <button class="btn primary" id="btnAdicionarEquipamento">+ Adicionar equipamento</button>
       </div>
-      <div class="card" id="cardChamadosOrfaos" hidden>
-        <div class="card-head">
-          <h2>Chamados sem equipamento cadastrado</h2>
-          <span class="pill" id="chamadosOrfaosCount">0</span>
-        </div>
-        <p class="muted">Chamados corretivos da planilha que não bateram com nenhum equipamento já cadastrado — pode ser um aparelho que falta registrar.</p>
-        <div class="table-wrap">
-          <table id="chamadosOrfaosTable"></table>
-        </div>
-      </div>
       <div class="card">
         <div class="card-head" style="align-items: center;">
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -366,6 +356,15 @@
           <table id="equipamentosTable"></table>
         </div>
       </div>
+      <details class="drawer-secao" id="cardChamadosOrfaos" hidden>
+        <summary>Chamados sem equipamento cadastrado <span class="pill" id="chamadosOrfaosCount">0</span></summary>
+        <div style="padding: var(--sp-4);">
+          <p class="muted">Chamados corretivos da planilha que não bateram com nenhum equipamento já cadastrado — pode ser um aparelho que falta registrar.</p>
+          <div class="table-wrap">
+            <table id="chamadosOrfaosTable"></table>
+          </div>
+        </div>
+      </details>
     </section>
 
     <!-- VIEW 9: FERIADOS E FÉRIAS -->
