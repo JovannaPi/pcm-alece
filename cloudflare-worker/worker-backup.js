@@ -163,7 +163,7 @@ async function rodarBackup(env) {
   await escreverAba("Equipamentos", [
     "id", "patrimonio", "setor", "ambiente", "local", "setorPCM", "equipeResponsavel",
     "statusPreventiva", "dataAgendada", "diaPlanejado", "semanaPlanejada", "origem",
-    "marca", "modelo", "capacidade", "fotoUrl",
+    "marca", "modelo", "capacidade", "tipoGas", "observacao", "fotoUrl",
   ], equipamentos, token, env);
 
   await escreverAba("Historico", [
