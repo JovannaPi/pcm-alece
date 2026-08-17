@@ -834,6 +834,7 @@ function classificar(rows) {
   const colMarca = localizarColuna(["Marca"], headers);
   const colModelo = localizarColuna(["Modelo"], headers);
   const colPotencia = localizarColuna(["Potência", "BTU", "Capacidade"], headers);
+  const colTipoGas = localizarColuna(["Tipo de Gás", "Tipo de Gas", "Gás", "Gas"], headers);
 
   if (!colSetor || !colAmbiente) {
     toast("Não encontrei as colunas 'Setor' e 'Ambiente'. Confira o cabeçalho.");
@@ -886,6 +887,8 @@ function classificar(rows) {
     let capacidade = colPotencia ? limparValor(row[colPotencia]) : "";
     if (capacidade && !capacidade.toLowerCase().includes("btu")) capacidade += " BTU/h";
 
+    const tipoGas = colTipoGas ? limparValor(row[colTipoGas]) : "";
+
     const setorPCM = identificarSetor(setor, ambiente);
 
     let id;
@@ -903,6 +906,7 @@ function classificar(rows) {
       marca,          // <--- Salva no Firebase
       modelo,         // <--- Salva no Firebase
       capacidade,     // <--- Salva no Firebase
+      tipoGas,
       setor, ambiente,
       local: row.__local || "SEDE",
       statusCondicao: colStatus ? row[colStatus] : "",
@@ -2888,7 +2892,7 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
     const secaoCond = renderSecaoUnidade("cond", "Condensadora (unidade externa)", dadosExistentes.condensadora, "cond");
     const secaoEvap = renderSecaoUnidade("evap", "Evaporadora (unidade interna)", dadosExistentes.evaporadora, "evap");
 
-    if (!secaoCond.html && !secaoEvap.html) {
+    if (!secaoCond.html && !secaoEvap.html && item.tipoGas) {
       await finalizarConclusao();
     } else {
       renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes);
@@ -2995,12 +2999,24 @@ function lerSecaoUnidade(prefixo, campos, dadosExistentes) {
 
 function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
   const { item } = modalConclusaoEstado;
+  const precisaTipoGas = !item.tipoGas;
   $("#modalConclusaoTitulo").textContent = "Dados técnicos da máquina";
   $("#modalConclusaoCorpo").innerHTML = `
     <p class="muted">Só está perguntando o que ainda não está registrado pra essa máquina. Da próxima vez, isso não é perguntado de novo.</p>
     <div class="grid-form">
       <label>Informante<input type="text" value="${escapeHtml(modalConclusaoEstado.tecnico)}" disabled></label>
       <label>Prédio<input type="text" value="${escapeHtml(item.local || "SEDE")}" disabled></label>
+      ${precisaTipoGas ? `
+      <label>Tipo de gás *
+        <select id="infoTipoGas">
+          <option value="">Selecione...</option>
+          ${GASES_REFRIGERANTES.map((g) => `<option value="${g}">${g}</option>`).join("")}
+          <option value="Outro">Outro</option>
+        </select>
+      </label>
+      <div class="campo-outro" id="infoTipoGasOutroWrap" hidden>
+        <input type="text" id="infoTipoGasOutro" placeholder="Especifique">
+      </div>` : ""}
     </div>
     ${secaoCond.html}
     ${secaoEvap.html}
@@ -3013,11 +3029,22 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
 
   wireSecaoUnidade("cond", secaoCond.campos);
   wireSecaoUnidade("evap", secaoEvap.campos);
+  if (precisaTipoGas) wireCampoOutro("infoTipoGas", "infoTipoGasOutroWrap", "Outro");
 
   $("#btnModalConclusaoCancelar2").addEventListener("click", () => fecharModalConclusao(true));
 
   $("#btnModalConclusaoSalvar").addEventListener("click", async () => {
     const informante = modalConclusaoEstado.tecnico;
+
+    let tipoGasNovo = "";
+    if (precisaTipoGas) {
+      const selTipoGas = $("#infoTipoGas");
+      tipoGasNovo = selTipoGas.value === "Outro" ? $("#infoTipoGasOutro").value.trim() : selTipoGas.value;
+      if (!tipoGasNovo) {
+        toast("Preencha os campos obrigatórios (*).");
+        return;
+      }
+    }
 
     const dadosCond = dadosExistentes.condensadora;
     const dadosEvap = dadosExistentes.evaporadora;
@@ -3035,13 +3062,14 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
       evaporadora,
       local: item.local || "SEDE",
     };
+    if (tipoGasNovo) modalConclusaoEstado.tipoGasNovo = tipoGasNovo;
 
     await finalizarConclusao();
   });
 }
 
 async function finalizarConclusao() {
-  const { item, checklist, avaliacaoEstrelas, tecnico, infoTecnica, statusAnterior, aoAtualizar, fotoFile } = modalConclusaoEstado;
+  const { item, checklist, avaliacaoEstrelas, tecnico, infoTecnica, statusAnterior, aoAtualizar, fotoFile, tipoGasNovo } = modalConclusaoEstado;
   const btnSalvar = $("#btnModalConclusaoSalvar") || $("#btnModalConclusaoContinuar");
   if (btnSalvar) btnSalvar.disabled = true;
 
@@ -3050,6 +3078,7 @@ async function finalizarConclusao() {
       statusPreventiva: "Concluída",
       dataConclusao: formatISO(new Date()),
     };
+    if (tipoGasNovo) camposStatus.tipoGas = tipoGasNovo;
     const proxima = await calcularProximaData({ ...item, dataConclusao: camposStatus.dataConclusao });
     camposStatus.proximaPreventiva = proxima.data;
     camposStatus.proximaPreventivaDia = proxima.dia;
@@ -3762,7 +3791,7 @@ function renderEquipamentosCadastro() {
   const tbody = table.querySelector("tbody");
 
   itensComCorretivas.forEach(({ item, totalCorretivas }) => {
-    const dadosTecnicos = escapeHtml([item.marca, item.modelo, item.capacidade].filter(Boolean).join(" • ") || "-");
+    const dadosTecnicos = escapeHtml([item.marca, item.modelo, item.capacidade, item.tipoGas && `Gás: ${item.tipoGas}`].filter(Boolean).join(" • ") || "-");
     const tr = document.createElement("tr");
     tr.innerHTML = `<td></td><td>${escapeHtml(item.patrimonio || "-")}</td><td>${escapeHtml(item.setor)}</td><td>${escapeHtml(item.ambiente)}</td>
       <td>${escapeHtml(item.local || "SEDE")}</td>
@@ -4865,6 +4894,8 @@ function gerarPDFPMOC(ordem) {
   const prioridade = eqFull.prioridadeSetor || "-";
   const equipe = ordem.equipe || eqFull.equipeResponsavel || "-";
   const tecnico = ordem.tecnico || "";
+  const tipoGas = escapeHtml(eqFull.tipoGas || "Não informado");
+  const observacao = escapeHtml(eqFull.observacao || "");
 
   const dataExecucao = ordem.registradoEm
     ? new Date(ordem.registradoEm).toLocaleDateString("pt-BR")
@@ -4976,6 +5007,7 @@ function gerarPDFPMOC(ordem) {
             <div class="item"><span class="lbl">Equipe Responsável</span><span class="val">${equipe}</span></div>
             <div class="item"><span class="lbl">Técnico responsável</span><span class="val">${tecnico || "Não informado"}</span></div>
             <div class="item"><span class="lbl">Data de conclusão</span><span class="val">${dataExecucao}</span></div>
+            <div class="item"><span class="lbl">Tipo de Gás</span><span class="val">${tipoGas}</span></div>
           </div>
 
           <div class="section-title">2. Rotina de Manutenção PMOC — o que foi feito</div>
@@ -4993,7 +5025,7 @@ function gerarPDFPMOC(ordem) {
           <div style="font-size: 18px; letter-spacing: 3px;">${estrelasHtml}</div>
 
           <div class="section-title">4. Observações e Peças Pendentes</div>
-          <div style="border: 1px solid #DCE3EA; height: 50px; background: #F6F8FA;"></div>
+          <div style="border: 1px solid #DCE3EA; min-height: 50px; background: #F6F8FA; padding: 8px 10px; font-size: 12px; color: #334155;">${observacao || "&nbsp;"}</div>
 
           <div style="margin-top: 18px; font-size: 12px; text-align: right; color: #5B6B7A;">
             Técnico(a): ${tecnico || "_______________________"} &nbsp;&nbsp;&nbsp; Assinatura: _______________________
