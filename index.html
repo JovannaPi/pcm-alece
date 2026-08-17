@@ -294,9 +294,23 @@
           <label>Prédio
             <select id="eqLocal"></select>
            </label>
+          <label>Tipo de gás
+            <select id="eqTipoGas">
+              <option value="">Não informado</option>
+              <option value="R22">R22</option>
+              <option value="R410A">R410A</option>
+              <option value="R32">R32</option>
+              <option value="R404A">R404A</option>
+              <option value="R134a">R134a</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </label>
           <label>Foto (opcional)<input type="file" accept="image/*" capture="environment" id="eqFotoInput"></label>
         </div>
-        <button class="btn primary" id="btnAdicionarEquipamento">+ Adicionar equipamento</button>
+        <label>Observações (ex: contato da sala, restrições de horário...)
+          <input type="text" id="eqObservacao" placeholder="Ex: falar com Fulano, ramal 1234">
+        </label>
+        <button class="btn primary" id="btnAdicionarEquipamento" style="margin-top:16px">+ Adicionar equipamento</button>
       </div>
       <div class="card">
         <div class="card-head" style="align-items: center;">

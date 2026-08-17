@@ -49,6 +49,7 @@ const CAPACIDADES_CONDENSADORA = [
 ];
 const ESPESSURAS_FIO = ["2.5mm", "4mm", "6mm"];
 const MODELOS_EVAPORADORA = ["Split Hi-Wall", "Split Inverter", "Cassete", "Piso-Teto"];
+const GASES_REFRIGERANTES = ["R22", "R410A", "R32", "R404A", "R134a"];
 const MESES_CICLO = 4;
 
 async function calcularProximaData(item) {
@@ -3348,6 +3349,8 @@ function prepararEdicao(item) {
   $("#eqSetor").value = item.setor || "";
   $("#eqAmbiente").value = item.ambiente || "";
   if ($("#eqLocal")) $("#eqLocal").value = item.local || "SEDE";
+  if ($("#eqTipoGas")) $("#eqTipoGas").value = item.tipoGas || "";
+  if ($("#eqObservacao")) $("#eqObservacao").value = item.observacao || "";
 
   if (btnAdicionarEquipamento) {
     btnAdicionarEquipamento.textContent = "Salvar Alterações";
@@ -3390,14 +3393,15 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
 
     // Definindo as colunas
     sheet.columns = [
-      // DADOS GERAIS (1 a 6)
+      // DADOS GERAIS (1 a 7)
       { key: "patrimonio", width: 16 },
       { key: "setor", width: 28 },
       { key: "ambiente", width: 28 },
       { key: "local", width: 14 },
+      { key: "tipoGas", width: 12 },
       { key: "informante", width: 18 },
       { key: "preenchidoEm", width: 16 },
-      // CONDENSADORA (7 a 13)
+      // CONDENSADORA (8 a 14)
       { key: "condNumero", width: 10 },
       { key: "condTombo", width: 14 },
       { key: "condTag", width: 14 },
@@ -3405,7 +3409,7 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
       { key: "condModelo", width: 16 },
       { key: "condCapacidade", width: 16 },
       { key: "condFio", width: 16 },
-      // EVAPORADORA (14 a 19)
+      // EVAPORADORA (15 a 20)
       { key: "evapTombo", width: 14 },
       { key: "evapTag", width: 14 },
       { key: "evapMarca", width: 14 },
@@ -3415,23 +3419,23 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     ];
 
     // LINHA 1: Super-Cabeçalhos (Mesclados)
-    sheet.mergeCells('A1:F1');
-    sheet.mergeCells('G1:M1');
-    sheet.mergeCells('N1:S1');
-    
+    sheet.mergeCells('A1:G1');
+    sheet.mergeCells('H1:N1');
+    sheet.mergeCells('O1:T1');
+
     const r1 = sheet.getRow(1);
     r1.height = 25;
     r1.getCell(1).value = "DADOS GERAIS DA MÁQUINA";
-    r1.getCell(7).value = "UNIDADE EXTERNA (CONDENSADORA)";
-    r1.getCell(14).value = "UNIDADE INTERNA (EVAPORADORA)";
+    r1.getCell(8).value = "UNIDADE EXTERNA (CONDENSADORA)";
+    r1.getCell(15).value = "UNIDADE INTERNA (EVAPORADORA)";
 
     // Estilo da Linha 1
     r1.eachCell((cell, colNumber) => {
       cell.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
       cell.alignment = { horizontal: "center", vertical: "middle" };
       let cor = "FF1F4E78"; // Azul padrão para Geral
-      if (colNumber >= 7 && colNumber <= 13) cor = "FF9C6500"; // Amarelo/Dourado escuro
-      if (colNumber >= 14 && colNumber <= 19) cor = "FF375623"; // Verde escuro
+      if (colNumber >= 8 && colNumber <= 14) cor = "FF9C6500"; // Amarelo/Dourado escuro
+      if (colNumber >= 15 && colNumber <= 20) cor = "FF375623"; // Verde escuro
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
     });
 
@@ -3439,7 +3443,7 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     const r2 = sheet.getRow(2);
     r2.height = 20;
     r2.values = [
-      "Patrimônio", "Setor", "Ambiente", "Prédio", "Informante", "Preenchido em",
+      "Patrimônio", "Setor", "Ambiente", "Prédio", "Tipo de Gás", "Informante", "Preenchido em",
       "Nº", "Tombo", "Tag", "Marca", "Modelo", "Capacidade", "Fio (mm)",
       "Tombo", "Tag", "Marca", "Modelo", "Capacidade", "Fio (mm)"
     ];
@@ -3455,8 +3459,8 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
         right: { style: "thin", color: { argb: "FFBFBFBF" } }
       };
       let cor = "FFEEF3F8"; // Fundo claro Geral
-      if (colNumber >= 7 && colNumber <= 13) cor = "FFFFE699"; // Fundo claro Condensadora
-      if (colNumber >= 14 && colNumber <= 19) cor = "FFC6E0B4"; // Fundo claro Evaporadora
+      if (colNumber >= 8 && colNumber <= 14) cor = "FFFFE699"; // Fundo claro Condensadora
+      if (colNumber >= 15 && colNumber <= 20) cor = "FFC6E0B4"; // Fundo claro Evaporadora
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
     });
 
@@ -3477,6 +3481,7 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
         setor: item.setor || "-",
         ambiente: item.ambiente || "-",
         local: (dados && dados.local) || item.local || "-",
+        tipoGas: item.tipoGas || "-",
         informante: dados ? (dados.informante || "-") : "Planilha (levantamento)",
         preenchidoEm: dados && dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleDateString("pt-BR") : "-",
         condNumero: cond.numero || "-", condTombo: cond.tombo || "-", condTag: cond.tag || "-",
@@ -3525,6 +3530,8 @@ async function adicionarEquipamentoManual() {
   const patrimonio = $("#eqPatrimonio").value.trim();
   const setor = $("#eqSetor").value.trim();
   const ambiente = $("#eqAmbiente").value.trim();
+  const tipoGas = $("#eqTipoGas")?.value || "";
+  const observacao = $("#eqObservacao")?.value.trim() || "";
   const arquivoFoto = $("#eqFotoInput")?.files?.[0] || null;
 
   if (!setor || !ambiente) {
@@ -3557,7 +3564,7 @@ async function adicionarEquipamentoManual() {
     // reagendarTudo() não recalcula quem não está pendente).
     const podeReagendar = localMudou && itemOriginal.statusPreventiva === "Pendente";
     try {
-      const camposAtualizados = { patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM };
+      const camposAtualizados = { patrimonio, setor, ambiente, local, setorPCM, prioridadeSetor, pisoPCM, tipoGas, observacao };
       if (arquivoFoto) {
         toast("Enviando foto...");
         camposAtualizados.fotoUrl = await enviarFoto(arquivoFoto, { publicId: `equipamentos/${idEquipamentoEmEdicao}/foto`, overwrite: true });
@@ -3624,7 +3631,8 @@ async function adicionarEquipamentoManual() {
       prioridadeSetor,
       pisoPCM,
       statusPreventiva: "Pendente",
-      observacao: "",
+      observacao,
+      tipoGas,
       origem: "manual",
       ordemExecucao,
       equipeResponsavel,
@@ -3653,6 +3661,8 @@ async function adicionarEquipamentoManual() {
   $("#eqPatrimonio").value = "";
   $("#eqSetor").value = "";
   $("#eqAmbiente").value = "";
+  if ($("#eqTipoGas")) $("#eqTipoGas").value = "";
+  if ($("#eqObservacao")) $("#eqObservacao").value = "";
   if ($("#eqFotoInput")) $("#eqFotoInput").value = "";
 }
 
@@ -3956,6 +3966,8 @@ async function abrirDrawerEquipamento(id) {
       <div class="drawer-campo"><span class="rotulo">Piso</span><span class="valor">${item.pisoPCM === 99 ? "Não identificado" : item.pisoPCM}</span></div>
       <div class="drawer-campo"><span class="rotulo">Condição (levantamento)</span><span class="valor">${escapeHtml(item.statusCondicao || "-")}</span></div>
       <div class="drawer-campo"><span class="rotulo">Origem do cadastro</span><span class="valor">${item.origem === "manual" ? "Manual" : "Planilha"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Tipo de gás</span><span class="valor">${escapeHtml(item.tipoGas || "-")}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Observações</span><span class="valor">${escapeHtml(item.observacao || "-")}</span></div>
     </details>
 
     <details class="drawer-secao">
@@ -3991,6 +4003,14 @@ async function abrirDrawerEquipamento(id) {
       <label>Marca<input type="text" id="drawerMarca" value="${escapeHtml(item.marca || "")}" placeholder="Vem da planilha, se tiver"></label>
       <label>Modelo<input type="text" id="drawerModelo" value="${escapeHtml(item.modelo || "")}" placeholder="Vem da planilha, se tiver"></label>
       <label>Capacidade<input type="text" id="drawerCapacidade" value="${escapeHtml(item.capacidade || "")}" placeholder="Vem da planilha, se tiver"></label>
+      <label>Tipo de gás
+        <select id="drawerTipoGas">
+          <option value="">Não informado</option>
+          ${GASES_REFRIGERANTES.map((g) => `<option value="${g}" ${item.tipoGas === g ? "selected" : ""}>${g}</option>`).join("")}
+          <option value="Outro" ${item.tipoGas && !GASES_REFRIGERANTES.includes(item.tipoGas) ? "selected" : ""}>Outro</option>
+        </select>
+      </label>
+      <label>Observações (ex: contato da sala, restrições de horário...)<input type="text" id="drawerObservacao" value="${escapeHtml(item.observacao || "")}" placeholder="Ex: falar com Fulano, ramal 1234"></label>
       <div class="drawer-acoes">
         <button class="btn primary" id="drawerSalvarCadastro">Salvar cadastro</button>
       </div>
@@ -4024,6 +4044,8 @@ async function abrirDrawerEquipamento(id) {
     const marca = $("#drawerMarca").value.trim();
     const modelo = $("#drawerModelo").value.trim();
     const capacidade = $("#drawerCapacidade").value.trim();
+    const tipoGas = $("#drawerTipoGas")?.value || "";
+    const observacao = $("#drawerObservacao")?.value.trim() || "";
     if (!setor || !ambiente) {
       toast("Preencha pelo menos Setor e Ambiente.");
       return;
@@ -4031,7 +4053,7 @@ async function abrirDrawerEquipamento(id) {
     const setorPCM = identificarSetor(setor, ambiente);
     try {
       await updateDoc(doc(db, "ciclos", ESTADO.cicloAtual, "equipamentos", id), {
-        patrimonio, setor, ambiente, local, setorPCM, marca, modelo, capacidade,
+        patrimonio, setor, ambiente, local, setorPCM, marca, modelo, capacidade, tipoGas, observacao,
         prioridadeSetor: PRIORIDADE[setorPCM] || 7,
         pisoPCM: descobrirPiso(setor),
       });
@@ -4447,7 +4469,7 @@ async function montarPlanilhaOrganizada(itens) {
     ["semanaPlanejada", "Semana Planejada"], ["diaPlanejado", "Dia Planejado"],
     ["equipeResponsavel", "Equipe Responsável"], ["ordemExecucao", "Ordem Execução"],
     ["prioridadeSetor", "Prioridade"], ["statusPreventiva", "Status Preventiva"],
-    ["observacao", "Observação"],
+    ["tipoGas", "Tipo de Gás"], ["observacao", "Observação"],
   ];
   const statusPrevIdx = colunas.findIndex(([k]) => k === "statusPreventiva") + 1;
   const ambienteIdx = colunas.findIndex(([k]) => k === "ambiente") + 1;
@@ -4535,7 +4557,7 @@ async function montarPlanilhaOrganizada(itens) {
     });
   });
 
-  const larguras = { 1: 14, 2: 24, 3: 30, 4: 14, 5: 22, 6: 8, 7: 14, 8: 12, 9: 14, 10: 10, 11: 12, 12: 14, 13: 24 };
+  const larguras = { 1: 14, 2: 24, 3: 30, 4: 14, 5: 22, 6: 8, 7: 14, 8: 12, 9: 14, 10: 10, 11: 12, 12: 14, 13: 14, 14: 24 };
   Object.entries(larguras).forEach(([i, w]) => {
     if (Number(i) <= colunas.length) ws2.getColumn(Number(i)).width = w;
   });
