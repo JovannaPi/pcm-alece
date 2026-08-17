@@ -1281,6 +1281,8 @@ body.modo-padrao select:not(#filtroStatus):not(#filtroSetorPCM):not(#filtroOrige
 body.modo-padrao button.btn.primary:not(#modalConclusao *),
 body.modo-padrao button.btn.danger-inverted,
 body.modo-padrao button.sidenav-danger,
+body.modo-padrao #drawerEnviarFoto,
+body.modo-padrao #drawerExcluir,
 body.modo-padrao .menu-linha-item,
 body.modo-padrao .link-discreto,
 body.modo-padrao input[type="checkbox"]:not(#modalConclusao *) {

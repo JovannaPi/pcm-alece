@@ -60,17 +60,22 @@ async function verificarLogin(idToken, env) {
   return { uid };
 }
 
-// Confere se a conta não está bloqueada — mesma regra que o resto do app já
-// usa (usuarios/{uid}.bloqueado). Usa o próprio token da pessoa pra ler,
-// respeitando as regras normais do Firestore (allow read: if estaLogado()).
-async function naoEstaBloqueado(uid, idToken, env) {
+// Confere se a conta pode enviar foto -- mesma regra que o Firestore já usa
+// pra deixar escrever num equipamento (souAdmin() || souTrabalhador()), não
+// só "não bloqueado". Sem isso, uma conta "padrão" (só leitura) conseguia
+// gastar a cota do Cloudinary mesmo não podendo depois anexar a foto em
+// lugar nenhum. Usa o próprio token da pessoa pra ler, respeitando as
+// regras normais do Firestore (allow read: if estaLogado()).
+async function podeEnviarFoto(uid, idToken, env) {
   const resp = await fetch(
     `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/usuarios/${uid}`,
     { headers: { Authorization: `Bearer ${idToken}` } }
   );
   if (!resp.ok) return false;
   const dados = await resp.json();
-  return dados.fields?.bloqueado?.booleanValue !== true;
+  if (dados.fields?.bloqueado?.booleanValue === true) return false;
+  const permissao = dados.fields?.permissao?.stringValue;
+  return permissao === "admin" || permissao === "trabalhador";
 }
 
 export default {
@@ -90,8 +95,8 @@ export default {
     if (resultadoLogin.erro) return respostaJson({ erro: "Falha no login: " + resultadoLogin.erro }, 401);
     const uid = resultadoLogin.uid;
 
-    const podeEnviar = await naoEstaBloqueado(uid, idToken, env);
-    if (!podeEnviar) return respostaJson({ erro: "Conta bloqueada." }, 403);
+    const autorizado = await podeEnviarFoto(uid, idToken, env);
+    if (!autorizado) return respostaJson({ erro: "Sem permissão pra enviar foto." }, 403);
 
     let corpo = {};
     try {

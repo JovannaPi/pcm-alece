@@ -342,7 +342,7 @@ async function carregarChamadosCorretivos(forcar) {
         .find((v) => String(v || "").trim()) || "";
       const dataObj = converterDataCorretiva(linha[COL_CORRETIVA.DATA]);
       return {
-        data: dataObj ? dataObj.toISOString() : "", // formato que ordena cer
+        data: dataObj ? dataObj.toISOString() : "", // formato que ordena certo
         dataFormatada: formatarDataHoraCorretiva(dataObj), // formato que aparece na tela
         equipe: linha[COL_CORRETIVA.EQUIPE] || "",
         chamado: linha[COL_CORRETIVA.CHAMADO] || "",
@@ -368,6 +368,17 @@ async function carregarChamadosCorretivos(forcar) {
 
 function normalizarTexto(v) {
   return String(v || "").trim().toUpperCase();
+}
+
+// Protege contra HTML/script escondido em texto vindo de fora (planilha
+// importada, formulário público de chamados, campos digitados por usuários)
+// antes de inserir na tela via innerHTML. Sem isso, alguém poderia escrever
+// algo tipo <script> num campo de texto e rodar código no navegador de quem
+// visse aquele dado depois.
+function escapeHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
 }
 
 function chamadosDoEquipamento(item) {
@@ -405,8 +416,23 @@ function chamadosDoEquipamento(item) {
 // pra cada chamado, confere se ALGUM equipamento já cadastrado bate com ele.
 // O que sobra são chamados de aparelhos que provavelmente ainda não foram
 // registrados no sistema.
+// Guarda o resultado da última comparação -- comparar cada chamado com cada
+// equipamento é uma conta que cresce rápido (equipamentos × chamados), e
+// renderEquipamentosCadastro() chama isso a cada digitação na busca/filtro.
+// Só recalcula de verdade quando as duas listas mudaram de fato (Firestore
+// substitui o array inteiro a cada atualização, então comparar a
+// referência já garante isso).
+let _cacheChamadosOrfaos = { equipamentosRef: null, chamadosRef: null, resultado: [] };
+
 function chamadosSemEquipamento() {
-  return ESTADO.chamadosCorretivos.filter((c) => {
+  if (
+    _cacheChamadosOrfaos.equipamentosRef === ESTADO.equipamentos &&
+    _cacheChamadosOrfaos.chamadosRef === ESTADO.chamadosCorretivos
+  ) {
+    return _cacheChamadosOrfaos.resultado;
+  }
+
+  const resultado = ESTADO.chamadosCorretivos.filter((c) => {
     const tomboTag = normalizarTexto(c.tombo) || normalizarTexto(c.tag);
     const anexoChamado = normalizarTexto(c.anexo);
     const poolLocal = normalizarTexto(`${c.gabinete} ${c.sala} ${c.nomeSetor} ${c.salaSetor} ${c.localAdicional}`);
@@ -427,6 +453,13 @@ function chamadosSemEquipamento() {
 
     return !temEquipamento;
   });
+
+  _cacheChamadosOrfaos = {
+    equipamentosRef: ESTADO.equipamentos,
+    chamadosRef: ESTADO.chamadosCorretivos,
+    resultado,
+  };
+  return resultado;
 }
 
 // Preenche o formulário de cadastro manual com o que dá pra aproveitar do
@@ -467,11 +500,11 @@ function renderChamadosOrfaos() {
     const tr = document.createElement("tr");
     const salaGabinete = [c.gabinete, c.sala, c.nomeSetor, c.salaSetor].filter(Boolean).join(" / ") || "-";
     tr.innerHTML = `
-      <td>${c.dataFormatada || "-"}</td>
-      <td>${c.anexo || "-"}</td>
-      <td>${salaGabinete}</td>
-      <td>${c.chamado || "-"}</td>
-      <td>${c.descricaoProblema || c.pecaFaltante || "-"}</td>`;
+      <td>${escapeHtml(c.dataFormatada || "-")}</td>
+      <td>${escapeHtml(c.anexo || "-")}</td>
+      <td>${escapeHtml(salaGabinete)}</td>
+      <td>${escapeHtml(c.chamado || "-")}</td>
+      <td>${escapeHtml(c.descricaoProblema || c.pecaFaltante || "-")}</td>`;
     const tdBtn = document.createElement("td");
     const btn = document.createElement("button");
     btn.className = "btn ghost";
@@ -1036,7 +1069,7 @@ async function gerarCronograma() {
       });
 
       const diasNecessarios = Math.ceil(itensDoPredio.length / capacidadeDia);
-      resumoPorPredio.push(`<strong>${local}</strong>: ${itensDoPredio.length} itens · ${diasNecessarios} dia(s) úteis · capacidade ${capacidadeDia}/dia`);
+      resumoPorPredio.push(`<strong>${escapeHtml(local)}</strong>: ${itensDoPredio.length} itens · ${diasNecessarios} dia(s) úteis · capacidade ${capacidadeDia}/dia`);
     });
 
     $("#resumoCapacidade").innerHTML = resumoPorPredio.join("<br>") +
@@ -1663,9 +1696,9 @@ function renderAuditoria() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${new Date(r.registradoEm).toLocaleString("pt-BR")}</td>
-      <td>${r.usuario || "-"}</td>
-      <td><strong>${r.acao}</strong></td>
-      <td>${r.detalhes || "-"}</td>`;
+      <td>${escapeHtml(r.usuario || "-")}</td>
+      <td><strong>${escapeHtml(r.acao)}</strong></td>
+      <td>${escapeHtml(r.detalhes || "-")}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1893,23 +1926,23 @@ function renderEquipesPorPredio() {
       linhas += `
         <div class="eq-linha">
           <span style="color: var(--borda-forte); font-size: 14px; margin-right: 4px;" title="Ordem/Vaga ${ordem}">⋮⋮</span>
-          <input type="text" data-predio="${predio}" data-ordem="${ordem}" class="eq-nome-input"
-            value="${existente ? existente.nome : ""}" placeholder="Nome da equipe ${ordem}...">
+          <input type="text" data-predio="${escapeHtml(predio)}" data-ordem="${ordem}" class="eq-nome-input"
+            value="${existente ? escapeHtml(existente.nome) : ""}" placeholder="Nome da equipe ${ordem}...">
           ${badgeHtml}
           <details class="menu-linha">
             <summary>⋯</summary>
             <div class="menu-linha-opcoes">
               ${existente && modoRodizio && !ativasPorNome.includes(existente.nome) ? ativasPorNome.map((nomeAtivo) =>
-                `<button class="menu-linha-item eq-trocar-rodizio-btn" data-predio="${predio}" data-entra="${existente.nome}" data-sai="${nomeAtivo}">Trocar com "${nomeAtivo}" (está no rodízio)</button>`
+                `<button class="menu-linha-item eq-trocar-rodizio-btn" data-predio="${escapeHtml(predio)}" data-entra="${escapeHtml(existente.nome)}" data-sai="${escapeHtml(nomeAtivo)}">Trocar com "${escapeHtml(nomeAtivo)}" (está no rodízio)</button>`
               ).join("") : ""}
               ${existente && !modoRodizio && ehAbaixoDoLimite ? equipesAcima.map((ativa) =>
-                `<button class="menu-linha-item eq-promover-btn" data-id="${existente.id}" data-id-destino="${ativa.id}">Trocar posição com "${ativa.nome}"</button>`
+                `<button class="menu-linha-item eq-promover-btn" data-id="${existente.id}" data-id-destino="${ativa.id}">Trocar posição com "${escapeHtml(ativa.nome)}"</button>`
               ).join("") : ""}
               ${existente && !modoRodizio && ehAbaixoDoLimite ? vagasAtivasVazias.map((vaga) =>
                 `<button class="menu-linha-item eq-promover-vaga-btn" data-id="${existente.id}" data-vaga="${vaga}">Mover para vaga ${vaga} (vazia)</button>`
               ).join("") : ""}
               ${existente ? outrosPredios.map((p) =>
-                `<button class="menu-linha-item eq-mover-btn" data-id="${existente.id}" data-destino="${p}">Mover para ${p}</button>`
+                `<button class="menu-linha-item eq-mover-btn" data-id="${existente.id}" data-destino="${escapeHtml(p)}">Mover para ${escapeHtml(p)}</button>`
               ).join("") : ""}
               ${existente ? `<button class="menu-linha-item menu-linha-excluir eq-excluir" data-id="${existente.id}">Excluir equipe</button>` : ""}
             </div>
@@ -1922,13 +1955,13 @@ function renderEquipesPorPredio() {
     return `
       <div class="eq-predio-card">
         <div class="eq-predio-titulo">
-          ${predio}
+          ${escapeHtml(predio)}
           <span class="badge-capacidade">${subtitulo}</span>
         </div>
         <div style="margin-bottom: 12px; display: flex; flex-direction: column; flex: 1;">
           ${linhas}
         </div>
-        <button class="btn ghost btn-adicionar-vaga" data-predio="${predio}" style="margin-top:auto">+ Adicionar equipe</button>
+        <button class="btn ghost btn-adicionar-vaga" data-predio="${escapeHtml(predio)}" style="margin-top:auto">+ Adicionar equipe</button>
       </div>`;
   }).join("");
 
@@ -2116,8 +2149,8 @@ function renderCapacidadesPorPredio() {
             const htmlEquipes = `<div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
               ${equipesDoPredio.map(e => `
                 <label style="display:flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
-                  <input type="checkbox" class="chk-equipe-${slug}" value="${e.nome}" ${ativas.includes(e.nome) ? "checked" : ""}>
-                  ${e.nome}
+                  <input type="checkbox" class="chk-equipe-${slug}" value="${escapeHtml(e.nome)}" ${ativas.includes(e.nome) ? "checked" : ""}>
+                  ${escapeHtml(e.nome)}
                 </label>
               `).join("")}
             </div>`;
@@ -2136,18 +2169,18 @@ function renderCapacidadesPorPredio() {
     return `
       <div class="capacidade-linha" style="display:flex; flex-direction:column; align-items:flex-start; padding: 16px 0; border-bottom: 1px solid var(--borda);">
         <div style="display:flex; align-items:center; gap: 16px; width: 100%; flex-wrap: wrap;">
-          <span class="capacidade-nome" style="font-size:14px; min-width: 100px;">${local}</span>
-          
+          <span class="capacidade-nome" style="font-size:14px; min-width: 100px;">${escapeHtml(local)}</span>
+
           <label>Vagas por dia (Capacidade)
-            <input type="number" min="1" id="nEquipes_${slug}" data-local="${local}" class="input-capacidade-equipes" value="${cap.nEquipes}" title="Quantas equipes trabalham simultaneamente por dia neste prédio">
+            <input type="number" min="1" id="nEquipes_${slug}" data-local="${escapeHtml(local)}" class="input-capacidade-equipes" value="${cap.nEquipes}" title="Quantas equipes trabalham simultaneamente por dia neste prédio">
           </label>
-          
+
           <label>Aparelhos/vaga/dia
-            <input type="number" min="1" id="aparelhosDia_${slug}" data-local="${local}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia}">
+            <input type="number" min="1" id="aparelhosDia_${slug}" data-local="${escapeHtml(local)}" class="input-capacidade-aparelhos" value="${cap.aparelhosDia}">
           </label>
-          
+
           <label style="margin-left: auto; display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="chkModoRodizio_${slug}" data-local="${local}" class="toggle-modo-rodizio" ${modoRodizio ? "checked" : ""}>
+            <input type="checkbox" id="chkModoRodizio_${slug}" data-local="${escapeHtml(local)}" class="toggle-modo-rodizio" ${modoRodizio ? "checked" : ""}>
             Fazer rodízio
           </label>
         </div>
@@ -2328,8 +2361,8 @@ function renderCalendar() {
       
       badge.className = "cal-day-badge " + classe + (ESTADO.localFiltro === "Todos" ? "" : " badge-empilhado");
       badge.innerHTML = ESTADO.localFiltro === "Todos"
-        ? `<span class="badge-predio">${predio}</span><span class="badge-contagem">${itensPredio.length} ${ROTULOS_STATUS[classe]}</span>`
-        : itensPredio.map((i) => `<div class="badge-maquina-linha">${i.patrimonio || i.ambiente}</div>`).join("");
+        ? `<span class="badge-predio">${escapeHtml(predio)}</span><span class="badge-contagem">${itensPredio.length} ${ROTULOS_STATUS[classe]}</span>`
+        : itensPredio.map((i) => `<div class="badge-maquina-linha">${escapeHtml(i.patrimonio || i.ambiente)}</div>`).join("");
       badge.addEventListener("mouseenter", (e) => mostrarTooltipCalendario(e.currentTarget, predio, itensPredio));
       badge.addEventListener("mouseleave", ocultarTooltipCalendario);
       badge.addEventListener("click", (e) => {
@@ -2355,10 +2388,10 @@ function mostrarTooltipCalendario(elemento, predio, itens) {
     document.body.appendChild(tip);
   }
   const preview = itens.slice(0, 3)
-    .map((i) => `<div>${i.patrimonio || i.ambiente}</div>`)
+    .map((i) => `<div>${escapeHtml(i.patrimonio || i.ambiente)}</div>`)
     .join("");
   const resto = itens.length > 3 ? `<div class="cal-badge-tooltip-mais">+${itens.length - 3} mais</div>` : "";
-  tip.innerHTML = `<strong>${predio}</strong>${preview}${resto}`;
+  tip.innerHTML = `<strong>${escapeHtml(predio)}</strong>${preview}${resto}`;
   const rect = elemento.getBoundingClientRect();
   tip.style.left = `${rect.left}px`;
   tip.style.top = `${rect.bottom + 6}px`;
@@ -2410,7 +2443,7 @@ function renderTabelaDetalheDia(itensDoDia, aoAtualizar) {
 
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${item.patrimonio || "-"}</td><td>${item.local || "SEDE"}</td><td>${item.setor}</td><td>${item.ambiente}</td><td>${item.equipeResponsavel}</td>`;
+    tr.innerHTML = `<td>${escapeHtml(item.patrimonio || "-")}</td><td>${escapeHtml(item.local || "SEDE")}</td><td>${escapeHtml(item.setor)}</td><td>${escapeHtml(item.ambiente)}</td><td>${escapeHtml(item.equipeResponsavel)}</td>`;
 
     const tdStatus = document.createElement("td");
     const select = document.createElement("select");
@@ -2514,7 +2547,7 @@ function renderVisaoGerencial() {
 
   elPredio.innerHTML = porPredio.map((p) => `
     <div class="vg-card">
-      <p class="vg-titulo">${p.local}</p>
+      <p class="vg-titulo">${escapeHtml(p.local)}</p>
       <p class="vg-pct">${p.pct}%</p>
       <p class="vg-detalhe">${p.concluidas} de ${p.total} concluídos</p>
     </div>`).join("") || `<p class="muted">Nenhum aparelho carregado ainda.</p>`;
@@ -2563,10 +2596,10 @@ function renderVisaoGerencial() {
 
     return `
       <div class="vg-equipe-grupo">
-        <p class="vg-equipe-predio-nome">${local}</p>
+        <p class="vg-equipe-predio-nome">${escapeHtml(local)}</p>
         ${linhas.map((l) => `
           <div class="vg-equipe-linha">
-            <span>${l.equipe}</span>
+            <span>${escapeHtml(l.equipe)}</span>
             <span style="color:var(--texto-suave)">${l.concluidas} de ${l.total} · ${l.pct}%</span>
           </div>`).join("")}
       </div>`;
@@ -2959,8 +2992,8 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
   $("#modalConclusaoCorpo").innerHTML = `
     <p class="muted">Só está perguntando o que ainda não está registrado pra essa máquina. Da próxima vez, isso não é perguntado de novo.</p>
     <div class="grid-form">
-      <label>Informante<input type="text" value="${modalConclusaoEstado.tecnico}" disabled></label>
-      <label>Prédio<input type="text" value="${item.local || "SEDE"}" disabled></label>
+      <label>Informante<input type="text" value="${escapeHtml(modalConclusaoEstado.tecnico)}" disabled></label>
+      <label>Prédio<input type="text" value="${escapeHtml(item.local || "SEDE")}" disabled></label>
     </div>
     ${secaoCond.html}
     ${secaoEvap.html}
@@ -3136,10 +3169,10 @@ function renderHistorico(){
     tr.innerHTML = `
         <td></td>
         <td>${new Date(h.registradoEm).toLocaleString("pt-BR")}</td>
-        <td>${h.patrimonio || "-"}</td>
-        <td>${h.setor}</td>
-        <td>${h.equipe}</td>
-        <td>${h.usuario || "-"}</td>
+        <td>${escapeHtml(h.patrimonio || "-")}</td>
+        <td>${escapeHtml(h.setor)}</td>
+        <td>${escapeHtml(h.equipe)}</td>
+        <td>${escapeHtml(h.usuario || "-")}</td>
         <td>${h.tipo || "Preventiva"}</td>
         ${colDe}
         ${colPara}
@@ -3207,10 +3240,10 @@ function renderOrdens() {
     tr.innerHTML = `
       <td></td>
       <td>${new Date(o.registradoEm).toLocaleString("pt-BR")}</td>
-      <td>${o.patrimonio || "-"}</td>
-      <td>${o.setor || ""}</td>
-      <td>${o.ambiente || ""}</td>
-      <td>${o.equipe || ""}</td>
+      <td>${escapeHtml(o.patrimonio || "-")}</td>
+      <td>${escapeHtml(o.setor || "")}</td>
+      <td>${escapeHtml(o.ambiente || "")}</td>
+      <td>${escapeHtml(o.equipe || "")}</td>
     `;
 
     const chaveSel = `${o.cicloId}::${o.id}`;
@@ -3713,10 +3746,10 @@ function renderEquipamentosCadastro() {
   const tbody = table.querySelector("tbody");
 
   itensComCorretivas.forEach(({ item, totalCorretivas }) => {
-    const dadosTecnicos = [item.marca, item.modelo, item.capacidade].filter(Boolean).join(" • ") || "-";
+    const dadosTecnicos = escapeHtml([item.marca, item.modelo, item.capacidade].filter(Boolean).join(" • ") || "-");
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td></td><td>${item.patrimonio || "-"}</td><td>${item.setor}</td><td>${item.ambiente}</td>
-      <td>${item.local || "SEDE"}</td>
+    tr.innerHTML = `<td></td><td>${escapeHtml(item.patrimonio || "-")}</td><td>${escapeHtml(item.setor)}</td><td>${escapeHtml(item.ambiente)}</td>
+      <td>${escapeHtml(item.local || "SEDE")}</td>
       <td>${item.setorPCM}</td>
       <td>
         ${estaAtrasado(item)
@@ -3856,8 +3889,8 @@ async function abrirDrawerEquipamento(id) {
   const fotosPreventivas = conclusoes.filter((c) => c.fotoUrl);
   const { exatos, aproximados } = chamadosDoEquipamento(item);
   const linhaChamado = (c) =>
-    `<div class="drawer-campo"><span class="rotulo">${c.dataFormatada || "-"}</span>
-     <span class="valor">${c.solucionado || "-"} — ${c.descricaoProblema || c.pecaFaltante || "sem descrição"} (${c.equipe || "-"})</span></div>`;
+    `<div class="drawer-campo"><span class="rotulo">${escapeHtml(c.dataFormatada || "-")}</span>
+     <span class="valor">${escapeHtml(c.solucionado || "-")} — ${escapeHtml(c.descricaoProblema || c.pecaFaltante || "sem descrição")} (${escapeHtml(c.equipe || "-")})</span></div>`;
 
   let infoTecnica = null;
   try {
@@ -3872,7 +3905,7 @@ async function abrirDrawerEquipamento(id) {
       ["Nº", dados.numero], ["Tombo", dados.tombo], ["Tag", dados.tag],
       ["Marca", dados.marca], ["Modelo", dados.modelo],
       ["Capacidade", dados.capacidade], ["Espessura do fio", dados.espessuraFio],
-    ].map(([r, v]) => `<div class="drawer-campo"><span class="rotulo">${rotulo} — ${r}</span><span class="valor">${v || "-"}</span></div>`).join("");
+    ].map(([r, v]) => `<div class="drawer-campo"><span class="rotulo">${rotulo} — ${r}</span><span class="valor">${escapeHtml(v || "-")}</span></div>`).join("");
   };
 
   $("#drawerTitulo").textContent = item.patrimonio ? `Patrimônio ${item.patrimonio}` : item.ambiente;
@@ -3886,7 +3919,7 @@ async function abrirDrawerEquipamento(id) {
           : `<span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>`}</span></div>
       <div class="drawer-campo"><span class="rotulo">${item.statusPreventiva === "Concluída" ? "Próximo ciclo previsto" : "Próxima preventiva"}</span><span class="valor">${formatarDataBR(item.statusPreventiva === "Concluída" ? item.proximaPreventiva : item.dataAgendada)} ${(item.statusPreventiva === "Concluída" ? item.proximaPreventivaDia : item.diaPlanejado) ? "(" + (item.statusPreventiva === "Concluída" ? item.proximaPreventivaDia : item.diaPlanejado) + ")" : ""}</span></div>
       <div class="drawer-campo"><span class="rotulo">Semana planejada</span><span class="valor">${item.semanaPlanejada || "-"}</span></div>
-      <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${item.equipeResponsavel || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Equipe responsável</span><span class="valor">${escapeHtml(item.equipeResponsavel || "-")}</span></div>
       <div class="drawer-campo"><span class="rotulo">Última preventiva concluída</span><span class="valor">${ultimaPreventiva}</span></div>
       <div class="drawer-campo"><span class="rotulo">Total de preventivas feitas</span><span class="valor">${totalPreventivas}</span></div>
     </details>
@@ -3896,7 +3929,7 @@ async function abrirDrawerEquipamento(id) {
       <div class="drawer-campo" style="flex-direction:column; align-items:flex-start; gap:8px;">
         <span class="rotulo">Foto atual do equipamento</span>
         ${item.fotoUrl
-          ? `<img src="${item.fotoUrl}" alt="Foto do equipamento" style="width:100%; border-radius:var(--raio-pequeno); border:1px solid var(--borda);">`
+          ? `<img src="${escapeHtml(item.fotoUrl)}" alt="Foto do equipamento" style="width:100%; border-radius:var(--raio-pequeno); border:1px solid var(--borda);">`
           : '<span class="valor" style="color:var(--texto-suave)">Nenhuma foto cadastrada ainda.</span>'}
       </div>
       ${fotosPreventivas.length ? `
@@ -3904,8 +3937,8 @@ async function abrirDrawerEquipamento(id) {
           <div style="font-size:11px; color:var(--texto-suave); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">Histórico por preventiva</div>
           <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px;">
             ${fotosPreventivas.map((f) => `
-              <a href="${f.fotoUrl}" target="_blank" rel="noopener" title="${new Date(f.registradoEm).toLocaleDateString("pt-BR")}">
-                <img src="${f.fotoUrl}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--raio-pequeno); border:1px solid var(--borda);">
+              <a href="${escapeHtml(f.fotoUrl)}" target="_blank" rel="noopener" title="${new Date(f.registradoEm).toLocaleDateString("pt-BR")}">
+                <img src="${escapeHtml(f.fotoUrl)}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--raio-pequeno); border:1px solid var(--borda);">
                 <div style="font-size:10px; text-align:center; color:var(--texto-suave); margin-top:2px;">${new Date(f.registradoEm).toLocaleDateString("pt-BR")}</div>
               </a>
             `).join("")}
@@ -3916,12 +3949,12 @@ async function abrirDrawerEquipamento(id) {
 
     <details class="drawer-secao">
       <summary>Localização e classificação</summary>
-      <div class="drawer-campo"><span class="rotulo">Prédio</span><span class="valor">${item.local || "SEDE"}</span></div>
-      <div class="drawer-campo"><span class="rotulo">Setor</span><span class="valor">${item.setor || "-"}</span></div>
-      <div class="drawer-campo"><span class="rotulo">Ambiente</span><span class="valor">${item.ambiente || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Prédio</span><span class="valor">${escapeHtml(item.local || "SEDE")}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Setor</span><span class="valor">${escapeHtml(item.setor || "-")}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Ambiente</span><span class="valor">${escapeHtml(item.ambiente || "-")}</span></div>
       <div class="drawer-campo"><span class="rotulo">Setor PCM</span><span class="valor">${item.setorPCM || "-"}</span></div>
       <div class="drawer-campo"><span class="rotulo">Piso</span><span class="valor">${item.pisoPCM === 99 ? "Não identificado" : item.pisoPCM}</span></div>
-      <div class="drawer-campo"><span class="rotulo">Condição (levantamento)</span><span class="valor">${item.statusCondicao || "-"}</span></div>
+      <div class="drawer-campo"><span class="rotulo">Condição (levantamento)</span><span class="valor">${escapeHtml(item.statusCondicao || "-")}</span></div>
       <div class="drawer-campo"><span class="rotulo">Origem do cadastro</span><span class="valor">${item.origem === "manual" ? "Manual" : "Planilha"}</span></div>
     </details>
 
@@ -3937,7 +3970,7 @@ async function abrirDrawerEquipamento(id) {
     <details class="drawer-secao">
       <summary>Dados técnicos</summary>
       ${infoTecnica ? `
-        <div class="drawer-campo"><span class="rotulo">Informante</span><span class="valor">${infoTecnica.informante || "-"}</span></div>
+        <div class="drawer-campo"><span class="rotulo">Informante</span><span class="valor">${escapeHtml(infoTecnica.informante || "-")}</span></div>
         <div class="drawer-campo"><span class="rotulo">Preenchido em</span><span class="valor">${infoTecnica.preenchidoEm ? new Date(infoTecnica.preenchidoEm).toLocaleString("pt-BR") : "-"}</span></div>
         ${linhaInfoUnidade("Condensadora", infoTecnica.condensadora)}
         ${linhaInfoUnidade("Evaporadora", infoTecnica.evaporadora)}
@@ -3946,18 +3979,18 @@ async function abrirDrawerEquipamento(id) {
 
     <details class="drawer-secao drawer-form">
       <summary>Editar cadastro</summary>
-      <label>Patrimônio<input type="text" id="drawerPatrimonio" value="${item.patrimonio || ""}"></label>
-      <label>Setor<input type="text" id="drawerSetor" value="${item.setor || ""}"></label>
-      <label>Ambiente<input type="text" id="drawerAmbiente" value="${item.ambiente || ""}"></label>
+      <label>Patrimônio<input type="text" id="drawerPatrimonio" value="${escapeHtml(item.patrimonio || "")}"></label>
+      <label>Setor<input type="text" id="drawerSetor" value="${escapeHtml(item.setor || "")}"></label>
+      <label>Ambiente<input type="text" id="drawerAmbiente" value="${escapeHtml(item.ambiente || "")}"></label>
       <label>Prédio
         <select id="drawerLocal">
           ${ESTADO.configSite.predios.map((l) =>
-            `<option value="${l}" ${(item.local || ESTADO.configSite.predios[0]) === l ? "selected" : ""}>${l}</option>`).join("")}
+            `<option value="${escapeHtml(l)}" ${(item.local || ESTADO.configSite.predios[0]) === l ? "selected" : ""}>${escapeHtml(l)}</option>`).join("")}
         </select>
       </label>
-      <label>Marca<input type="text" id="drawerMarca" value="${item.marca || ""}" placeholder="Vem da planilha, se tiver"></label>
-      <label>Modelo<input type="text" id="drawerModelo" value="${item.modelo || ""}" placeholder="Vem da planilha, se tiver"></label>
-      <label>Capacidade<input type="text" id="drawerCapacidade" value="${item.capacidade || ""}" placeholder="Vem da planilha, se tiver"></label>
+      <label>Marca<input type="text" id="drawerMarca" value="${escapeHtml(item.marca || "")}" placeholder="Vem da planilha, se tiver"></label>
+      <label>Modelo<input type="text" id="drawerModelo" value="${escapeHtml(item.modelo || "")}" placeholder="Vem da planilha, se tiver"></label>
+      <label>Capacidade<input type="text" id="drawerCapacidade" value="${escapeHtml(item.capacidade || "")}" placeholder="Vem da planilha, se tiver"></label>
       <div class="drawer-acoes">
         <button class="btn primary" id="drawerSalvarCadastro">Salvar cadastro</button>
       </div>
@@ -4205,7 +4238,7 @@ function renderFeriados() {
     const tr = document.createElement("tr");
     const [ai, am, ad] = f.dataInicio.split("-");
     const [bi, bm, bd] = f.dataFim.split("-");
-    tr.innerHTML = `<td>${f.tipo === "feriado" ? "Feriado" : "Férias"}</td><td>${f.label}</td>
+    tr.innerHTML = `<td>${f.tipo === "feriado" ? "Feriado" : "Férias"}</td><td>${escapeHtml(f.label)}</td>
       <td>${ad}/${am}/${ai}</td><td>${bd}/${bm}/${bi}</td>`;
     const tdBtn = document.createElement("td");
     const btnDel = document.createElement("button");
@@ -5135,8 +5168,8 @@ function renderCiclos() {
   }
 
   ESTADO.ciclos.forEach((c) => {
-    const porPredio = c.porPredio 
-      ? Object.entries(c.porPredio).map(([local, qtd]) => `${local}: ${qtd}`).join(" · ")
+    const porPredio = c.porPredio
+      ? Object.entries(c.porPredio).map(([local, qtd]) => `${escapeHtml(local)}: ${qtd}`).join(" · ")
       : "-";
       
     const isAtivo = !c.dataFechamento;
