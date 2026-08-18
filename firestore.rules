@@ -1,85 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function estaLogado() {
-      return request.auth != null;
-    }
-
-    function meuPerfil() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
-    }
-
-    function naoEstouBloqueado() {
-      return estaLogado() && meuPerfil().bloqueado != true;
-    }
-
-    function souAdmin() {
-      return naoEstouBloqueado() && meuPerfil().permissao == 'admin';
-    }
-
-    function souTrabalhador() {
-      return naoEstouBloqueado() && meuPerfil().permissao == 'trabalhador';
-    }
-
-    // Perfil de usuário: qualquer pessoa logada e não bloqueada pode ler
-    // (a lista de usuários já é só mostrada pra admin na tela, mas a leitura
-    // do PRÓPRIO perfil precisa funcionar pra todo mundo, logo no login).
-    match /usuarios/{userId} {
-      allow read: if estaLogado();
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId || souAdmin();
-      allow delete: if false;
-    }
-
-    match /auditoria/{id} {
-      allow read: if souAdmin();
-      allow create: if naoEstouBloqueado();
-      allow update, delete: if false;
-    }
-
-    match /equipes/{id} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
-    }
-
-    match /feriados/{id} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
-    }
-
-    match /config/{id} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
-    }
-
-    // Dados fixos da condensadora (marca, modelo, capacidade etc) —
-    // trabalhador preenche na primeira conclusão de cada máquina.
-    match /infoCondensadoras/{equipamentoId} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin() || souTrabalhador();
-    }
-
-    match /ciclos/{cicloId} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
-
-      // Trabalhador precisa escrever aqui pra marcar "Concluída" no calendário
-      match /equipamentos/{itemId} {
-        allow read: if naoEstouBloqueado();
-        allow write: if souAdmin() || souTrabalhador();
-      }
-
-      match /historico/{id} {
-        allow read: if naoEstouBloqueado();
-        allow create: if souAdmin() || souTrabalhador();
-        allow update, delete: if souAdmin();
-      }
-
-      match /ordens/{id} {
-        allow read: if naoEstouBloqueado();
-        allow write: if souAdmin() || souTrabalhador();
-      }
+    // Permitir leitura e escrita para qualquer pessoa autenticada
+    // (já que o app é só para duas pessoas, sem autenticação formal)
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
