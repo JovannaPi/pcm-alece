@@ -316,6 +316,12 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   color: var(--azul-800);
   font-weight: 600;
 }
+
+/* Atalho de Calendário/Dashboard só existe pro trabalhador na barra
+   inferior do mobile (ver media query) — em qualquer outra situação
+   (desktop, ou outro papel de usuário) fica escondido, já que essas telas
+   já estão acessíveis pelas abas de cima. */
+.sidenav-atalho-trabalhador { display: none; }
 .sidenav-item.active .sidenav-icon { background: var(--dourado); }
 
 .sidenav-icon {
@@ -1256,6 +1262,17 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   .sidenav-icon { margin: 0 auto; width: 16px; height: 4px; border-radius: 2px; } /* Deixei as bolinhas parecendo "tracinhos" de app */
   #btnSair, #btnApagarCronograma { margin-top: 0 !important; }
 
+  /* Trabalhador só enxerga Calendário/Dashboard — sem isso, a barra
+     inferior (o menu "estilo app", o mais fácil de alcançar com o
+     polegar) ficava só com o botão Sair, enquanto as duas telas que ele
+     realmente usa ficavam escondidas na faixa de abas de cima. Troca:
+     os atalhos aparecem embaixo, e a duplicata em cima some. */
+  body.modo-trabalhador .sidenav-atalho-trabalhador { display: flex; }
+  body.modo-trabalhador .tabs .tab[data-view="calendar"],
+  body.modo-trabalhador .tabs .tab[data-view="dashboard"] {
+    display: none;
+  }
+
   /* 4. FORMULÁRIOS E TOOLBARS EM 1 COLUNA */
   .grid-form { grid-template-columns: 1fr; }
   .filtros-equipamentos { display: flex; flex-direction: column; gap: 8px; }
@@ -1281,21 +1298,23 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   .menu-linha-opcoes { right: auto; left: -50px; }
   .toast { width: 90vw; bottom: 80px; }
 
-  /* 7. TABELA DE EQUIPAMENTOS VIRA CARDS (em vez de rolar de lado) — é a
-     tabela que mais aparece pro técnico no campo. As outras tabelas
-     continuam com rolagem horizontal por enquanto (ajuste 6 acima). */
-  #equipamentosTable thead { display: none; }
-  #equipamentosTable, #equipamentosTable tbody { display: block; width: 100%; min-width: 0 !important; }
-  #equipamentosTable tr {
+  /* 7. TABELAS QUE VIRAM CARDS NO MOBILE (em vez de rolar de lado) — hoje
+     usado na tabela de equipamentos e na de detalhe do dia (calendário),
+     que são as que mais aparecem em campo, inclusive pro trabalhador (que
+     só enxerga Calendário/Dashboard). As outras tabelas continuam com
+     rolagem horizontal por enquanto (ajuste 6 acima). */
+  .tabela-cards-mobile thead { display: none; }
+  .tabela-cards-mobile, .tabela-cards-mobile tbody { display: block; width: 100%; min-width: 0 !important; }
+  .tabela-cards-mobile tr {
     display: block;
     position: relative;
     border: 1px solid var(--borda);
     border-radius: var(--raio);
     margin-bottom: 10px;
-    padding: 30px 40px 8px 12px;
+    padding: 10px 12px;
     background: var(--superficie);
   }
-  #equipamentosTable td {
+  .tabela-cards-mobile td {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1305,7 +1324,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
     text-align: right;
     font-size: 13px;
   }
-  #equipamentosTable td[data-label]::before {
+  .tabela-cards-mobile td[data-label]::before {
     content: attr(data-label);
     font-size: 10px;
     font-weight: 700;
@@ -1315,6 +1334,12 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
     text-align: left;
     flex-shrink: 0;
   }
+
+  /* Só a de equipamentos tem coluna de seleção (checkbox) e de ações (⋯)
+     nas pontas — viram "cantos" fixos do card em vez de mais uma linha de
+     rótulo:valor. A de detalhe do dia não tem essas colunas extras, usa
+     só o padrão genérico acima. */
+  #equipamentosTable tr { padding: 30px 40px 8px 12px; }
   #equipamentosTable td:first-child {
     position: absolute;
     top: 8px;
