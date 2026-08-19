@@ -1,18 +1,7 @@
-/* ============================================================
-   PMOC ALECE — Sistema de Manutenção Preventiva
-   Redesign: institucional moderno
-
-   Identidade: as cores aqui não são arbitrárias — foram herdadas
-   do próprio sistema (a paleta usada na Ordem de Serviço impressa
-   e na planilha .xlsx exportada), para que app, PDF e Excel
-   pareçam a mesma marca. O dourado é o único acento de destaque;
-   o resto é deliberadamente contido.
-   ============================================================ */
-
 @import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap");
 
 :root {
-  /* --- Azul institucional (herdado do cabeçalho da OS/Excel) --- */
+  
   --azul-900: #10263D;   /* navy mais profundo — topbar, sidenav ativo */
   --azul-800: #163A5B;   /* == cor do "chamado-id" na OS impressa */
   --azul-700: #1F4E78;   /* == COR_HEADER do Excel — botões primários */
@@ -112,9 +101,8 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   outline-offset: 2px;
 }
 
-/* ------------------------------------------------------------
-   Tela de login
-   ------------------------------------------------------------ */
+/*Tela de Login*/
+
 .auth-overlay {
   position: fixed;
   inset: 0;
@@ -170,9 +158,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 }
 .auth-card input:focus { border-color: var(--azul-700); background: var(--superficie); }
 
-/* ------------------------------------------------------------
-   Topbar
-   ------------------------------------------------------------ */
+/* Topbar */
 .topbar {
   background: var(--azul-900);
   border-bottom: 3px solid var(--dourado);
@@ -188,7 +174,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 85px; /* Aumentado de 64px para 85px */
+  min-height: 85px; 
   gap: var(--sp-5);
 }
 
@@ -249,9 +235,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   border-radius: 2px 2px 0 0;
 }
 
-/* ------------------------------------------------------------
-   Faixa de alerta (atrasados)
-   ------------------------------------------------------------ */
+/* Faixa de alerta (atrasados) */
 .alert-banner {
   background: var(--vermelho-fundo);
   border-bottom: 1px solid #E8A87C;
@@ -277,9 +261,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 }
 .alert-banner-close:hover { opacity: 1; background: rgba(0,0,0,0.06); }
 
-/* ------------------------------------------------------------
-   Layout geral: sidenav + conteúdo
-   ------------------------------------------------------------ */
+/* Layout geral: sidenav + conteúdo */
 .body-layout {
   display: flex;
   width: 100%; 
@@ -298,8 +280,8 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   flex-direction: column;
   gap: 2px;
   position: sticky;
-  top: 85px; /* Mude de 67px para 85px (para bater com a nova altura do header) */
-  height: calc(100vh - 85px); /* Mude também aqui para bater com a nova altura */
+  top: 85px; 
+  height: calc(100vh - 85px); 
   overflow-y: auto;
 }
 
@@ -363,9 +345,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 .view { display: none; flex-direction: column; gap: var(--sp-4); }
 .view.active { display: flex; }
 
-/* ------------------------------------------------------------
-   Cards
-   ------------------------------------------------------------ */
+/* Cards */
 .card {
   background: var(--superficie);
   border: 1px solid var(--borda);
@@ -397,9 +377,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------
-   Botões
-   ------------------------------------------------------------ */
+/* Botões */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -473,9 +451,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 }
 .btn-menu:hover { background: var(--azul-50); border-color: var(--borda); }
 
-/* ------------------------------------------------------------
-   Formulários
-   ------------------------------------------------------------ */
+/* Formulários */
 .grid-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -546,10 +522,10 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
 
 .filtros-equipamentos {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* Divide em 3 colunas iguais */
+  grid-template-columns: repeat(3, 1fr); 
   gap: 8px;
   margin-bottom: var(--sp-3);
-  background: var(--azul-50); /* Um fundo suave para separar do resto */
+  background: var(--azul-50); 
   padding: 8px;
   border-radius: var(--raio-pequeno);
 }
@@ -572,7 +548,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 180px; /* Ficou maior e mais convidativo */
+  min-height: 180px; 
   border: 2px dashed var(--borda-forte);
   border-radius: var(--raio);
   background: var(--superficie);
@@ -636,9 +612,7 @@ select:focus-visible, .tab:focus-visible, [tabindex]:focus-visible {
   text-align: center;
 }
 
-/* ------------------------------------------------------------
-   Tabelas
-   ------------------------------------------------------------ */
+/* Tabelas */
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--borda);
@@ -680,9 +654,7 @@ table tbody tr:hover td { background: var(--azul-50); }
 
 table tbody td:first-child { font-family: var(--fonte-dado); }
 
-/* ------------------------------------------------------------
-   Status (pills / selects) — cores herdadas do Excel exportado
-   ------------------------------------------------------------ */
+/* Status (pills / selects) — cores herdadas do Excel exportado */
 .status-select {
   display: inline-flex;
   align-items: center;
@@ -701,9 +673,7 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 .status-select.concluido { background: var(--verde-fundo); color: var(--verde-texto); }
 .status-select.atrasado { background: var(--azul-900); color: #fff; }
 
-/* ------------------------------------------------------------
-   Filtro por prédio (pills)
-   ------------------------------------------------------------ */
+/* Filtro por prédio (pills) */
 .local-filtro {
   display: flex;
   flex-wrap: wrap;
@@ -726,9 +696,7 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
   color: #fff;
 }
 
-/* ------------------------------------------------------------
-   Calendário
-   ------------------------------------------------------------ */
+/* Calendário */
 .calendar-nav { display: flex; gap: 6px; }
 .calendar-nav .btn { padding: 6px 14px; }
 
@@ -853,9 +821,7 @@ table tbody td:first-child { font-family: var(--fonte-dado); }
 }
 .cal-day-badge.holiday { background: var(--dourado); color: #fff; }
 
-/* ------------------------------------------------------------
-   Dashboard / KPIs
-   ------------------------------------------------------------ */
+/* Dashboard / KPIs */
 .ciclo-resumo {
   background: var(--azul-900);
   color: #fff;
@@ -989,9 +955,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   background: var(--superficie);
 }
 
-/* ------------------------------------------------------------
-   Barra de ação flutuante (seleção em massa)
-   ------------------------------------------------------------ */
+/* Barra de ação flutuante (seleção em massa) */
 .action-bar-flutuante {
   display: none;
   align-items: center;
@@ -1013,9 +977,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 }
 .action-bar-direita .btn.danger-inverted:hover { background: rgba(255,255,255,0.12); }
 
-/* ------------------------------------------------------------
-   Drawer (painel lateral de detalhes)
-   ------------------------------------------------------------ */
+/* Drawer (painel lateral de detalhes) */
 .drawer-overlay {
   position: fixed;
   inset: 0;
@@ -1030,8 +992,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   max-width: 92vw;
   background: var(--superficie);
   box-shadow: -8px 0 24px rgba(16,38,61,0.18);
-  z-index: 111; /* acima do topbar (101) — o proprio cabecalho do drawer
-                   nao pode ficar escondido atras da barra de navegacao */
+  z-index: 111; 
   display: flex;
   flex-direction: column;
   animation: entrar-drawer 0.2s ease;
@@ -1183,9 +1144,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 .menu-linha-excluir { color: var(--vermelho-texto); }
 .menu-linha-excluir:hover { background: var(--vermelho-fundo); }
 
-/* ------------------------------------------------------------
-   Toast
-   ------------------------------------------------------------ */
+/* Toast */
 .toast {
   position: fixed;
   left: 50%;
@@ -1208,9 +1167,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ============================================================
-   RESPONSIVIDADE (MOBILE / CELULAR)
-   ============================================================ */
+/* RESPONSIVIDADE (MOBILE / CELULAR) */
 
 @media (max-width: 960px) {
   .body-layout { flex-direction: column; }
@@ -1467,7 +1424,6 @@ body.modo-trabalhador .status-select {
   transition: all 0.2s ease;
 }
 
-/* A mágica acontece aqui: A linha "acende" quando você clica para digitar */
 .eq-linha:focus-within {
   background: #fff;
   border-color: var(--dourado);
@@ -1514,7 +1470,7 @@ body.modo-trabalhador .status-select {
 }
 
 .toolbar-pesquisa .search-input {
-  flex: 1; /* Faz a barra de busca ocupar o espaço restante */
+  flex: 1; 
   min-width: 250px;
   margin-bottom: 0;
   background: var(--superficie);
