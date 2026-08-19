@@ -382,35 +382,69 @@ function escapeHtml(valor) {
   }[c]));
 }
 
-function chamadosDoEquipamento(item) {
-  const patrimonio = normalizarTexto(item.patrimonio);
-  const localItem = normalizarTexto(item.local);
-  const setorAmbiente = normalizarTexto(`${item.setor} ${item.ambiente}`);
-  const exatos = [];
-  const aproximados = [];
+// Índice de chamados corretivos, reconstruído só quando ESTADO.chamadosCorretivos
+// muda de verdade (Firestore/CSV substitui o array inteiro a cada atualização,
+// então comparar a referência já garante isso — mesmo truque do cache logo
+// abaixo). Sem isso, chamadosDoEquipamento() varria TODOS os chamados pra
+// CADA equipamento renderizado, a cada tecla digitada na busca.
+let _indiceChamados = { ref: null, porTombo: new Map(), porAnexo: new Map() };
 
+function indiceChamados() {
+  if (_indiceChamados.ref === ESTADO.chamadosCorretivos) return _indiceChamados;
+
+  const porTombo = new Map();
+  const porAnexo = new Map();
   ESTADO.chamadosCorretivos.forEach((c) => {
     const tomboTag = normalizarTexto(c.tombo) || normalizarTexto(c.tag);
-    if (patrimonio && tomboTag && tomboTag === patrimonio) {
-      exatos.push(c);
-      return;
+    if (tomboTag) {
+      if (!porTombo.has(tomboTag)) porTombo.set(tomboTag, []);
+      porTombo.get(tomboTag).push(c);
     }
     const anexoChamado = normalizarTexto(c.anexo);
-    if (localItem && anexoChamado && (anexoChamado === localItem || localItem.includes(anexoChamado) || anexoChamado.includes(localItem))) {
-      const poolLocal = normalizarTexto(`${c.gabinete} ${c.sala} ${c.nomeSetor} ${c.salaSetor} ${c.localAdicional}`);
-      // Só compara pelos NÚMEROS de sala/gabinete (ignorando o andar, que é 1
-      // dígito) — palavras genéricas tipo "sala"/"gabinete"/"assessores"
-      // aparecem em quase todo chamado do prédio e geravam falso positivo.
-      const numerosItem = (setorAmbiente.match(/[0-9]+/g) || []).filter((n) => n.length >= 2);
-      const numerosChamado = poolLocal.match(/[0-9]+/g) || [];
-      if (numerosItem.length && numerosItem.some((n) => numerosChamado.includes(n))) {
-        aproximados.push(c);
-      }
+    if (anexoChamado) {
+      if (!porAnexo.has(anexoChamado)) porAnexo.set(anexoChamado, []);
+      porAnexo.get(anexoChamado).push(c);
     }
   });
 
+  _indiceChamados = { ref: ESTADO.chamadosCorretivos, porTombo, porAnexo };
+  return _indiceChamados;
+}
+
+function chamadosDoEquipamento(item) {
+  const { porTombo, porAnexo } = indiceChamados();
+  const patrimonio = normalizarTexto(item.patrimonio);
+  const localItem = normalizarTexto(item.local);
+  const setorAmbiente = normalizarTexto(`${item.setor} ${item.ambiente}`);
+
+  const exatos = (patrimonio && porTombo.get(patrimonio)) || [];
+  const exatosSet = new Set(exatos);
+
+  const aproximados = [];
+  if (localItem) {
+    // Só compara pelos NÚMEROS de sala/gabinete (ignorando o andar, que é 1
+    // dígito) — palavras genéricas tipo "sala"/"gabinete"/"assessores"
+    // aparecem em quase todo chamado do prédio e geravam falso positivo.
+    const numerosItem = (setorAmbiente.match(/[0-9]+/g) || []).filter((n) => n.length >= 2);
+    if (numerosItem.length) {
+      // Varre só os poucos "anexos" distintos que existem (um por prédio),
+      // não todos os chamados — o índice já agrupou isso.
+      for (const [anexoChamado, lista] of porAnexo) {
+        if (anexoChamado !== localItem && !localItem.includes(anexoChamado) && !anexoChamado.includes(localItem)) continue;
+        lista.forEach((c) => {
+          if (exatosSet.has(c)) return; // já contado como exato, não duplica
+          const poolLocal = normalizarTexto(`${c.gabinete} ${c.sala} ${c.nomeSetor} ${c.salaSetor} ${c.localAdicional}`);
+          const numerosChamado = poolLocal.match(/[0-9]+/g) || [];
+          if (numerosItem.some((n) => numerosChamado.includes(n))) {
+            aproximados.push(c);
+          }
+        });
+      }
+    }
+  }
+
   const porData = (a, b) => String(b.data).localeCompare(String(a.data));
-  return { exatos: exatos.sort(porData), aproximados: aproximados.sort(porData) };
+  return { exatos: [...exatos].sort(porData), aproximados: aproximados.sort(porData) };
 }
 
 // Mesma lógica de casamento de chamadosDoEquipamento(), só que ao contrário:
@@ -1432,7 +1466,7 @@ function iniciarSincronizacao() {
     }
     renderCalendar();
     renderDashboard();
-    renderEquipamentosCadastro();
+    renderComProtecaoDeMenu("#equipamentosTable", renderEquipamentosCadastro);
     atualizarBannerAtrasados();
     atualizarAlertaDiasVazios();
     renderCiclos();
@@ -1676,7 +1710,7 @@ function iniciarSincronizacaoUsuarios() {
   const q = query(collection(db, "usuarios"), orderBy("criadoEm", "desc"));
   onSnapshot(q, (snap) => {
     ESTADO.usuarios = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderUsuarios();
+    renderComProtecaoDeMenu("#usuariosTable", renderUsuarios);
   }, (err) => console.error("Erro ao ler usuários:", err));
 }
 
@@ -1816,7 +1850,7 @@ function iniciarSincronizacaoEquipes() {
   const q = query(collection(db, "equipes"), orderBy("predio"), orderBy("ordem"));
   onSnapshot(q, (snap) => {
     ESTADO.equipes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderEquipesPorPredio();
+    renderComProtecaoDeMenu("#equipesPorPredio", renderEquipesPorPredio);
   }, (err) => console.error("Erro ao ler equipes:", err));
 }
 
@@ -2245,12 +2279,24 @@ function lerCapacidadesDaTela() {
   return capacidades;
 }
 
+// Espera a pessoa parar de digitar por 300ms antes de rodar renderFn — sem
+// isso, cada tecla refazia a tabela inteira (inclusive o casamento com
+// chamados corretivos), o que engasgava a digitação com a base grande.
+function debounce(fn, atrasoMs = 300) {
+  let temporizador;
+  return (...args) => {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(() => fn(...args), atrasoMs);
+  };
+}
+
 function ligarBusca(inputId, chaveFiltro, renderFn) {
   const input = $(`#${inputId}`);
   if (!input) return;
+  const renderComDebounce = debounce(renderFn);
   input.addEventListener("input", () => {
     ESTADO.filtros[chaveFiltro] = input.value.trim().toLowerCase();
-    renderFn();
+    renderComDebounce();
   });
 }
 ligarBusca("buscaEquipamentos", "equipamentos", renderEquipamentosCadastro);
@@ -3133,7 +3179,7 @@ function iniciarSincronizacaoOrdens() {
         cicloId: d.ref.parent.parent.id,
         ...d.data()
       }));
-    renderOrdens();
+    renderComProtecaoDeMenu("#ordensTable", renderOrdens);
   }, (err) => {
     console.error(err);
     toast("Erro ao ler ordens de serviço: " + err.message);
@@ -3154,7 +3200,7 @@ function iniciarSincronizacaoHistorico(){
         cicloId: d.ref.parent.parent.id,
         ...d.data()
       }));
-    renderHistorico();
+    renderComProtecaoDeMenu("#historicoTable", renderHistorico);
   }, (err) => {
     console.error(err);
     toast("Erro ao carregar histórico: " + err.message);
@@ -3894,10 +3940,31 @@ document.addEventListener("keydown", (e) => {
 // Fecha qualquer menu "⋯" (details.menu-linha) aberto ao clicar fora dele —
 // antes só fechava clicando de novo nos "⋯", o que confundia.
 document.addEventListener("click", (e) => {
+  let fechouAlgum = false;
   document.querySelectorAll("details.menu-linha[open]").forEach((det) => {
-    if (!det.contains(e.target)) det.open = false;
+    if (!det.contains(e.target)) { det.open = false; fechouAlgum = true; }
   });
+  if (fechouAlgum && _renderesAdiados.size) {
+    const pendentes = [..._renderesAdiados];
+    _renderesAdiados.clear();
+    pendentes.forEach((fn) => fn());
+  }
 });
+
+// Os re-renders automáticos (disparados por onSnapshot, quando QUALQUER
+// pessoa muda algo no sistema) reconstroem a tabela inteira via innerHTML.
+// Se um técnico está com um menu "⋯" aberto naquela tabela no momento em
+// que isso acontece, o menu simplesmente some da tela sem aviso. Em vez de
+// reconstruir na hora, adia até o menu fechar (ver o listener de click acima).
+const _renderesAdiados = new Set();
+function renderComProtecaoDeMenu(containerSeletor, renderFn) {
+  const container = document.querySelector(containerSeletor);
+  if (container && container.querySelector("details.menu-linha[open]")) {
+    _renderesAdiados.add(renderFn);
+    return;
+  }
+  renderFn();
+}
 
 async function abrirDrawerEquipamento(id) {
   await carregarChamadosCorretivos();
