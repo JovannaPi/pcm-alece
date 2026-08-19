@@ -56,7 +56,13 @@
 
 <div class="body-layout">
   <nav class="sidenav">
-    <div class="sidenav-label" style="font-size: 15px; text-align: center; display: block; width: 100%; margin-bottom: 5px;">Gestão</div>
+    <button class="tab sidenav-item sidenav-atalho-trabalhador" data-view="calendar">
+      <span class="sidenav-icon"></span> Calendário
+    </button>
+    <button class="tab sidenav-item sidenav-atalho-trabalhador" data-view="dashboard">
+      <span class="sidenav-icon"></span> Dashboard
+    </button>
+    <div class="sidenav-label" id="sidenavLabelGestao" style="font-size: 15px; text-align: center; display: block; width: 100%; margin-bottom: 5px;">Gestão</div>
     <button class="tab sidenav-item" data-view="ordens">
       <span class="sidenav-icon"></span> Ordens de serviço
     </button>
@@ -170,7 +176,7 @@
           <h2 id="dayDetailTitle">Dia selecionado</h2>
         </div>
         <div class="table-wrap">
-          <table id="dayDetailTable"></table>
+          <table id="dayDetailTable" class="tabela-cards-mobile"></table>
         </div>
       </div>
     </section>
@@ -369,7 +375,7 @@
           </div>
         </div>
         <div class="table-wrap">
-          <table id="equipamentosTable"></table>
+          <table id="equipamentosTable" class="tabela-cards-mobile"></table>
         </div>
       </div>
       <details class="drawer-secao" id="cardChamadosOrfaos" hidden>

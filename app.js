@@ -578,7 +578,11 @@ $all(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     $all(".tab").forEach((b) => b.classList.remove("active"));
     $all(".view").forEach((v) => v.classList.remove("active"));
-    btn.classList.add("active");
+    // Marca TODOS os botões que apontam pra essa mesma view (não só o que
+    // foi clicado) -- necessário porque Calendário/Dashboard agora têm um
+    // atalho duplicado na barra inferior pro trabalhador, e os dois
+    // precisam mostrar o estado "ativo" em sincronia.
+    $all(`.tab[data-view="${btn.dataset.view}"]`).forEach((b) => b.classList.add("active"));
     $(`#view-${btn.dataset.view}`).classList.add("active");
     if (btn.dataset.view) {
       localStorage.setItem("ultimaAbaPMOC", btn.dataset.view);
@@ -2494,9 +2498,10 @@ function renderTabelaDetalheDia(itensDoDia, aoAtualizar) {
 
   itensDoDia.forEach((item) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${escapeHtml(item.patrimonio || "-")}</td><td>${escapeHtml(item.local || "SEDE")}</td><td>${escapeHtml(item.setor)}</td><td>${escapeHtml(item.ambiente)}</td><td>${escapeHtml(item.equipeResponsavel)}</td>`;
+    tr.innerHTML = `<td data-label="Patrimônio">${escapeHtml(item.patrimonio || "-")}</td><td data-label="Prédio">${escapeHtml(item.local || "SEDE")}</td><td data-label="Setor">${escapeHtml(item.setor)}</td><td data-label="Ambiente">${escapeHtml(item.ambiente)}</td><td data-label="Equipe">${escapeHtml(item.equipeResponsavel)}</td>`;
 
     const tdStatus = document.createElement("td");
+    tdStatus.dataset.label = "Status";
     const select = document.createElement("select");
     const atrasado = estaAtrasado(item);
     select.className = "status-select " + (atrasado ? "atrasado" : classeStatus(item.statusPreventiva));
