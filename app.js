@@ -2842,24 +2842,32 @@ async function abrirModalConclusao(item, selectEl, statusAnterior, aoAtualizar) 
 
   $("#modalConclusaoTitulo").textContent = `Concluir preventiva — ${item.patrimonio || item.ambiente}`;
   $("#modalConclusaoCorpo").innerHTML = `
-    <label>Técnico responsável *<input type="text" id="tecnicoConclusao" placeholder="Seu nome"></label>
-
-    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 10px">O que foi feito na máquina</h3>
-    <div id="checklistPreventiva">
-      ${CHECKLIST_PREVENTIVA.map((tarefa, i) => `
-        <label class="checklist-item">
-          <input type="checkbox" id="chkTarefa${i}" value="${tarefa}">
-          ${tarefa}
-        </label>
-      `).join("")}
+    <div class="ilha-secao">
+      <label>Técnico responsável *<input type="text" id="tecnicoConclusao" placeholder="Seu nome"></label>
     </div>
 
-    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 6px">Avaliação do estado da máquina</h3>
-    <div class="estrelas-widget" id="estrelasConclusao" data-valor="0">
-      ${[1, 2, 3, 4, 5].map((n) => `<span class="estrela" data-valor="${n}">★</span>`).join("")}
+    <div class="ilha-secao">
+      <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">O que foi feito na máquina</h3>
+      <div id="checklistPreventiva">
+        ${CHECKLIST_PREVENTIVA.map((tarefa, i) => `
+          <label class="checklist-item">
+            <input type="checkbox" id="chkTarefa${i}" value="${tarefa}">
+            ${tarefa}
+          </label>
+        `).join("")}
+      </div>
     </div>
 
-    <label>Foto da máquina${ESTADO.configSite.fotoObrigatoria ? " *" : " (opcional)"}<input type="file" accept="image/*" capture="environment" id="fotoConclusaoInput"></label>
+    <div class="ilha-secao">
+      <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px">Avaliação do estado da máquina</h3>
+      <div class="estrelas-widget" id="estrelasConclusao" data-valor="0">
+        ${[1, 2, 3, 4, 5].map((n) => `<span class="estrela" data-valor="${n}">★</span>`).join("")}
+      </div>
+    </div>
+
+    <div class="ilha-secao">
+      <label>Foto da máquina${ESTADO.configSite.fotoObrigatoria ? " *" : " (opcional)"}<input type="file" accept="image/*" capture="environment" id="fotoConclusaoInput"></label>
+    </div>
 
     <div style="display:flex;gap:12px;margin-top:24px">
       <button class="btn primary" id="btnModalConclusaoContinuar">Continuar</button>
@@ -2979,27 +2987,29 @@ function renderSecaoUnidade(prefixo, titulo, dadosExistentes, tipoUnidade) {
   if (!campos.length) return { html: "", campos: [] };
 
   const html = `
-    <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 10px">${titulo}</h3>
-    <div class="grid-form">
-      ${campos.map((c) => {
-        const id = `${prefixo}_${c.chave}`;
-        const marcador = c.obrigatorio ? " *" : "";
-        if (c.tipo === "texto") {
-          return "<label>" + c.rotulo + marcador + '<input type="text" id="' + id + '"></label>';
-        }
-        const opcoesExtras = c.tipo === "select"
-          ? '<option value="">Selecione...</option>' + c.opcoes.map((o) => '<option value="' + o + '">' + o + '</option>').join("") + '<option value="Outro">Outro</option>'
-          : '<option value="sem">' + c.labelSem + '</option><option value="outro">Outro</option>';
-        return "" +
-          "<div>" +
-            "<label>" + c.rotulo + marcador +
-              '<select id="' + id + '">' + opcoesExtras + "</select>" +
-            "</label>" +
-            '<div class="campo-outro" id="' + id + 'OutroWrap" hidden>' +
-              '<input type="text" id="' + id + 'Outro" placeholder="Especifique">' +
-            "</div>" +
-          "</div>";
-      }).join("")}
+    <div class="ilha-secao">
+      <h3 style="font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.04em;margin:0 0 10px">${titulo}</h3>
+      <div class="grid-form">
+        ${campos.map((c) => {
+          const id = `${prefixo}_${c.chave}`;
+          const marcador = c.obrigatorio ? " *" : "";
+          if (c.tipo === "texto") {
+            return "<label>" + c.rotulo + marcador + '<input type="text" id="' + id + '"></label>';
+          }
+          const opcoesExtras = c.tipo === "select"
+            ? '<option value="">Selecione...</option>' + c.opcoes.map((o) => '<option value="' + o + '">' + o + '</option>').join("") + '<option value="Outro">Outro</option>'
+            : '<option value="sem">' + c.labelSem + '</option><option value="outro">Outro</option>';
+          return "" +
+            "<div>" +
+              "<label>" + c.rotulo + marcador +
+                '<select id="' + id + '">' + opcoesExtras + "</select>" +
+              "</label>" +
+              '<div class="campo-outro" id="' + id + 'OutroWrap" hidden>' +
+                '<input type="text" id="' + id + 'Outro" placeholder="Especifique">' +
+              "</div>" +
+            "</div>";
+        }).join("")}
+      </div>
     </div>
   `;
 
@@ -3043,20 +3053,22 @@ function renderPassoInfoTecnica(secaoCond, secaoEvap, dadosExistentes) {
   $("#modalConclusaoTitulo").textContent = "Dados técnicos da máquina";
   $("#modalConclusaoCorpo").innerHTML = `
     <p class="muted">Só está perguntando o que ainda não está registrado pra essa máquina. Da próxima vez, isso não é perguntado de novo.</p>
-    <div class="grid-form">
-      <label>Informante<input type="text" value="${escapeHtml(modalConclusaoEstado.tecnico)}" disabled></label>
-      <label>Prédio<input type="text" value="${escapeHtml(item.local || "SEDE")}" disabled></label>
-      ${precisaTipoGas ? `
-      <label>Tipo de gás *
-        <select id="infoTipoGas">
-          <option value="">Selecione...</option>
-          ${GASES_REFRIGERANTES.map((g) => `<option value="${g}">${g}</option>`).join("")}
-          <option value="Outro">Outro</option>
-        </select>
-      </label>
-      <div class="campo-outro" id="infoTipoGasOutroWrap" hidden>
-        <input type="text" id="infoTipoGasOutro" placeholder="Especifique">
-      </div>` : ""}
+    <div class="ilha-secao">
+      <div class="grid-form">
+        <label>Informante<input type="text" value="${escapeHtml(modalConclusaoEstado.tecnico)}" disabled></label>
+        <label>Prédio<input type="text" value="${escapeHtml(item.local || "SEDE")}" disabled></label>
+        ${precisaTipoGas ? `
+        <label>Tipo de gás *
+          <select id="infoTipoGas">
+            <option value="">Selecione...</option>
+            ${GASES_REFRIGERANTES.map((g) => `<option value="${g}">${g}</option>`).join("")}
+            <option value="Outro">Outro</option>
+          </select>
+        </label>
+        <div class="campo-outro" id="infoTipoGasOutroWrap" hidden>
+          <input type="text" id="infoTipoGasOutro" placeholder="Especifique">
+        </div>` : ""}
+      </div>
     </div>
     ${secaoCond.html}
     ${secaoEvap.html}
@@ -3438,6 +3450,14 @@ const btnAdicionarEquipamento = $("#btnAdicionarEquipamento");
 if (btnAdicionarEquipamento) {
   btnAdicionarEquipamento.addEventListener("click", adicionarEquipamentoManual);
 }
+
+// Botão flutuante (mobile): quando a lista de equipamentos já está longa,
+// evita ter que rolar a tela de volta lá pra cima só pra achar o formulário
+// de cadastro -- pula direto pra ele.
+$("#fabAdicionarEquipamento")?.addEventListener("click", () => {
+  $("#eqPatrimonio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  $("#eqPatrimonio")?.focus();
+});
 
 $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
   toast("Buscando dados técnicos...");
@@ -3833,17 +3853,17 @@ function renderEquipamentosCadastro() {
   itensComCorretivas.forEach(({ item, totalCorretivas }) => {
     const dadosTecnicos = escapeHtml([item.marca, item.modelo, item.capacidade, item.tipoGas && `Gás: ${item.tipoGas}`].filter(Boolean).join(" • ") || "-");
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td></td><td>${escapeHtml(item.patrimonio || "-")}</td><td>${escapeHtml(item.setor)}</td><td>${escapeHtml(item.ambiente)}</td>
-      <td>${escapeHtml(item.local || "SEDE")}</td>
-      <td>${item.setorPCM}</td>
-      <td>
+    tr.innerHTML = `<td></td><td data-label="Patrimônio">${escapeHtml(item.patrimonio || "-")}</td><td data-label="Setor">${escapeHtml(item.setor)}</td><td data-label="Ambiente">${escapeHtml(item.ambiente)}</td>
+      <td data-label="Prédio">${escapeHtml(item.local || "SEDE")}</td>
+      <td data-label="Setor PCM">${item.setorPCM}</td>
+      <td data-label="Status">
         ${estaAtrasado(item)
           ? '<span class="status-select atrasado" style="cursor:default">Atrasado</span>'
           : `<span class="status-select ${classeStatus(item.statusPreventiva)}" style="cursor:default">${item.statusPreventiva}</span>`}
       </td>
-      <td>${item.origem === "manual" ? "Manual" : "Planilha"}</td>
-      <td style="font-size:12px">${dadosTecnicos}</td>
-      <td style="text-align:center">${totalCorretivas > 0 ? `<strong>${totalCorretivas}</strong>` : "-"}</td>`;
+      <td data-label="Origem">${item.origem === "manual" ? "Manual" : "Planilha"}</td>
+      <td data-label="Marca/Modelo/Cap." style="font-size:12px">${dadosTecnicos}</td>
+      <td data-label="Corretivas" style="text-align:center">${totalCorretivas > 0 ? `<strong>${totalCorretivas}</strong>` : "-"}</td>`;
 
     const tdCheck = tr.children[0];
     const chk = document.createElement("input");
