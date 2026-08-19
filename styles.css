@@ -1072,6 +1072,19 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
 .drawer-campo .rotulo { color: var(--texto-suave); flex-shrink: 0; }
 .drawer-campo .valor { text-align: right; font-weight: 500; color: var(--texto); font-family: var(--fonte-dado); font-size: 12.5px; }
 
+/* "Ilha" de informação — agrupa um bloco de campos (ex: checklist, foto,
+   dados técnicos) num sub-cartão sutil, pra separar visualmente seções de
+   um formulário longo (modal de conclusão) e reduzir a carga cognitiva de
+   olhar tudo junto sem nenhuma divisão. */
+.ilha-secao {
+  background: var(--azul-50);
+  border-radius: var(--raio);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.ilha-secao h3 { margin-top: 0 !important; }
+.ilha-secao:last-of-type { margin-bottom: 0; }
+
 .checklist-item {
   display: flex;
   align-items: center;
@@ -1195,7 +1208,7 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   /* 2. TOPBAR COMPACTA E ABAS DESLIZANTES */
   .topbar-inner { flex-wrap: wrap; padding: 10px; min-height: auto; gap: 8px; }
   .brand-org { display: none; }
-  .brand img { height: 32px; }
+  .brand img { height: 40px; }
   .brand-name { font-size: 18px; }
   
   .tabs { 
@@ -1265,9 +1278,82 @@ details.ciclos-discreto[open] summary, details.drawer-secao[open] summary {
   .table-wrap { width: 100%; overflow-x: auto; }
   table { min-width: 600px; /* Garante que a tabela role para o lado ao invés de esmagar o conteúdo */ }
   table tbody td, table thead th { padding: 8px; font-size: 12px; }
-  .menu-linha-opcoes { right: auto; left: -50px; } 
-  .toast { width: 90vw; bottom: 80px; } 
+  .menu-linha-opcoes { right: auto; left: -50px; }
+  .toast { width: 90vw; bottom: 80px; }
+
+  /* 7. TABELA DE EQUIPAMENTOS VIRA CARDS (em vez de rolar de lado) — é a
+     tabela que mais aparece pro técnico no campo. As outras tabelas
+     continuam com rolagem horizontal por enquanto (ajuste 6 acima). */
+  #equipamentosTable thead { display: none; }
+  #equipamentosTable, #equipamentosTable tbody { display: block; width: 100%; min-width: 0 !important; }
+  #equipamentosTable tr {
+    display: block;
+    position: relative;
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    margin-bottom: 10px;
+    padding: 30px 40px 8px 12px;
+    background: var(--superficie);
+  }
+  #equipamentosTable td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: none;
+    text-align: right;
+    font-size: 13px;
+  }
+  #equipamentosTable td[data-label]::before {
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--texto-suave);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  #equipamentosTable td:first-child {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 0;
+  }
+  #equipamentosTable td:last-child {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 0;
+  }
+
+  /* 8. BOTÃO FLUTUANTE (FAB) — atalho pra ação primária de uma tela sem
+     precisar rolar de volta pro topo. Hoje só usado no cadastro manual de
+     equipamento (ver #fabAdicionarEquipamento no JS). */
+  .fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 16px;
+    bottom: 78px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--azul-700);
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
+    border: none;
+    box-shadow: 0 4px 14px rgba(16,38,61,0.35);
+    z-index: 998;
+    cursor: pointer;
+  }
+  .fab:active { background: var(--azul-800); }
 }
+
+.fab { display: none; }
 
 .drawer-overlay {
   transition: opacity 0.2s ease;
