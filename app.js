@@ -3493,15 +3493,18 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
 
     // Definindo as colunas
     sheet.columns = [
-      // DADOS GERAIS (1 a 7)
+      // DADOS GERAIS (1 a 10)
       { key: "patrimonio", width: 16 },
       { key: "setor", width: 28 },
       { key: "ambiente", width: 28 },
       { key: "local", width: 14 },
       { key: "tipoGas", width: 12 },
+      { key: "marcaLevantamento", width: 14 },
+      { key: "modeloLevantamento", width: 16 },
+      { key: "capacidadeLevantamento", width: 16 },
       { key: "informante", width: 18 },
       { key: "preenchidoEm", width: 16 },
-      // CONDENSADORA (8 a 14)
+      // CONDENSADORA (11 a 17)
       { key: "condNumero", width: 10 },
       { key: "condTombo", width: 14 },
       { key: "condTag", width: 14 },
@@ -3509,7 +3512,7 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
       { key: "condModelo", width: 16 },
       { key: "condCapacidade", width: 16 },
       { key: "condFio", width: 16 },
-      // EVAPORADORA (15 a 20)
+      // EVAPORADORA (18 a 23)
       { key: "evapTombo", width: 14 },
       { key: "evapTag", width: 14 },
       { key: "evapMarca", width: 14 },
@@ -3519,23 +3522,23 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     ];
 
     // LINHA 1: Super-Cabeçalhos (Mesclados)
-    sheet.mergeCells('A1:G1');
-    sheet.mergeCells('H1:N1');
-    sheet.mergeCells('O1:T1');
+    sheet.mergeCells('A1:J1');
+    sheet.mergeCells('K1:Q1');
+    sheet.mergeCells('R1:W1');
 
     const r1 = sheet.getRow(1);
     r1.height = 25;
     r1.getCell(1).value = "DADOS GERAIS DA MÁQUINA";
-    r1.getCell(8).value = "UNIDADE EXTERNA (CONDENSADORA)";
-    r1.getCell(15).value = "UNIDADE INTERNA (EVAPORADORA)";
+    r1.getCell(11).value = "UNIDADE EXTERNA (CONDENSADORA)";
+    r1.getCell(18).value = "UNIDADE INTERNA (EVAPORADORA)";
 
     // Estilo da Linha 1
     r1.eachCell((cell, colNumber) => {
       cell.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
       cell.alignment = { horizontal: "center", vertical: "middle" };
       let cor = "FF1F4E78"; // Azul padrão para Geral
-      if (colNumber >= 8 && colNumber <= 14) cor = "FF9C6500"; // Amarelo/Dourado escuro
-      if (colNumber >= 15 && colNumber <= 20) cor = "FF375623"; // Verde escuro
+      if (colNumber >= 11 && colNumber <= 17) cor = "FF9C6500"; // Amarelo/Dourado escuro
+      if (colNumber >= 18 && colNumber <= 23) cor = "FF375623"; // Verde escuro
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
     });
 
@@ -3543,7 +3546,9 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
     const r2 = sheet.getRow(2);
     r2.height = 20;
     r2.values = [
-      "Patrimônio", "Setor", "Ambiente", "Prédio", "Tipo de Gás", "Informante", "Preenchido em",
+      "Patrimônio", "Setor", "Ambiente", "Prédio", "Tipo de Gás",
+      "Marca (levantamento)", "Modelo (levantamento)", "Capacidade (levantamento)",
+      "Informante", "Preenchido em",
       "Nº", "Tombo", "Tag", "Marca", "Modelo", "Capacidade", "Fio (mm)",
       "Tombo", "Tag", "Marca", "Modelo", "Capacidade", "Fio (mm)"
     ];
@@ -3559,8 +3564,8 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
         right: { style: "thin", color: { argb: "FFBFBFBF" } }
       };
       let cor = "FFEEF3F8"; // Fundo claro Geral
-      if (colNumber >= 8 && colNumber <= 14) cor = "FFFFE699"; // Fundo claro Condensadora
-      if (colNumber >= 15 && colNumber <= 20) cor = "FFC6E0B4"; // Fundo claro Evaporadora
+      if (colNumber >= 11 && colNumber <= 17) cor = "FFFFE699"; // Fundo claro Condensadora
+      if (colNumber >= 18 && colNumber <= 23) cor = "FFC6E0B4"; // Fundo claro Evaporadora
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
     });
 
@@ -3569,12 +3574,14 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
       const dados = infoPorId.get(id) || null;
       const item = ESTADO.equipamentos.find((e) => e.id === id) || {};
 
-      // Quando a máquina nunca passou pelo formulário (sem "dados"), usa o
-      // que já veio da planilha pros dois lados — não dá pra saber se é da
-      // condensadora ou da evaporadora, então mostra nos dois.
-      const infoPlanilha = { marca: item.marca || "", modelo: item.modelo || "", capacidade: item.capacidade || "" };
-      const cond = dados ? (dados.condensadora || {}) : infoPlanilha;
-      const evap = dados ? (dados.evaporadora || {}) : infoPlanilha;
+      // Marca/Modelo/Capacidade da planilha (levantamento) vão numa coluna
+      // geral própria — NÃO duplica mais isso pra dentro de Condensadora e
+      // Evaporadora quando a máquina ainda não passou pelo formulário de
+      // conclusão, porque dava a falsa impressão de que as duas unidades
+      // tinham sido conferidas separadamente e coincidiam. Sem o
+      // formulário preenchido, os dados por unidade ficam em branco mesmo.
+      const cond = dados ? (dados.condensadora || {}) : {};
+      const evap = dados ? (dados.evaporadora || {}) : {};
 
       const row = sheet.addRow({
         patrimonio: item.patrimonio || evap.tombo || "-", // Usa o tombo da evap se não tiver no item principal
@@ -3582,6 +3589,9 @@ $("#btnBaixarCondensadoras")?.addEventListener("click", async () => {
         ambiente: item.ambiente || "-",
         local: (dados && dados.local) || item.local || "-",
         tipoGas: item.tipoGas || "-",
+        marcaLevantamento: item.marca || "-",
+        modeloLevantamento: item.modelo || "-",
+        capacidadeLevantamento: item.capacidade || "-",
         informante: dados ? (dados.informante || "-") : "Planilha (levantamento)",
         preenchidoEm: dados && dados.preenchidoEm ? new Date(dados.preenchidoEm).toLocaleDateString("pt-BR") : "-",
         condNumero: cond.numero || "-", condTombo: cond.tombo || "-", condTag: cond.tag || "-",
