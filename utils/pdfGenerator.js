@@ -1,3 +1,12 @@
+// Protege contra HTML/script escondido em texto vindo de fora (planilha
+// importada, nome de equipe etc.) antes de colar no HTML do relatório --
+// esse arquivo é separado do app.js e não enxerga o escapeHtml() de lá.
+function escapeHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
 function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
   const hoje = new Date();
   const dataFormatada = hoje.toLocaleDateString('pt-BR');
@@ -234,7 +243,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
     conteudoHTML += `
       <tr>
-        <td class="text-left"><strong>${setor}</strong></td>
+        <td class="text-left"><strong>${escapeHtml(setor)}</strong></td>
         <td class="text-center">${itens.length}</td>
         <td class="text-center">${setorConcluidas}</td>
         <td class="text-center">${setorAndamento}</td>
@@ -261,7 +270,7 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
     conteudoHTML += `
       <p style="font-size: 10px; color: #555; margin-bottom: 15px;">
         <strong>Distribuição do passivo:</strong> ${
-        Object.entries(porEquipe).map(([equipe, qtd]) => `${equipe} (${qtd})`).join(' | ')
+        Object.entries(porEquipe).map(([equipe, qtd]) => `${escapeHtml(equipe)} (${qtd})`).join(' | ')
       }</p>
       <table>
         <thead>
@@ -286,10 +295,10 @@ function gerarRelatorioPDF(equipamentos, cicloInfo, historico) {
 
       conteudoHTML += `
         <tr>
-          <td class="text-left">${eq.patrimonio || 'S/N'}</td>
-          <td class="text-left">${eq.setor}</td>
-          <td class="text-left">${eq.ambiente}</td>
-          <td class="text-left">${eq.equipeResponsavel || '-'}</td>
+          <td class="text-left">${escapeHtml(eq.patrimonio || 'S/N')}</td>
+          <td class="text-left">${escapeHtml(eq.setor)}</td>
+          <td class="text-left">${escapeHtml(eq.ambiente)}</td>
+          <td class="text-left">${escapeHtml(eq.equipeResponsavel || '-')}</td>
           <td class="text-center">${dataFormatadaStr}</td>
           <td class="text-center"><span class="status-badge ${classeStatus}">${eq.statusPreventiva}</span></td>
         </tr>
