@@ -2,84 +2,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function estaLogado() {
-      return request.auth != null;
-    }
-
     function meuPerfil() {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
     }
 
-    function naoEstouBloqueado() {
-      return estaLogado() && meuPerfil().bloqueado != true;
-    }
-
     function souAdmin() {
-      return naoEstouBloqueado() && meuPerfil().permissao == 'admin';
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        meuPerfil().permissao == "admin" &&
+        meuPerfil().bloqueado != true;
     }
 
     function souTrabalhador() {
-      return naoEstouBloqueado() && meuPerfil().permissao == 'trabalhador';
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        meuPerfil().permissao == "trabalhador" &&
+        meuPerfil().bloqueado != true;
     }
 
-    // Perfil de usuário: qualquer pessoa logada e não bloqueada pode ler
-    // (a lista de usuários já é só mostrada pra admin na tela, mas a leitura
-    // do PRÓPRIO perfil precisa funcionar pra todo mundo, logo no login).
-    match /usuarios/{userId} {
-      allow read: if estaLogado();
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId || souAdmin();
-      allow delete: if false;
+    function estouBloqueado() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        meuPerfil().bloqueado == true;
     }
 
-    match /auditoria/{id} {
-      allow read: if souAdmin();
-      allow create: if naoEstouBloqueado();
-      allow update, delete: if false;
+    match /usuarios/{uid} {
+      allow read: if request.auth != null;
+
+      // Auto-cadastro (tela de login pública): só cria como "padrão" e não
+      // bloqueado, não importa o que a pessoa tente mandar no resto do
+      // documento. Quando é o ADMIN criando a conta de outra pessoa (tela
+      // de Usuários, onde ele escolhe a permissão), não trava nada -- ele
+      // já é uma conta de confiança e precisa poder escolher trabalhador/admin.
+      allow create: if request.auth != null && (
+        (request.auth.uid == uid
+          && request.resource.data.permissao == "padrao"
+          && request.resource.data.bloqueado == false)
+        || souAdmin()
+      );
+
+      // Editar o próprio perfil não pode mudar a própria permissão nem se
+      // desbloquear sozinho -- só um admin (de verdade, não bloqueado) pode
+      // mudar esses dois campos, seja no próprio perfil ou no de outra pessoa.
+      allow update: if request.auth != null && (
+        souAdmin() ||
+        (request.auth.uid == uid
+          && request.resource.data.permissao == resource.data.permissao
+          && request.resource.data.bloqueado == resource.data.bloqueado)
+      );
     }
 
-    match /equipes/{id} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
+    match /ciclos/{cicloId}/equipamentos/{itemId} {
+      allow create, update: if souTrabalhador();
     }
-
-    match /feriados/{id} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
+    match /ciclos/{cicloId}/historico/{id} {
+      // Só cria -- editar/apagar um registro já existente fica só com admin
+      // (é um log de manutenção, não devia dar pra reescrever depois).
+      allow create: if souTrabalhador();
     }
-
-    match /config/{id} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin();
+    match /ciclos/{cicloId}/ordens/{id} {
+      allow create, update, delete: if souTrabalhador();
     }
-
-    // Dados fixos da condensadora (marca, modelo, capacidade etc) —
-    // trabalhador preenche na primeira conclusão de cada máquina.
     match /infoCondensadoras/{equipamentoId} {
-      allow read: if naoEstouBloqueado();
-      allow write: if souAdmin() || souTrabalhador();
+      allow create, update: if souTrabalhador();
     }
 
-    match /ciclos/{cicloId} {
-      allow read: if naoEstouBloqueado();
+    match /{document=**} {
+      allow read: if request.auth != null && !estouBloqueado();
       allow write: if souAdmin();
-
-      // Trabalhador precisa escrever aqui pra marcar "Concluída" no calendário
-      match /equipamentos/{itemId} {
-        allow read: if naoEstouBloqueado();
-        allow write: if souAdmin() || souTrabalhador();
-      }
-
-      match /historico/{id} {
-        allow read: if naoEstouBloqueado();
-        allow create: if souAdmin() || souTrabalhador();
-        allow update, delete: if souAdmin();
-      }
-
-      match /ordens/{id} {
-        allow read: if naoEstouBloqueado();
-        allow write: if souAdmin() || souTrabalhador();
-      }
     }
   }
 }
