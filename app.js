@@ -4974,12 +4974,12 @@ async function apagarTodasOrdensTodosOsCiclos() {
 function gerarPDFPMOC(ordem) {
   const eqFull = ESTADO.equipamentos.find(e => e.id === ordem.equipamentoId) || {};
 
-  const idEquip = eqFull.patrimonio || ordem.patrimonio || "Sem Patrimônio";
+  const idEquip = escapeHtml(eqFull.patrimonio || ordem.patrimonio || "Sem Patrimônio");
   const setor = eqFull.setorPCM || ordem.setor || "Não informado";
-  const ambiente = eqFull.ambiente || ordem.ambiente || "-";
+  const ambiente = escapeHtml(eqFull.ambiente || ordem.ambiente || "-");
   const prioridade = eqFull.prioridadeSetor || "-";
-  const equipe = ordem.equipe || eqFull.equipeResponsavel || "-";
-  const tecnico = ordem.tecnico || "";
+  const equipe = escapeHtml(ordem.equipe || eqFull.equipeResponsavel || "-");
+  const tecnico = escapeHtml(ordem.tecnico || "");
   const tipoGas = escapeHtml(eqFull.tipoGas || "Não informado");
   const observacao = escapeHtml(eqFull.observacao || "");
 
